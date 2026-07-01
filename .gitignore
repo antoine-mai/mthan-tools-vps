@@ -1,0 +1,13 @@
+/bin/
+/tmp/
+/client/node_modules/
+/client/build/
+
+*.test
+*.out
+coverage.txt
+coverage.out
+
+.env
+.env.*
+!.env.example
