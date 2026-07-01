@@ -2,8 +2,12 @@
 set -euo pipefail
 
 APP_NAME="vps"
-BINARY_URL="${BINARY_URL:-https://dist.mthan.net/vps/bin/vps}"
+CTL_NAME="mthanctl"
+BIN_URL="${BIN_URL:-https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin}"
+BINARY_URL="${BINARY_URL:-${BIN_URL}/${APP_NAME}}"
+CTL_BINARY_URL="${CTL_BINARY_URL:-${BIN_URL}/${CTL_NAME}}"
 INSTALL_PATH="${INSTALL_PATH:-/usr/local/bin/${APP_NAME}}"
+CTL_INSTALL_PATH="${CTL_INSTALL_PATH:-/usr/local/bin/${CTL_NAME}}"
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}@.service"
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-root}}"
 ROOT_ADDR="${ROOT_ADDR:-:2215}"
@@ -43,23 +47,31 @@ resolve_service_user() {
 }
 
 download_binary() {
+  local name="$1"
+  local url="$2"
+  local install_path="$3"
   local tmp_file
   tmp_file="$(mktemp)"
 
-  echo "Downloading ${APP_NAME} from ${BINARY_URL}"
+  echo "Downloading ${name} from ${url}"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "${BINARY_URL}" -o "${tmp_file}"
+    curl -fsSL "${url}" -o "${tmp_file}"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "${tmp_file}" "${BINARY_URL}"
+    wget -qO "${tmp_file}" "${url}"
   else
     echo "missing required command: curl or wget" >&2
     rm -f "${tmp_file}"
     exit 1
   fi
 
-  install -m 0755 "${tmp_file}" "${INSTALL_PATH}"
+  install -m 0755 "${tmp_file}" "${install_path}"
   rm -f "${tmp_file}"
+}
+
+download_binaries() {
+  download_binary "${APP_NAME}" "${BINARY_URL}" "${INSTALL_PATH}"
+  download_binary "${CTL_NAME}" "${CTL_BINARY_URL}" "${CTL_INSTALL_PATH}"
 }
 
 create_service() {
@@ -139,12 +151,13 @@ main() {
   require_command systemd-escape
 
   resolve_service_user
-  download_binary
+  download_binaries
   create_service
   start_services
 
   echo "${APP_NAME} installed successfully"
   echo "Binary: ${INSTALL_PATH}"
+  echo "Control binary: ${CTL_INSTALL_PATH}"
   echo "Service template: ${SERVICE_FILE}"
   echo "Root service instance: ${ROOT_SERVICE_UNIT}"
   echo "Root service addr: ${ROOT_ADDR}"

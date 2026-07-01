@@ -34,10 +34,10 @@ At startup, `main.go` selects `services/root.go` for root processes and `service
 ## Install service
 
 ```sh
-sudo ./scripts/install.sh
+curl -fsSL https://github.com/antoine-mai/mthan-tools-vps/raw/main/scripts/install.sh | sudo bash
 ```
 
-The installer downloads the binary from `https://dist.mthan.net/vps/bin/vps`, installs it to `/usr/local/bin/vps`, creates `vps@.service`, and starts a root helper service.
+The installer downloads `vps` and `mthanctl` from `https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin`, installs them to `/usr/local/bin/vps` and `/usr/local/bin/mthanctl`, creates `vps@.service`, and starts a root helper service.
 The installer must be run as `root`.
 
 Installed services use two runtimes:
@@ -52,7 +52,7 @@ Both the root panel and user service can receive public traffic. Root-only `/pos
 By default, the public service user is the sudo user. If the installer is run directly as root, the service user defaults to `root`, so only the root helper is started. To choose a public user explicitly:
 
 ```sh
-sudo SERVICE_USER=deploy ./scripts/install.sh
+curl -fsSL https://github.com/antoine-mai/mthan-tools-vps/raw/main/scripts/install.sh | sudo env SERVICE_USER=deploy bash
 ```
 
 ## Build and push dist
@@ -61,7 +61,7 @@ sudo SERVICE_USER=deploy ./scripts/install.sh
 DIST_REPO_DIR=/path/to/dist-repo ./scripts/build.sh
 ```
 
-The build script creates `bin/vps`, builds the React client, copies the binary to `bin/vps` in the dist repo, copies the React build to `dist/client`, commits, and pushes.
+The build script creates `bin/vps` and `bin/mthanctl`, builds the React client, copies both binaries to `bin/` in the dist repo, copies the React build to `dist/client`, commits, and pushes.
 
 For local build only:
 

@@ -2,9 +2,11 @@
 set -euo pipefail
 
 APP_NAME="vps"
+CTL_NAME="mthanctl"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${BIN_DIR:-${ROOT_DIR}/bin}"
 BINARY_PATH="${BIN_DIR}/${APP_NAME}"
+CTL_BINARY_PATH="${BIN_DIR}/${CTL_NAME}"
 
 GOOS="${GOOS:-linux}"
 GOARCH="${GOARCH:-amd64}"
@@ -102,7 +104,7 @@ build_client() {
   cp -R "${ROOT_DIR}/client/build" "${BIN_DIR}/client"
 }
 
-build_binary() {
+build_binaries() {
   require_command go
 
   mkdir -p "${BIN_DIR}"
@@ -121,6 +123,15 @@ build_binary() {
   )
 
   chmod 0755 "${BINARY_PATH}"
+
+  echo "Building ${CTL_NAME} binary for ${GOOS}/${GOARCH}"
+  (
+    cd "${ROOT_DIR}"
+    GOOS="${GOOS}" GOARCH="${GOARCH}" CGO_ENABLED="${CGO_ENABLED}" \
+      go build ${GO_BUILD_FLAGS} -tags ctl -o "${CTL_BINARY_PATH}" .
+  )
+
+  chmod 0755 "${CTL_BINARY_PATH}"
 }
 
 prepare_dist_repo() {
@@ -170,6 +181,7 @@ push_dist() {
 
   mkdir -p "${bin_target_dir}"
   install -m 0755 "${BINARY_PATH}" "${bin_target_dir}/${APP_NAME}"
+  install -m 0755 "${CTL_BINARY_PATH}" "${bin_target_dir}/${CTL_NAME}"
 
   if [[ -d "${BIN_DIR}/client" ]]; then
     rm -rf "${client_target_dir}"
@@ -195,11 +207,12 @@ main() {
   trap cleanup EXIT
 
   parse_args "$@"
-  build_binary
+  build_binaries
   build_client
 
   if [[ "${PUSH_DIST}" != "1" ]]; then
     echo "Build complete: ${BINARY_PATH}"
+    echo "Build complete: ${CTL_BINARY_PATH}"
     return
   fi
 
