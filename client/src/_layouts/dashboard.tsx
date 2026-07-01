@@ -1,8 +1,8 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
-import ColorModeSwitch from "_components/color-mode-switch";
-import { runtime } from "runtime";
 import { UserProvider, useUser } from "../_contexts/user";
+import Sidebar from "./_components/sidebar";
+import Header from "./_components/header";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -17,7 +17,8 @@ function DashboardLayoutContent({
     description,
     title,
 }: DashboardLayoutProps) {
-    const { isLoggedIn, logout } = useUser();
+    const { isLoggedIn } = useUser();
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
 
     useEffect(() => {
         if (!isLoggedIn) {
@@ -25,66 +26,56 @@ function DashboardLayoutContent({
         }
     }, [isLoggedIn]);
 
-    const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
-        e.preventDefault();
-        logout();
-    };
-
     return (
-        <main className="min-h-screen bg-background text-foreground">
-            <header className="border-b border-border">
-                <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6">
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                            MThan VPS
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {runtime.mode}
-                        </p>
+        <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+            {/* Desktop Sidebar */}
+            <Sidebar className="hidden md:flex" />
+
+            {/* Mobile Sidebar Overlay */}
+            {isMobileOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+                    onClick={() => setIsMobileOpen(false)}
+                />
+            )}
+
+            {/* Mobile Sidebar Drawer */}
+            <Sidebar
+                className={`fixed bottom-0 top-0 left-0 z-50 transition-transform duration-300 md:hidden ${
+                    isMobileOpen ? "translate-x-0" : "-translate-x-full"
+                }`}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+                <Header title="MThan VPS Panel" onMenuClick={() => setIsMobileOpen(true)} />
+
+                <main className="flex-1 overflow-y-auto px-6 py-8">
+                    <div className="mx-auto max-w-5xl">
+                        {/* Page Header */}
+                        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="max-w-2xl space-y-2">
+                                <h2 className="text-3xl font-semibold tracking-tight">
+                                    {title}
+                                </h2>
+                                {description ? (
+                                    <p className="text-sm leading-6 text-muted-foreground">
+                                        {description}
+                                    </p>
+                                ) : null}
+                            </div>
+
+                            {actions ? (
+                                <div className="flex flex-wrap gap-3">{actions}</div>
+                            ) : null}
+                        </div>
+
+                        {/* Page Content */}
+                        {children}
                     </div>
-
-                    <div className="flex items-center gap-3">
-                        <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <a
-                                className="transition-colors hover:text-foreground"
-                                href="/"
-                            >
-                                Dashboard
-                            </a>
-                            <a
-                                className="transition-colors hover:text-foreground"
-                                href="/logout"
-                                onClick={handleLogout}
-                            >
-                                Logout
-                            </a>
-                        </nav>
-                        <ColorModeSwitch />
-                    </div>
-                </div>
-            </header>
-
-            <div className="mx-auto max-w-6xl px-6 py-8">
-                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="max-w-2xl space-y-2">
-                        <h1 className="text-3xl font-semibold tracking-tight">
-                            {title}
-                        </h1>
-                        {description ? (
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                {description}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    {actions ? (
-                        <div className="flex flex-wrap gap-3">{actions}</div>
-                    ) : null}
-                </div>
-
-                {children}
+                </main>
             </div>
-        </main>
+        </div>
     );
 }
 
