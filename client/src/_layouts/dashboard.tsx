@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import ColorModeSwitch from "_components/color-mode-switch";
 import { runtime } from "runtime";
+import { UserProvider, useUser } from "../_contexts/user";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -10,12 +11,25 @@ type DashboardLayoutProps = {
     title: string;
 };
 
-export default function DashboardLayout({
+function DashboardLayoutContent({
     actions,
     children,
     description,
     title,
 }: DashboardLayoutProps) {
+    const { isLoggedIn, logout } = useUser();
+
+    useEffect(() => {
+        if (!isLoggedIn) {
+            window.location.href = "/login";
+        }
+    }, [isLoggedIn]);
+
+    const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        logout();
+    };
+
     return (
         <main className="min-h-screen bg-background text-foreground">
             <header className="border-b border-border">
@@ -39,9 +53,10 @@ export default function DashboardLayout({
                             </a>
                             <a
                                 className="transition-colors hover:text-foreground"
-                                href="/login"
+                                href="/logout"
+                                onClick={handleLogout}
                             >
-                                Login
+                                Logout
                             </a>
                         </nav>
                         <ColorModeSwitch />
@@ -70,5 +85,13 @@ export default function DashboardLayout({
                 {children}
             </div>
         </main>
+    );
+}
+
+export default function DashboardLayout(props: DashboardLayoutProps) {
+    return (
+        <UserProvider>
+            <DashboardLayoutContent {...props} />
+        </UserProvider>
     );
 }

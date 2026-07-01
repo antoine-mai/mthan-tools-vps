@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useState, useEffect } from "react";
 import {
     ArrowRight,
     Loader2,
@@ -20,6 +20,13 @@ export default function LoginRoute() {
     const [status, setStatus] = useState<LoginStatus>("idle");
     const [message, setMessage] = useState("");
     const isLoading = status === "loading";
+
+    useEffect(() => {
+        const isLoggedIn = localStorage.getItem("is_logged_in") === "true";
+        if (isLoggedIn) {
+            window.location.href = "/";
+        }
+    }, []);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -45,7 +52,11 @@ export default function LoginRoute() {
             }
 
             setStatus("success");
-            setMessage("Login successful.");
+            setMessage("Login successful. Redirecting...");
+            localStorage.setItem("is_logged_in", "true");
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 800);
         } catch {
             setStatus("error");
             setMessage("Unable to login.");
