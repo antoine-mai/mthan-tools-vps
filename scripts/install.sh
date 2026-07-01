@@ -97,22 +97,80 @@ start_service() {
   systemctl enable --now "${ROOT_SERVICE_UNIT}"
 }
 
+resolve_root_url() {
+  local port
+  port=$(echo "${ROOT_ADDR}" | sed 's/.*://')
+
+  local ip=""
+  # Try to fetch public IP (with timeout to prevent hanging)
+  if command -v curl >/dev/null 2>&1; then
+    ip=$(curl -fsSL --connect-timeout 2 https://ipinfo.io/ip 2>/dev/null || true)
+  elif command -v wget >/dev/null 2>&1; then
+    ip=$(wget -qO- --timeout=2 https://ipinfo.io/ip 2>/dev/null || true)
+  fi
+
+  # Fallback to local IP if public IP failed
+  if [[ -z "${ip}" ]]; then
+    if command -v hostname >/dev/null 2>&1; then
+      ip=$(hostname -I | awk '{print $1}' || true)
+    fi
+  fi
+
+  # Ultimate fallback
+  if [[ -z "${ip}" ]]; then
+    ip="<YOUR_SERVER_IP>"
+  fi
+
+  echo "http://${ip}:${port}"
+}
+
+cleanup_old_install() {
+  echo "Cleaning up old installation..."
+
+  # Stop and disable active/loaded service instances of mthan-vps or old vps service
+  local units
+  units=$(systemctl list-units --type=service --all --no-legend "${SERVICE_NAME}@*" "vps@*" 2>/dev/null | awk '{print $1}') || true
+  for unit in ${units}; do
+    if [[ -n "${unit}" ]]; then
+      echo "Stopping service: ${unit}"
+      systemctl stop "${unit}" || true
+      echo "Disabling service: ${unit}"
+      systemctl disable "${unit}" || true
+    fi
+  done
+
+  # Clean up service files
+  rm -f "/etc/systemd/system/${SERVICE_NAME}@.service"
+  rm -f "/etc/systemd/system/vps@.service"
+
+  # Clean up binaries
+  rm -f "/usr/local/bin/vps"
+  rm -f "${INSTALL_PATH}"
+  rm -f "${CTL_INSTALL_PATH}"
+
+  systemctl daemon-reload || true
+}
+
 main() {
   require_root
   require_command install
   require_command mktemp
   require_command systemctl
 
+  cleanup_old_install
   download_binaries
   create_service
   start_service
+
+  local root_url
+  root_url=$(resolve_root_url)
 
   echo "${SERVICE_NAME} installed successfully"
   echo "Binary: ${INSTALL_PATH}"
   echo "Control binary: ${CTL_INSTALL_PATH}"
   echo "Service template: ${SERVICE_FILE}"
   echo "Root service instance: ${ROOT_SERVICE_UNIT}"
-  echo "Root service addr: ${ROOT_ADDR}"
+  echo "Root service URL: ${root_url}"
 }
 
 main "$@"

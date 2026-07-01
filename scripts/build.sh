@@ -207,8 +207,8 @@ main() {
   trap cleanup EXIT
 
   parse_args "$@"
-  build_binaries
   build_client
+  build_binaries
 
   if [[ "${PUSH_DIST}" != "1" ]]; then
     echo "Build complete: ${BINARY_PATH}"
