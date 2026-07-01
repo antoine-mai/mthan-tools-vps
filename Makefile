@@ -1,4 +1,4 @@
-APP_NAME := vps
+APP_NAME := mthan-vps
 CTL_NAME := mthanctl
 GO_BUILD_FLAGS := -buildvcs=false
 GO_PACKAGES := . ./routes/... ./services/...

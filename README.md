@@ -37,23 +37,16 @@ At startup, `main.go` selects `services/root.go` for root processes and `service
 curl -fsSL https://github.com/antoine-mai/mthan-tools-vps/raw/main/scripts/install.sh | sudo bash
 ```
 
-The installer downloads `vps` and `mthanctl` from `https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin`, installs them to `/usr/local/bin/vps` and `/usr/local/bin/mthanctl`, creates `vps@.service`, and starts a root helper service.
+The installer downloads `vps` and `mthanctl` from `https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin`, installs them to `/usr/local/bin/vps` and `/usr/local/bin/mthanctl`, creates `vps@.service`, and starts the root service.
 The installer must be run as `root`.
 
-Installed services use two runtimes:
+Installed service:
 
 ```text
-vps@root.service    public root panel and root helper, APP_ADDR=:2215
-vps@<user>.service  public user service, APP_ADDR=:2205, POST_BASE_URL=http://127.0.0.1:2215
+vps@root.service  public root panel and root helper, APP_ADDR=:2215
 ```
 
-Both the root panel and user service can receive public traffic. Root-only `/post/*` routes still reject cross-origin public calls: they accept requests from the same host as the root panel or from localhost. Public user requests should hit `/api/*`; API routes call the root helper through `POST_BASE_URL` when they need privileged work.
-
-By default, the public service user is the sudo user. If the installer is run directly as root, the service user defaults to `root`, so only the root helper is started. To choose a public user explicitly:
-
-```sh
-curl -fsSL https://github.com/antoine-mai/mthan-tools-vps/raw/main/scripts/install.sh | sudo env SERVICE_USER=deploy bash
-```
+User activation is managed from the root panel after install. Root-only `/post/*` routes reject cross-origin public calls: they accept requests from the same host as the root panel or from localhost.
 
 ## Build and push dist
 
