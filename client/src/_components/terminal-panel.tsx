@@ -5,6 +5,7 @@ import { Plus, X, Terminal as TerminalIcon } from "lucide-react";
 import "xterm/css/xterm.css";
 
 import type { ColorMode } from "_utils/color-mode";
+import { runtime } from "runtime";
 
 type TerminalPanelProps = {
     onClose: () => void;
@@ -15,7 +16,8 @@ type TerminalTab = {
     title: string;
 };
 
-const initialTab: TerminalTab = { id: 1, title: "bash" };
+const terminalTitle = `${shortOSName(runtime.osName)} - Root`;
+const initialTab: TerminalTab = { id: 1, title: terminalTitle };
 
 export default function TerminalPanel({ onClose }: TerminalPanelProps) {
     const [tabs, setTabs] = useState<TerminalTab[]>([initialTab]);
@@ -27,7 +29,7 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
             const nextId = Math.max(...currentTabs.map((tab) => tab.id), 0) + 1;
             const nextTab = {
                 id: nextId,
-                title: `bash ${nextId}`,
+                title: terminalTitle,
             };
             setActiveTabId(nextTab.id);
             return [...currentTabs, nextTab];
@@ -65,7 +67,7 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
                         return (
                             <div
                                 key={tab.id}
-                                className={`group flex h-9 max-w-44 items-center border-r border-border text-xs transition-colors ${
+                                className={`group flex h-9 w-44 shrink-0 items-center border-r border-border text-xs transition-colors ${
                                     isActive
                                         ? "bg-background text-foreground"
                                         : "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -159,7 +161,6 @@ function TerminalSession({
         wsRef.current = ws;
 
         ws.onopen = () => {
-            term.write("\r\n*** Connected to VPS Terminal (Root) ***\r\n\r\n");
             resizeTerminal();
         };
 
@@ -167,13 +168,8 @@ function TerminalSession({
             term.write(event.data);
         };
 
-        ws.onerror = () => {
-            term.write("\r\n*** Terminal connection error ***\r\n");
-        };
-
-        ws.onclose = () => {
-            term.write("\r\n*** Terminal connection closed ***\r\n");
-        };
+        ws.onerror = () => undefined;
+        ws.onclose = () => undefined;
 
         const dataDisposable = term.onData((data) => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -267,6 +263,27 @@ function useResolvedColorMode(): ColorMode {
 
 function readDocumentColorMode(): ColorMode {
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+function shortOSName(osName: string) {
+    const normalized = osName.trim();
+    if (!normalized) return "Linux";
+
+    const knownNames = [
+        "Ubuntu",
+        "Fedora",
+        "Debian",
+        "AlmaLinux",
+        "Rocky Linux",
+        "CentOS",
+        "Arch Linux",
+        "openSUSE",
+    ];
+    const match = knownNames.find((name) =>
+        normalized.toLowerCase().startsWith(name.toLowerCase()),
+    );
+
+    return match ?? normalized.split(/\s+/)[0] ?? "Linux";
 }
 
 function terminalTheme(colorMode: ColorMode) {

@@ -7,6 +7,7 @@ import {
     Settings,
     LogOut,
     User,
+    Users,
 } from "lucide-react";
 import { useUser } from "../../_contexts/user";
 import { runtime } from "../../runtime";
@@ -23,6 +24,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
 
     const topMenuItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+        { icon: Users, label: "Users", href: "/users" },
         { icon: Server, label: "VPS Control", href: "/vps" },
         { icon: FileText, label: "System Logs", href: "/logs" },
         { icon: Settings, label: "Settings", href: "/settings" },

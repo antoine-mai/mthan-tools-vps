@@ -1,15 +1,18 @@
 package services
 
 import (
+	"bufio"
 	"os"
 	"os/user"
 	"strconv"
+	"strings"
 )
 
 type StartupConfig struct {
 	Addr        string
 	Env         string
 	Mode        string
+	OSName      string
 	PostBaseURL string
 	UID         int
 	Username    string
@@ -45,11 +48,39 @@ func startupConfig(mode string, isRoot bool) StartupConfig {
 		Addr:        getEnv("APP_ADDR", ":8000"),
 		Env:         getEnv("APP_ENV", "development"),
 		Mode:        mode,
+		OSName:      osName(),
 		PostBaseURL: os.Getenv("POST_BASE_URL"),
 		UID:         uid,
 		Username:    username(uid),
 		IsRoot:      isRoot,
 	}
+}
+
+func osName() string {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		return "Linux"
+	}
+	defer file.Close()
+
+	values := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		key, value, ok := strings.Cut(scanner.Text(), "=")
+		if !ok {
+			continue
+		}
+		values[key] = strings.Trim(value, `"`)
+	}
+
+	if name := values["PRETTY_NAME"]; name != "" {
+		return name
+	}
+	if name := values["NAME"]; name != "" {
+		return name
+	}
+
+	return "Linux"
 }
 
 func getEnv(key, fallback string) string {

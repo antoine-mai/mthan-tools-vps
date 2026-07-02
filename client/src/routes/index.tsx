@@ -1,6 +1,7 @@
 import { runtime } from "../runtime";
 import LoginRoute from "./login";
 import RootRoutes from "./root";
+import UsersRoute from "./users";
 import UserRoutes from "./user";
 
 export default function Routes() {
@@ -9,6 +10,10 @@ export default function Routes() {
     }
 
     if (runtime.isRoot) {
+        if (isRoute("/users")) {
+            return <UsersRoute />;
+        }
+
         return <RootRoutes />;
     }
 

@@ -19,6 +19,7 @@ type ClientRuntime struct {
 	Env      string `json:"env"`
 	IsRoot   bool   `json:"isRoot"`
 	Mode     string `json:"mode"`
+	OSName   string `json:"osName"`
 	UID      int    `json:"uid"`
 	Username string `json:"username"`
 }
@@ -63,6 +64,7 @@ func newClientRuntime(startup services.StartupConfig) ClientRuntime {
 		Env:      startup.Env,
 		IsRoot:   startup.IsRoot,
 		Mode:     startup.Mode,
+		OSName:   startup.OSName,
 		UID:      startup.UID,
 		Username: startup.Username,
 	}

@@ -4,6 +4,7 @@ export type ClientRuntime = {
   env: string;
   isRoot: boolean;
   mode: RuntimeMode;
+  osName: string;
   uid: number;
   username: string;
 };
@@ -18,6 +19,7 @@ export const runtime: ClientRuntime = window.__VPS_RUNTIME__ ?? {
   env: "development",
   isRoot: false,
   mode: "user",
+  osName: "Linux",
   uid: -1,
   username: "",
 };
