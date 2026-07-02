@@ -131,7 +131,7 @@ cleanup_old_install() {
   local units
   units=$(systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null \
     | awk '{print $1}' \
-    | grep -E "^(${SERVICE_NAME}|vps)@.*\\.service$") || true
+    | grep -E "^(${SERVICE_NAME}|vps)@.+\\.service$") || true
   for unit in ${units}; do
     if [[ -n "${unit}" ]]; then
       echo "Stopping service: ${unit}"
