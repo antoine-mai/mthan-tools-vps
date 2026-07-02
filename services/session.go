@@ -51,6 +51,19 @@ func (s *SessionService) Create(user AuthenticatedUser, mode string) (Session, e
 	return session, nil
 }
 
+func (s *SessionService) Get(token string) (Session, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, exists := s.sessions[token]
+	if !exists {
+		return Session{}, false
+	}
+	if time.Now().After(session.ExpiresAt) {
+		return Session{}, false
+	}
+	return session, true
+}
+
 func (s *SessionService) MaxAge() int {
 	return int(s.ttl.Seconds())
 }

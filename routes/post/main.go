@@ -29,6 +29,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 			"status": "ok",
 		})
 	})))
+	mux.Handle("/post/terminal", postOnly(deps.Startup, TerminalHandler(deps.Sessions)))
 }
 
 type loginResponse struct {

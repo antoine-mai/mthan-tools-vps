@@ -13,9 +13,11 @@ import { runtime } from "../../runtime";
 
 type SidebarProps = {
     className?: string;
+    isTerminalOpen?: boolean;
+    onTerminalToggle?: () => void;
 };
 
-export default function Sidebar({ className = "" }: SidebarProps) {
+export default function Sidebar({ className = "", isTerminalOpen, onTerminalToggle }: SidebarProps) {
     const { logout } = useUser();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -68,20 +70,26 @@ export default function Sidebar({ className = "" }: SidebarProps) {
                 <div className="flex-1" />
 
                 {/* Terminal Menu Item */}
-                <a
-                    href="/terminal"
-                    className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
-                        window.location.pathname === "/terminal"
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                >
-                    <Terminal className="h-5 w-5 shrink-0" />
-                    {/* Hover Tooltip */}
-                    <span className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-150 rounded bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md border border-border whitespace-nowrap z-50">
-                        Terminal
-                    </span>
-                </a>
+                {runtime.isRoot && (
+                    <a
+                        href="#terminal"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (onTerminalToggle) onTerminalToggle();
+                        }}
+                        className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                            isTerminalOpen
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                    >
+                        <Terminal className="h-5 w-5 shrink-0" />
+                        {/* Hover Tooltip */}
+                        <span className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-150 rounded bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md border border-border whitespace-nowrap z-50">
+                            Terminal
+                        </span>
+                    </a>
+                )}
             </nav>
 
             {/* User Toggle & Dropdown */}
