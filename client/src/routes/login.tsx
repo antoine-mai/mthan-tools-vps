@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import ColorModeSwitch from "_components/color-mode-switch";
-import { Button } from "_components/ui/button";
+import { Button } from "_layouts/_components/ui/button";
 import DefaultLayout from "_layouts";
 import Api from "_utils/api";
 import { runtime } from "runtime";

@@ -1,4 +1,4 @@
-import { Button } from "_components/ui/button";
+import { Button } from "_layouts/_components/ui/button";
 import DashboardLayout from "_layouts/dashboard";
 
 export default function UserRoutes() {

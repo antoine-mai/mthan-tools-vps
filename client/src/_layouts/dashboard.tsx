@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { UserProvider, useUser } from "../_contexts/user";
 import Sidebar from "./_components/sidebar";
 import Header from "./_components/header";
-import TerminalPanel from "./_components/terminal-panel";
+import TerminalPanel from "_components/terminal-panel";
 import { runtime } from "../runtime";
 
 type DashboardLayoutProps = {
@@ -73,7 +73,7 @@ function DashboardLayoutContent({
             <div className="flex flex-1 flex-col overflow-hidden">
                 <Header title="MThan VPS Panel" onMenuClick={() => setIsMobileOpen(true)} />
 
-                <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="relative flex flex-1 flex-col overflow-hidden">
                     <main className="flex-1 overflow-y-auto px-6 py-8">
                         <div className="mx-auto max-w-5xl">
                             {/* Page Header */}
@@ -100,7 +100,9 @@ function DashboardLayoutContent({
                     </main>
 
                     {isTerminalOpen && runtime.isRoot && (
-                        <TerminalPanel onClose={() => setIsTerminalOpen(false)} />
+                        <div className="absolute inset-x-0 bottom-0 z-30">
+                            <TerminalPanel onClose={() => setIsTerminalOpen(false)} />
+                        </div>
                     )}
                 </div>
             </div>
