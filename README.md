@@ -28,7 +28,7 @@ The installer must be run as `root`.
 Installed service:
 
 ```text
-mthan-vps@root.service  public root panel and root helper, APP_ADDR=:2215
+mthan-vps@root.service  public root panel and root helper, APP_ADDR=:2205
 ```
 
 User activation is managed from the root panel after install. Root-only `/post/*` routes reject cross-origin public calls: they accept requests from the same host as the root panel or from localhost.

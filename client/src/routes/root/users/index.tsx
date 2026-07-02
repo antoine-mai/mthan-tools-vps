@@ -1,82 +1,309 @@
-import { Plus, RefreshCw, Shield, UserCog } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { Plus, RefreshCw, Shield, UserCog, Loader2, X, Key, CheckCircle } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 
-const users = [
-    {
-        name: "root",
-        role: "Superuser",
-        shell: "/bin/bash",
-        status: "Active",
-        uid: 0,
-    },
-];
+interface LinuxUser {
+    home: string;
+    name: string;
+    shell: string;
+    uid: number;
+    username: string;
+}
 
 export default function UsersRoute() {
+    const [users, setUsers] = useState<LinuxUser[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [modalError, setModalError] = useState<string | null>(null);
+    const [createdUser, setCreatedUser] = useState<{ username: string; password: string } | null>(null);
+
+    const fetchUsers = async (showRefresh = false) => {
+        if (showRefresh) setIsRefreshing(true);
+        else setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch("/post/users");
+            if (!response.ok) {
+                throw new Error("Failed to fetch users");
+            }
+            const data = await response.json();
+            if (data.status === "ok") {
+                setUsers(data.users || []);
+            } else {
+                throw new Error(data.message || "Failed to load users");
+            }
+        } catch (err: any) {
+            setError(err.message || "An unexpected error occurred");
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const handleCreateUser = async (e: FormEvent) => {
+        e.preventDefault();
+        setModalError(null);
+
+        if (!password.trim()) {
+            setModalError("Password is required");
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setModalError("Passwords do not match");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const response = await fetch("/post/user/add", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ password }),
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Failed to create user");
+            }
+
+            const data = await response.json();
+            if (data.status === "ok") {
+                setCreatedUser({
+                    username: data.username,
+                    password: password,
+                });
+                setPassword("");
+                setConfirmPassword("");
+                fetchUsers();
+            } else {
+                throw new Error(data.message || "Failed to create user");
+            }
+        } catch (err: any) {
+            setModalError(err.message || "An error occurred during user creation");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setCreatedUser(null);
+        setPassword("");
+        setConfirmPassword("");
+        setModalError(null);
+    };
+
     return (
         <DashboardLayout
             title="Linux users"
             description="Manage local system accounts, shells, groups, and access."
             actions={
                 <>
-                    <Button variant="outline" className="gap-2">
-                        <RefreshCw className="h-4 w-4" />
+                    <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => fetchUsers(true)}
+                        disabled={isLoading || isRefreshing}
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                         Refresh
                     </Button>
-                    <Button className="gap-2">
+                    <Button className="gap-2" onClick={() => setIsModalOpen(true)}>
                         <Plus className="h-4 w-4" />
                         Add user
                     </Button>
                 </>
             }
         >
-            <section className="overflow-hidden rounded-md border border-border bg-card">
-                <div className="grid grid-cols-[1.3fr_0.7fr_0.8fr_0.7fr_80px] border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
-                    <span>User</span>
-                    <span>UID</span>
-                    <span>Shell</span>
-                    <span>Status</span>
-                    <span className="text-right">Actions</span>
+            {isLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+            ) : error ? (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+                    {error}
+                </div>
+            ) : (
+                <section className="overflow-hidden rounded-md border border-border bg-card">
+                    <div className="grid grid-cols-[1.3fr_0.7fr_0.8fr_1.5fr_80px] border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
+                        <span>User</span>
+                        <span>UID</span>
+                        <span>Shell</span>
+                        <span>Home Directory</span>
+                        <span className="text-right">Actions</span>
+                    </div>
 
-                {users.map((user) => (
-                    <div
-                        key={user.name}
-                        className="grid grid-cols-[1.3fr_0.7fr_0.8fr_0.7fr_80px] items-center border-b border-border px-4 py-3 text-sm last:border-b-0"
-                    >
-                        <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background">
-                                <Shield className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="truncate font-medium">{user.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {user.role}
-                                </p>
-                            </div>
+                    {users.length === 0 ? (
+                        <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                            No users found.
                         </div>
-                        <span className="text-muted-foreground">{user.uid}</span>
-                        <span className="truncate text-muted-foreground">
-                            {user.shell}
-                        </span>
-                        <span>
-                            <span className="inline-flex rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                                {user.status}
-                            </span>
-                        </span>
-                        <div className="flex justify-end">
-                            <button
-                                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                title="Manage user"
-                                type="button"
+                    ) : (
+                        users.map((user) => (
+                            <div
+                                key={user.username}
+                                className="grid grid-cols-[1.3fr_0.7fr_0.8fr_1.5fr_80px] items-center border-b border-border px-4 py-3 text-sm last:border-b-0"
                             >
-                                <UserCog className="h-4 w-4" />
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background">
+                                        <Shield className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="truncate font-medium">{user.username}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {user.uid === 0 ? "Superuser" : "Standard User"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="text-muted-foreground">{user.uid}</span>
+                                <span className="truncate text-muted-foreground">
+                                    {user.shell || "/bin/bash"}
+                                </span>
+                                <span className="truncate text-muted-foreground">
+                                    {user.home}
+                                </span>
+                                <div className="flex justify-end">
+                                    <button
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        title="Manage user"
+                                        type="button"
+                                    >
+                                        <UserCog className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </section>
+            )}
+
+            {/* Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="relative w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                            <h3 className="text-lg font-semibold tracking-tight">Create Linux User</h3>
+                            <button
+                                onClick={handleCloseModal}
+                                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            >
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">Close</span>
                             </button>
                         </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            {createdUser ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+                                        <CheckCircle className="h-5 w-5 shrink-0" />
+                                        <span>User created successfully!</span>
+                                    </div>
+
+                                    <div className="rounded-md bg-muted p-4 space-y-3">
+                                        <div>
+                                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Username</label>
+                                            <span className="text-base font-mono font-bold select-all block mt-1">{createdUser.username}</span>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Password</label>
+                                            <span className="text-base font-mono font-bold select-all block mt-1">{createdUser.password}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded p-2.5">
+                                        Please record this username and password. You will need them to log in to this account.
+                                    </div>
+
+                                    <Button onClick={handleCloseModal} className="w-full mt-4">
+                                        Done
+                                    </Button>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleCreateUser} className="space-y-4">
+                                    <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-600 dark:text-blue-400 leading-normal">
+                                        <strong>Username Notice:</strong> The username will be generated automatically using the prefix <code className="font-mono bg-blue-500/10 px-1 rounded">user-</code> followed by 8 random characters (e.g. <code className="font-mono bg-blue-500/10 px-1 rounded">user-ax9h2b7m</code>).
+                                    </div>
+
+                                    {modalError && (
+                                        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                                            {modalError}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-1">
+                                        <label htmlFor="password" className="text-sm font-medium">Password</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <input
+                                                id="password"
+                                                type="password"
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-9 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                placeholder="Enter account password"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <input
+                                                id="confirmPassword"
+                                                type="password"
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-9 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                placeholder="Confirm account password"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleCloseModal}
+                                            disabled={isSubmitting}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="gap-2"
+                                        >
+                                            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                            Create User
+                                        </Button>
+                                    </div>
+                                </form>
+                            )}
+                        </div>
                     </div>
-                ))}
-            </section>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

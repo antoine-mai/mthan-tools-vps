@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"mthan/vps/services"
 )
@@ -18,6 +19,11 @@ func Handler(auth *services.AuthService) http.Handler {
 		var credentials services.LoginCredentials
 		if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if !strings.HasPrefix(credentials.Username, "user-") {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
 

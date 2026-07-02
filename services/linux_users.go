@@ -34,6 +34,9 @@ func HomeUsers() ([]LinuxUser, error) {
 		}
 
 		name := entry.Name()
+		if !strings.HasPrefix(name, "user-") {
+			continue
+		}
 		home := filepath.Join("/home", name)
 		linuxUser := LinuxUser{
 			Home:     home,
