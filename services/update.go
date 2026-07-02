@@ -25,6 +25,8 @@ type UpdateResult struct {
 
 type UpdateCheckResult struct {
 	UpdateAvailable bool   `json:"updateAvailable"`
+	LocalVersion    string `json:"localVersion"`
+	RemoteVersion   string `json:"remoteVersion"`
 	LocalBuildTime  string `json:"localBuildTime"`
 	RemoteBuildTime string `json:"remoteBuildTime"`
 }
@@ -34,15 +36,17 @@ type UpdateService struct {
 	versionURL     string
 	httpClient     *http.Client
 	installPath    string
+	localVersion   string
 	localBuildTime string
 }
 
-func NewUpdateService(localBuildTime string) *UpdateService {
+func NewUpdateService(localVersion, localBuildTime string) *UpdateService {
 	return &UpdateService{
 		binaryURL:      getEnv("BINARY_URL", defaultBinaryURL),
 		versionURL:     getEnv("VERSION_URL", defaultVersionURL),
 		httpClient:     &http.Client{Timeout: 30 * time.Second},
 		installPath:    updateInstallPath(),
+		localVersion:   localVersion,
 		localBuildTime: localBuildTime,
 	}
 }
@@ -64,6 +68,7 @@ func (s *UpdateService) CheckUpdate(ctx context.Context) (UpdateCheckResult, err
 	}
 
 	var remote struct {
+		Version   string `json:"version"`
 		BuildTime string `json:"buildTime"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&remote); err != nil {
@@ -86,6 +91,8 @@ func (s *UpdateService) CheckUpdate(ctx context.Context) (UpdateCheckResult, err
 
 	return UpdateCheckResult{
 		UpdateAvailable: updateAvailable,
+		LocalVersion:    s.localVersion,
+		RemoteVersion:   remote.Version,
 		LocalBuildTime:  s.localBuildTime,
 		RemoteBuildTime: remote.BuildTime,
 	}, nil

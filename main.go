@@ -37,15 +37,18 @@ func main() {
 	sessions := services.NewSessionService()
 
 	var buildTime string
+	var version string
 	if data, err := clientFS.ReadFile("client/build/version.json"); err == nil {
 		var v struct {
+			Version   string `json:"version"`
 			BuildTime string `json:"buildTime"`
 		}
 		if err := json.Unmarshal(data, &v); err == nil {
+			version = v.Version
 			buildTime = v.BuildTime
 		}
 	}
-	updater := services.NewUpdateService(buildTime)
+	updater := services.NewUpdateService(version, buildTime)
 
 	routes.Register(mux, routes.Dependencies{
 		Auth:     auth,

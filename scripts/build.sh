@@ -210,12 +210,14 @@ main() {
 
   # Generate version.json with UTC build time
   local build_time
+  local version
   build_time="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  version="$(date -u +'%Y%m%d%H%M%S')"
   mkdir -p "${BIN_DIR}"
-  echo "{\"buildTime\":\"${build_time}\"}" > "${BIN_DIR}/version.json"
-  echo "{\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/public/version.json"
+  echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${BIN_DIR}/version.json"
+  echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/public/version.json"
   if [[ -d "${ROOT_DIR}/client/build" ]]; then
-    echo "{\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/build/version.json"
+    echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/build/version.json"
   fi
 
   build_client

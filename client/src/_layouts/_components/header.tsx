@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import ColorModeSwitch from "_components/color-mode-switch";
-import { User, Menu, RefreshCw } from "lucide-react";
+import { AlertTriangle, User, Menu, RefreshCw, X } from "lucide-react";
 import { useApp } from "../../_contexts/app";
 
 type HeaderProps = {
@@ -8,61 +8,81 @@ type HeaderProps = {
     onMenuClick?: () => void;
 };
 
+type UpdateInfo = {
+    updateAvailable: boolean;
+    localVersion: string;
+    remoteVersion: string;
+    localBuildTime: string;
+    remoteBuildTime: string;
+};
+
 export default function Header({ title, onMenuClick }: HeaderProps) {
     const { mode, isRoot } = useApp();
     const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [checking, setChecking] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [updateModalOpen, setUpdateModalOpen] = useState(false);
+    const [updateError, setUpdateError] = useState("");
+    const [updateSuccess, setUpdateSuccess] = useState(false);
 
-    const checkUpdate = async () => {
-        if (!isRoot) return;
+    const checkUpdate = useCallback(async () => {
+        if (!isRoot) return null;
         setChecking(true);
         try {
             const response = await fetch("/post/update");
             if (response.ok) {
                 const data = await response.json();
                 setUpdateAvailable(data.updateAvailable);
+                setUpdateInfo(data);
+                return data as UpdateInfo;
             }
         } catch (err) {
             console.error("Failed to check for updates", err);
         } finally {
             setChecking(false);
         }
-    };
+
+        return null;
+    }, [isRoot]);
 
     useEffect(() => {
         if (isRoot) {
             checkUpdate();
-            // Poll for updates every 3 minutes
             const interval = setInterval(checkUpdate, 180000);
             return () => clearInterval(interval);
         }
-    }, [isRoot]);
+    }, [checkUpdate, isRoot]);
 
     const handleUpdate = async () => {
+        setUpdateError("");
+        setUpdateSuccess(false);
+
         if (!updateAvailable) {
             await checkUpdate();
             return;
         }
 
-        if (!window.confirm("A new update is available. Do you want to update and restart the server now?")) {
-            return;
-        }
+        setUpdateModalOpen(true);
+    };
 
+    const confirmUpdate = async () => {
         setUpdating(true);
+        setUpdateError("");
+        setUpdateSuccess(false);
         try {
             const response = await fetch("/post/update", { method: "POST" });
             if (response.ok) {
-                window.alert("Update successful! The server is restarting. Please wait 3 seconds and reload the page.");
+                setUpdateSuccess(true);
                 setTimeout(() => {
                     window.location.reload();
                 }, 3000);
             } else {
                 const msg = await response.text();
-                window.alert(`Update failed: ${msg}`);
+                setUpdateError(msg.trim() || "Update failed");
             }
         } catch (err: any) {
-            window.alert(`Update failed: ${err.message}`);
+            setUpdateError(err.message || "Update failed");
         } finally {
             setUpdating(false);
         }
@@ -114,6 +134,171 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                 </div>
                 <ColorModeSwitch />
             </div>
+
+            {updateModalOpen && (
+                <UpdateModal
+                    checking={checking}
+                    error={updateError}
+                    info={updateInfo}
+                    success={updateSuccess}
+                    updating={updating}
+                    onCheck={checkUpdate}
+                    onClose={() => {
+                        if (!updating) {
+                            setUpdateModalOpen(false);
+                        }
+                    }}
+                    onConfirm={confirmUpdate}
+                />
+            )}
         </header>
     );
+}
+
+function UpdateModal({
+    checking,
+    error,
+    info,
+    success,
+    updating,
+    onCheck,
+    onClose,
+    onConfirm,
+}: {
+    checking: boolean;
+    error: string;
+    info: UpdateInfo | null;
+    success: boolean;
+    updating: boolean;
+    onCheck: () => Promise<UpdateInfo | null>;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    const localVersion = displayVersion(info?.localVersion, info?.localBuildTime);
+    const remoteVersion = displayVersion(info?.remoteVersion, info?.remoteBuildTime);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-md border border-border bg-card text-card-foreground shadow-lg">
+                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <RefreshCw className="h-4 w-4" />
+                        </span>
+                        <div>
+                            <h2 className="text-sm font-semibold">Update server</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Review the build before restarting the service.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        disabled={updating}
+                        onClick={onClose}
+                        title="Close"
+                        type="button"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div className="space-y-4 px-5 py-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <VersionBlock
+                            buildTime={info?.localBuildTime}
+                            label="Current"
+                            version={localVersion}
+                        />
+                        <VersionBlock
+                            buildTime={info?.remoteBuildTime}
+                            label="Available"
+                            version={remoteVersion}
+                        />
+                    </div>
+
+                    <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        The server will download the new binary, replace the current executable, and restart.
+                    </div>
+
+                    {error && (
+                        <div className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                            Update installed. The server is restarting; the page will reload shortly.
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+                    <button
+                        className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                        disabled={checking || updating}
+                        onClick={onCheck}
+                        type="button"
+                    >
+                        {checking ? "Checking..." : "Refresh"}
+                    </button>
+                    <button
+                        className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                        disabled={updating}
+                        onClick={onClose}
+                        type="button"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        className="h-9 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        disabled={checking || updating || !info?.updateAvailable}
+                        onClick={onConfirm}
+                        type="button"
+                    >
+                        {updating ? "Updating..." : "Update and restart"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function VersionBlock({
+    buildTime,
+    label,
+    version,
+}: {
+    buildTime?: string;
+    label: string;
+    version: string;
+}) {
+    return (
+        <div className="rounded-md border border-border bg-background p-3">
+            <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                {label}
+            </p>
+            <p className="mt-2 truncate text-sm font-semibold">{version}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+                {formatBuildTime(buildTime)}
+            </p>
+        </div>
+    );
+}
+
+function displayVersion(version?: string, buildTime?: string) {
+    return version || buildTime || "Unknown version";
+}
+
+function formatBuildTime(buildTime?: string) {
+    if (!buildTime) return "Build time unknown";
+
+    const date = new Date(buildTime);
+    if (Number.isNaN(date.getTime())) {
+        return buildTime;
+    }
+
+    return date.toLocaleString();
 }

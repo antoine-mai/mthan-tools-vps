@@ -14,6 +14,6 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 		Auth:     services.NewAuthService(),
 		Sessions: services.NewSessionService(),
 		Startup:  services.StartupConfig{IsRoot: true},
-		Update:   services.NewUpdateService(""),
+		Update:   services.NewUpdateService("", ""),
 	})
 }
