@@ -35,6 +35,19 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		writeJSON(w, http.StatusOK, deps.Health.Status())
 	})))
 
+	mux.Handle("GET /api/session", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := requestSession(r, deps.Sessions)
+		if !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"session": session,
+			"status":  "ok",
+		})
+	})))
+
 	mux.Handle("POST /api/login", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var credentials services.LoginCredentials
 		if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
@@ -65,6 +78,15 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("GET /healthz", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, deps.Health.Status())
 	})))
+}
+
+func requestSession(r *http.Request, sessions *services.SessionService) (services.Session, bool) {
+	cookie, err := r.Cookie(services.SessionCookieName)
+	if err != nil {
+		return services.Session{}, false
+	}
+
+	return sessions.Get(cookie.Value)
 }
 
 var (

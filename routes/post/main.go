@@ -23,6 +23,18 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("OPTIONS /post/", postOnly(deps.Startup, http.HandlerFunc(noContent)))
 	registerLogin(mux, deps)
 	mux.Handle("POST /post/user/login", postOnly(deps.Startup, userlogin.Handler(deps.Auth)))
+	mux.Handle("GET /post/session", postOnly(deps.Startup, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := requestSession(r, deps.Sessions)
+		if !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"session": session,
+			"status":  "ok",
+		})
+	})))
 	registerUpdate(mux, deps)
 	mux.Handle("POST /post/ping", postOnly(deps.Startup, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -30,6 +42,15 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		})
 	})))
 	mux.Handle("GET /post/terminal", postOnly(deps.Startup, TerminalHandler(deps.Sessions)))
+}
+
+func requestSession(r *http.Request, sessions *services.SessionService) (services.Session, bool) {
+	cookie, err := r.Cookie(services.SessionCookieName)
+	if err != nil {
+		return services.Session{}, false
+	}
+
+	return sessions.Get(cookie.Value)
 }
 
 type loginResponse struct {

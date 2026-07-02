@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from "react";
+
+import Api from "_utils/api";
 
 type UserContextType = {
     isLoggedIn: boolean;
@@ -24,14 +26,37 @@ export function UserProvider({ children }: { children: ReactNode }) {
         window.location.href = "/login";
     };
 
-    // Placeholder for API-based session verification if needed in the future
-    const checkSession = async (): Promise<boolean> => {
+    const checkSession = useCallback(async (): Promise<boolean> => {
         const localStatus = localStorage.getItem("is_logged_in") === "true";
-        if (!localStatus && isLoggedIn) {
+        if (!localStatus) {
+            if (isLoggedIn) {
+                setIsLoggedIn(false);
+            }
+            return false;
+        }
+
+        try {
+            const response = await fetch(Api.current.session);
+            if (response.ok) {
+                if (!isLoggedIn) {
+                    setIsLoggedIn(true);
+                }
+                return true;
+            }
+        } catch {
+            // Treat network/session checks that cannot complete as logged out.
+        }
+
+        if (isLoggedIn) {
             setIsLoggedIn(false);
         }
-        return localStatus;
-    };
+        localStorage.removeItem("is_logged_in");
+        return false;
+    }, [isLoggedIn]);
+
+    useEffect(() => {
+        checkSession();
+    }, [checkSession]);
 
     return (
         <UserContext.Provider value={{ isLoggedIn, setIsLoggedIn, logout, checkSession }}>
