@@ -138,7 +138,11 @@ func (s *UpdateService) SelfUpdate(ctx context.Context) (UpdateResult, error) {
 		return UpdateResult{}, err
 	}
 
-	if err := os.Rename(tmpPath, s.installPath); err != nil {
+	if err := validateLinuxExecutable(tmpPath); err != nil {
+		return UpdateResult{}, err
+	}
+
+	if err := replaceFile(tmpPath, s.installPath); err != nil {
 		return UpdateResult{}, err
 	}
 	removeTmp = false
@@ -162,4 +166,52 @@ func updateInstallPath() string {
 	}
 
 	return "/usr/local/bin/mthan-vps"
+}
+
+func replaceFile(srcPath, dstPath string) error {
+	backupPath := dstPath + ".old"
+	_ = os.Remove(backupPath)
+
+	hadExisting := true
+	if err := os.Rename(dstPath, backupPath); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		hadExisting = false
+	}
+
+	if err := os.Rename(srcPath, dstPath); err != nil {
+		if hadExisting {
+			_ = os.Rename(backupPath, dstPath)
+		}
+		return err
+	}
+
+	return nil
+}
+
+func validateLinuxExecutable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Size() < 4 {
+		return errors.New("downloaded binary is empty")
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var magic [4]byte
+	if _, err := io.ReadFull(file, magic[:]); err != nil {
+		return err
+	}
+	if magic != [4]byte{0x7f, 'E', 'L', 'F'} {
+		return errors.New("downloaded file is not a Linux executable")
+	}
+
+	return nil
 }

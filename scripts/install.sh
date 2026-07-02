@@ -129,7 +129,9 @@ cleanup_old_install() {
 
   # Stop and disable active/loaded service instances of mthan-vps or old vps service
   local units
-  units=$(systemctl list-units --type=service --all --no-legend "${SERVICE_NAME}@*" "vps@*" 2>/dev/null | awk '{print $1}') || true
+  units=$(systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null \
+    | awk '{print $1}' \
+    | grep -E "^(${SERVICE_NAME}|vps)@.*\\.service$") || true
   for unit in ${units}; do
     if [[ -n "${unit}" ]]; then
       echo "Stopping service: ${unit}"

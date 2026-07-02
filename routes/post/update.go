@@ -41,7 +41,7 @@ func writeUpdateError(w http.ResponseWriter, err error) {
 	case errors.Is(err, services.ErrUpdateRequiresRoot):
 		http.Error(w, "root process required", http.StatusForbidden)
 	default:
-		http.Error(w, "self update failed", http.StatusInternalServerError)
+		http.Error(w, "self update failed: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 
