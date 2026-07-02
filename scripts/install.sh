@@ -12,6 +12,36 @@ CTL_INSTALL_PATH="${CTL_INSTALL_PATH:-/usr/local/bin/${CTL_NAME}}"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}@.service"
 ROOT_ADDR="${ROOT_ADDR:-:2215}"
 ROOT_SERVICE_UNIT=""
+REINSTALL=0
+
+usage() {
+  cat <<EOF
+Usage: install.sh [--reinstall]
+
+Options:
+  --reinstall   Stop old service instances, replace binaries, recreate service files, and restart root service.
+  -h, --help    Show this help message.
+EOF
+}
+
+parse_args() {
+  for arg in "$@"; do
+    case "${arg}" in
+      --reinstall)
+        REINSTALL=1
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        echo "unknown argument: ${arg}" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+}
 
 require_root() {
   if [[ "${EUID}" -eq 0 ]]; then
@@ -94,7 +124,12 @@ start_service() {
   systemctl daemon-reload
   write_service_env
   ROOT_SERVICE_UNIT="${SERVICE_NAME}@root.service"
-  systemctl enable --now "${ROOT_SERVICE_UNIT}"
+  systemctl enable "${ROOT_SERVICE_UNIT}"
+  if [[ "${REINSTALL}" == "1" ]]; then
+    systemctl restart "${ROOT_SERVICE_UNIT}"
+  else
+    systemctl start "${ROOT_SERVICE_UNIT}"
+  fi
 }
 
 resolve_root_url() {
@@ -157,12 +192,16 @@ cleanup_old_install() {
 }
 
 main() {
+  parse_args "$@"
+
   require_root
   require_command install
   require_command mktemp
   require_command systemctl
 
-  cleanup_old_install
+  if [[ "${REINSTALL}" == "1" ]]; then
+    cleanup_old_install
+  fi
   download_binaries
   create_service
   start_service
