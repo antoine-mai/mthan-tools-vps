@@ -84,30 +84,36 @@ function DashboardLayoutContent({
                 <Header title="MThan VPS Panel" onMenuClick={() => setIsMobileOpen(true)} />
 
                 <div className="relative flex flex-1 flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto px-6 py-8">
-                        <div className={fullWidth ? "w-full h-full" : "mx-auto max-w-5xl"}>
-                            {/* Page Header */}
-                            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="max-w-2xl space-y-2">
-                                    <h2 className="text-3xl font-semibold tracking-tight">
-                                        {title}
-                                    </h2>
-                                    {description ? (
-                                        <p className="text-sm leading-6 text-muted-foreground">
-                                            {description}
-                                        </p>
+                    {fullWidth ? (
+                        <main className="flex-1 overflow-hidden h-full w-full">
+                            {children}
+                        </main>
+                    ) : (
+                        <main className="flex-1 overflow-y-auto px-6 py-8">
+                            <div className="mx-auto max-w-5xl">
+                                {/* Page Header */}
+                                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="max-w-2xl space-y-2">
+                                        <h2 className="text-3xl font-semibold tracking-tight">
+                                            {title}
+                                        </h2>
+                                        {description ? (
+                                            <p className="text-sm leading-6 text-muted-foreground">
+                                                {description}
+                                            </p>
+                                        ) : null}
+                                    </div>
+
+                                    {actions ? (
+                                        <div className="flex flex-wrap gap-3">{actions}</div>
                                     ) : null}
                                 </div>
 
-                                {actions ? (
-                                    <div className="flex flex-wrap gap-3">{actions}</div>
-                                ) : null}
+                                {/* Page Content */}
+                                {children}
                             </div>
-
-                            {/* Page Content */}
-                            {children}
-                        </div>
-                    </main>
+                        </main>
+                    )}
 
                     {isTerminalOpen && runtime.isRoot && (
                         <div className="absolute inset-x-0 bottom-0 z-30">

@@ -154,7 +154,7 @@ export default function FilesRoute() {
             description="Manage and edit configuration files exactly like VSCode."
             fullWidth={true}
         >
-            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] border border-border rounded-lg bg-card overflow-hidden h-[calc(100vh-220px)] shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background">
                 {/* 1. Left Explorer Sidebar (VSCode Explorer Style) */}
                 <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
