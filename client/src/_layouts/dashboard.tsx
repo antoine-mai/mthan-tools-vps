@@ -11,6 +11,7 @@ type DashboardLayoutProps = {
     children: ReactNode;
     description?: string;
     title: string;
+    fullWidth?: boolean;
 };
 
 function DashboardLayoutContent({
@@ -18,6 +19,7 @@ function DashboardLayoutContent({
     children,
     description,
     title,
+    fullWidth,
 }: DashboardLayoutProps) {
     const { isLoggedIn } = useUser();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -83,7 +85,7 @@ function DashboardLayoutContent({
 
                 <div className="relative flex flex-1 flex-col overflow-hidden">
                     <main className="flex-1 overflow-y-auto px-6 py-8">
-                        <div className="mx-auto max-w-5xl">
+                        <div className={fullWidth ? "w-full h-full" : "mx-auto max-w-5xl"}>
                             {/* Page Header */}
                             <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="max-w-2xl space-y-2">

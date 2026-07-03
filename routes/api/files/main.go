@@ -24,6 +24,7 @@ func Handler(sessions *services.SessionService) http.Handler {
 		}
 
 		requestedPath := r.URL.Query().Get("path")
+		isContent := r.URL.Query().Get("content") == "true"
 
 		homeDir := ""
 		u, err := user.Lookup(session.Username)
@@ -31,6 +32,20 @@ func Handler(sessions *services.SessionService) http.Handler {
 			homeDir = u.HomeDir
 		} else {
 			homeDir = "/home/" + session.Username
+		}
+
+		if isContent {
+			content, err := services.GetFileContent(requestedPath, homeDir, false)
+			if err != nil {
+				if errors.Is(err, services.ErrAccessDenied) {
+					http.Error(w, "access denied", http.StatusForbidden)
+				} else {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				return
+			}
+			writeJSON(w, http.StatusOK, content)
+			return
 		}
 
 		list, err := services.ListDirectory(requestedPath, homeDir, false)
