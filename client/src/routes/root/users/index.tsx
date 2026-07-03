@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Plus, RefreshCw, Shield, UserCog, Loader2, X, Key, CheckCircle } from "lucide-react";
+import { Plus, RefreshCw, Shield, UserCog, Loader2, X, Key, CheckCircle, Eye, EyeOff } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
@@ -22,9 +22,36 @@ export default function UsersRoute() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
     const [createdUser, setCreatedUser] = useState<{ username: string; password: string } | null>(null);
+
+    const generateRandomPassword = () => {
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=";
+        const length = 16;
+        let result = "";
+        for (let i = 0; i < length; i++) {
+            const randomIndex = Math.floor(Math.random() * charset.length);
+            result += charset[randomIndex];
+        }
+        setPassword(result);
+        setConfirmPassword(result);
+        setShowPassword(true);
+    };
+
+    useEffect(() => {
+        if (!isModalOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                handleCloseModal();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isModalOpen]);
 
     const fetchUsers = async (showRefresh = false) => {
         if (showRefresh) setIsRefreshing(true);
@@ -106,6 +133,7 @@ export default function UsersRoute() {
         setCreatedUser(null);
         setPassword("");
         setConfirmPassword("");
+        setShowPassword(false);
         setModalError(null);
     };
 
@@ -249,18 +277,38 @@ export default function UsersRoute() {
                                     )}
 
                                     <div className="space-y-1">
-                                        <label htmlFor="password" className="text-sm font-medium">Password</label>
+                                        <div className="flex items-center justify-between">
+                                            <label htmlFor="password" className="text-sm font-medium">Password</label>
+                                            <button
+                                                type="button"
+                                                onClick={generateRandomPassword}
+                                                className="text-xs text-primary hover:underline"
+                                            >
+                                                Generate password
+                                            </button>
+                                        </div>
                                         <div className="relative">
                                             <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                             <input
                                                 id="password"
-                                                type="password"
-                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-9 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                type={showPassword ? "text" : "password"}
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                                 placeholder="Enter account password"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 required
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword((prev) => !prev)}
+                                                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                                            >
+                                                {showPassword ? (
+                                                    <EyeOff className="h-4 w-4" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4" />
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
 
@@ -270,8 +318,8 @@ export default function UsersRoute() {
                                             <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                             <input
                                                 id="confirmPassword"
-                                                type="password"
-                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-9 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                type={showPassword ? "text" : "password"}
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                                 placeholder="Confirm account password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
