@@ -22,6 +22,7 @@ export default function LoginRoute() {
     const isLoading = status === "loading";
 
     useEffect(() => {
+        document.title = "Login | MThan VPS";
         const isLoggedIn = localStorage.getItem("is_logged_in") === "true";
         if (isLoggedIn) {
             window.location.href = "/";

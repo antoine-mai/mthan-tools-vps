@@ -3,8 +3,7 @@ import {
     LayoutDashboard,
     Server,
     Terminal,
-    FileText,
-    Settings,
+    Folder,
     LogOut,
     User,
     Users,
@@ -25,9 +24,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
     const topMenuItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Users, label: "Users", href: "/users" },
-        { icon: Server, label: "VPS Control", href: "/vps" },
-        { icon: FileText, label: "System Logs", href: "/logs" },
-        { icon: Settings, label: "Settings", href: "/settings" },
+        { icon: Folder, label: "Files", href: "/files" },
     ];
 
     const handleLogoutClick = (e: React.MouseEvent<HTMLButtonElement>) => {
