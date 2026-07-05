@@ -157,9 +157,9 @@ export default function FilesRoute() {
             <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background">
                 {/* 1. Left Explorer Sidebar (VSCode Explorer Style) */}
                 <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
-                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                            Explorer: VPS
+                    <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                            Explorer
                         </span>
                         <button
                             onClick={initExplorer}
@@ -184,7 +184,7 @@ export default function FilesRoute() {
                         ) : homePath ? (
                             <DirectoryTreeNode
                                 path={homePath}
-                                name="workspace"
+                                name={runtime.username}
                                 isDir={true}
                                 depth={0}
                                 selectedPath={selectedFile?.path || ""}
@@ -202,8 +202,8 @@ export default function FilesRoute() {
                     {selectedFile ? (
                         <>
                             {/* Editor Tab Bar */}
-                            <div className="flex items-center border-b border-slate-800 bg-slate-900/60 select-none">
-                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-950 border-r border-slate-800 text-xs font-medium text-slate-200 relative">
+                            <div className="flex h-10 items-center border-b border-slate-800 bg-slate-900/60 select-none">
+                                <div className="flex h-full items-center gap-2 px-3 bg-slate-950 border-r border-slate-800 text-xs font-medium text-slate-200 relative">
                                     <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                                     <span>{selectedFile.name}</span>
                                     <button
