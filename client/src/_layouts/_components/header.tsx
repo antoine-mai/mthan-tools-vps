@@ -22,6 +22,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [checking, setChecking] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [restarting, setRestarting] = useState(false);
     const [updateModalOpen, setUpdateModalOpen] = useState(false);
     const [updateError, setUpdateError] = useState("");
     const [updateSuccess, setUpdateSuccess] = useState(false);
@@ -55,17 +56,17 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     }, [checkUpdate, isRoot]);
 
     useEffect(() => {
-        if (!updating) return;
+        if (!updating && !restarting) return;
 
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
-            e.returnValue = "Hệ thống đang cập nhật. Vui lòng không đóng trình duyệt hoặc tải lại trang.";
+            e.returnValue = "Hệ thống đang cập nhật hoặc khởi động lại. Vui lòng không đóng trình duyệt hoặc tải lại trang.";
             return e.returnValue;
         };
 
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-    }, [updating]);
+    }, [updating, restarting]);
 
     const handleUpdate = async () => {
         setUpdateError("");
@@ -81,12 +82,14 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
 
     const confirmUpdate = async () => {
         setUpdating(true);
+        setRestarting(false);
         setUpdateError("");
         setUpdateSuccess(false);
         try {
             const response = await fetch("/post/update", { method: "POST" });
             if (response.ok) {
                 setUpdateSuccess(true);
+                setRestarting(true);
                 setTimeout(() => {
                     window.location.reload();
                 }, 3000);
@@ -122,7 +125,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                 {isRoot && (
                     <button
                         onClick={handleUpdate}
-                        disabled={checking || updating}
+                        disabled={checking || updating || restarting}
                         className={`relative flex h-8 items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-all ${
                             updateAvailable
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
@@ -130,8 +133,8 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                         }`}
                         title={updateAvailable ? "New update available!" : "Check for updates"}
                     >
-                        <RefreshCw className={`h-3.5 w-3.5 ${checking || updating ? "animate-spin" : ""}`} />
-                        <span>{updating ? "Updating..." : updateAvailable ? "Update Available" : "Check Update"}</span>
+                        <RefreshCw className={`h-3.5 w-3.5 ${checking || updating || restarting ? "animate-spin" : ""}`} />
+                        <span>{restarting ? "Restarting..." : updating ? "Updating..." : updateAvailable ? "Update Available" : "Check Update"}</span>
                         {updateAvailable && (
                             <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
@@ -155,9 +158,10 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                     info={updateInfo}
                     success={updateSuccess}
                     updating={updating}
+                    restarting={restarting}
                     onCheck={checkUpdate}
                     onClose={() => {
-                        if (!updating) {
+                        if (!updating && !restarting) {
                             setUpdateModalOpen(false);
                         }
                     }}
@@ -174,6 +178,7 @@ function UpdateModal({
     info,
     success,
     updating,
+    restarting,
     onCheck,
     onClose,
     onConfirm,
@@ -183,6 +188,7 @@ function UpdateModal({
     info: UpdateInfo | null;
     success: boolean;
     updating: boolean;
+    restarting: boolean;
     onCheck: () => Promise<UpdateInfo | null>;
     onClose: () => void;
     onConfirm: () => void;
@@ -207,7 +213,7 @@ function UpdateModal({
                     </div>
                     <button
                         className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        disabled={updating}
+                        disabled={updating || restarting}
                         onClick={onClose}
                         title="Close"
                         type="button"
@@ -234,12 +240,18 @@ function UpdateModal({
                         The server will download the new binary, replace the current executable, and restart.
                     </div>
 
-                    {updating && (
+                    {(updating || restarting) && (
                         <div className="flex gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 animate-pulse">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                             <div className="space-y-1">
-                                <p className="font-semibold text-amber-800 dark:text-amber-200">Đang tiến hành cập nhật hệ thống...</p>
-                                <p className="leading-relaxed">Vui lòng không đóng trình duyệt, tắt tab hoặc tải lại trang này cho đến khi quá trình hoàn tất.</p>
+                                <p className="font-semibold text-amber-800 dark:text-amber-200">
+                                    {restarting ? "Đang khởi động lại hệ thống..." : "Đang tiến hành cập nhật hệ thống..."}
+                                </p>
+                                <p className="leading-relaxed">
+                                    {restarting
+                                        ? "Hệ thống đang được khởi động lại để áp dụng bản cập nhật mới. Vui lòng không đóng trình duyệt, tắt tab hoặc tải lại trang này."
+                                        : "Vui lòng không đóng trình duyệt, tắt tab hoặc tải lại trang này cho đến khi quá trình hoàn tất."}
+                                </p>
                             </div>
                         </div>
                     )}
@@ -261,7 +273,7 @@ function UpdateModal({
                 <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
                     <button
                         className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                        disabled={checking || updating}
+                        disabled={checking || updating || restarting}
                         onClick={onCheck}
                         type="button"
                     >
@@ -269,7 +281,7 @@ function UpdateModal({
                     </button>
                     <button
                         className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
-                        disabled={updating}
+                        disabled={updating || restarting}
                         onClick={onClose}
                         type="button"
                     >
@@ -277,11 +289,11 @@ function UpdateModal({
                     </button>
                     <button
                         className="h-9 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        disabled={checking || updating || !info?.updateAvailable}
+                        disabled={checking || updating || restarting || !info?.updateAvailable}
                         onClick={onConfirm}
                         type="button"
                     >
-                        {updating ? "Updating..." : "Update and restart"}
+                        {restarting ? "Restarting..." : updating ? "Updating..." : "Update and restart"}
                     </button>
                 </div>
             </div>
