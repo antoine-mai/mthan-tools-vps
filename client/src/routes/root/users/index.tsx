@@ -203,7 +203,7 @@ export default function UsersRoute() {
             description="Manage local system accounts, home folders, shells, and system access."
             fullWidth={true}
         >
-            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] border border-border rounded-lg bg-card overflow-hidden h-[calc(100vh-220px)] shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] h-[calc(100vh-56px)] overflow-hidden">
                 {/* Left Sidebar - Users List */}
                 <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
                     <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
@@ -303,42 +303,42 @@ export default function UsersRoute() {
                                 )}
                             </div>
 
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
-                                    <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            User ID (UID)
-                                        </span>
-                                        <p className="font-semibold text-sm text-foreground">{selectedUser.uid}</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
-                                    <Home className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1 min-w-0">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            Home Folder
-                                        </span>
-                                        <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.home}>
-                                            {selectedUser.home}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
-                                    <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1 min-w-0">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            Login Shell
-                                        </span>
-                                        <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.shell || "/bin/bash"}>
-                                            {selectedUser.shell || "/bin/bash"}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                             {/* Details Grid */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border bg-card/20">
+                                 <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
+                                     <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                     <div className="space-y-1">
+                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                             User ID (UID)
+                                         </span>
+                                         <p className="font-semibold text-sm text-foreground">{selectedUser.uid}</p>
+                                     </div>
+                                 </div>
+ 
+                                 <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
+                                     <Home className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                     <div className="space-y-1 min-w-0">
+                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                             Home Folder
+                                         </span>
+                                         <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.home}>
+                                             {selectedUser.home}
+                                         </p>
+                                     </div>
+                                 </div>
+ 
+                                 <div className="p-5 flex items-start gap-3">
+                                     <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                     <div className="space-y-1 min-w-0">
+                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                             Login Shell
+                                         </span>
+                                         <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.shell || "/bin/bash"}>
+                                             {selectedUser.shell || "/bin/bash"}
+                                         </p>
+                                     </div>
+                                 </div>
+                             </div>
                         </div>
                     ) : (
                         /* Empty state */

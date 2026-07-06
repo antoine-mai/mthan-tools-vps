@@ -116,7 +116,7 @@ export default function ModulesRoute() {
             description="Monitor, configure, and control core system software services and runtimes."
             fullWidth={true}
         >
-            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] border border-border rounded-lg bg-card overflow-hidden h-[calc(100vh-220px)] shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] h-[calc(100vh-56px)] overflow-hidden">
                 {/* Left Sidebar - Modules List */}
                 <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
                     <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
@@ -185,8 +185,8 @@ export default function ModulesRoute() {
                             </div>
 
                             {/* Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border bg-card/20">
+                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
                                     <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -196,7 +196,7 @@ export default function ModulesRoute() {
                                     </div>
                                 </div>
 
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
+                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
                                     <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                                     <div className="space-y-1 min-w-0">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -208,7 +208,7 @@ export default function ModulesRoute() {
                                     </div>
                                 </div>
 
-                                <div className="p-4 rounded-lg bg-card border border-border shadow-sm flex items-start gap-3">
+                                <div className="p-5 flex items-start gap-3">
                                     <Cpu className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                                     <div className="space-y-1 min-w-0">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -222,7 +222,7 @@ export default function ModulesRoute() {
                             </div>
 
                             {/* Service Control Panel */}
-                            <div className="border border-border rounded-lg bg-card p-5 space-y-4 shadow-sm">
+                            <div className="p-6 space-y-4">
                                 <div className="flex items-center justify-between border-b border-border pb-2">
                                     <h3 className="text-sm font-semibold text-foreground">
                                         Service Management Console

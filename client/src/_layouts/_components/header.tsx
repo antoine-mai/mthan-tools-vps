@@ -32,15 +32,45 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         if (!isRoot) return null;
         setChecking(true);
         try {
-            const response = await fetch("/post/update");
-            if (response.ok) {
-                const data = await response.json();
-                setUpdateAvailable(data.updateAvailable);
-                setUpdateInfo(data);
-                return data as UpdateInfo;
+            const localRes = await fetch("/version.json");
+            if (!localRes.ok) throw new Error("Failed to load local version");
+            const local = await localRes.json();
+
+            const remoteRes = await fetch(
+                "https://raw.githubusercontent.com/antoine-mai/mthan-tools-vps/main/bin/version.json",
+            );
+            if (!remoteRes.ok) throw new Error("Failed to load remote version");
+            const remote = await remoteRes.json();
+
+            let updateAvailable = false;
+            if (remote.buildTime && local.buildTime) {
+                const tRemote = new Date(remote.buildTime).getTime();
+                const tLocal = new Date(local.buildTime).getTime();
+                if (!isNaN(tRemote) && !isNaN(tLocal)) {
+                    updateAvailable = tRemote > tLocal;
+                } else {
+                    updateAvailable = remote.buildTime !== local.buildTime;
+                }
+            } else if (remote.buildTime) {
+                updateAvailable = true;
             }
+
+            const info: UpdateInfo = {
+                updateAvailable,
+                localVersion: local.version,
+                remoteVersion: remote.version,
+                localBuildTime: local.buildTime,
+                remoteBuildTime: remote.buildTime,
+            };
+
+            setUpdateAvailable(updateAvailable);
+            setUpdateInfo(info);
+            return info;
         } catch (err) {
-            console.error("Failed to check for updates", err);
+            console.error(
+                "Failed to check for updates directly from client:",
+                err,
+            );
         } finally {
             setChecking(false);
         }
@@ -51,7 +81,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     useEffect(() => {
         if (isRoot) {
             checkUpdate();
-            const interval = setInterval(checkUpdate, 180000);
+            const interval = setInterval(checkUpdate, 5000);
             return () => clearInterval(interval);
         }
     }, [checkUpdate, isRoot]);
@@ -61,12 +91,14 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
 
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
-            e.returnValue = "The system is updating or restarting. Please do not close the browser or reload the page.";
+            e.returnValue =
+                "The system is updating or restarting. Please do not close the browser or reload the page.";
             return e.returnValue;
         };
 
         window.addEventListener("beforeunload", handleBeforeUnload);
-        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+        return () =>
+            window.removeEventListener("beforeunload", handleBeforeUnload);
     }, [updating, restarting, bypassBeforeUnload]);
 
     const handleUpdate = async () => {
@@ -135,10 +167,24 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
                                 : "border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground"
                         }`}
-                        title={updateAvailable ? "New update available!" : "Check for updates"}
+                        title={
+                            updateAvailable
+                                ? "New update available!"
+                                : "Check for updates"
+                        }
                     >
-                        <RefreshCw className={`h-3.5 w-3.5 ${checking || updating || restarting ? "animate-spin" : ""}`} />
-                        <span>{restarting ? "Restarting..." : updating ? "Updating..." : updateAvailable ? "Update Available" : "Check Update"}</span>
+                        <RefreshCw
+                            className={`h-3.5 w-3.5 ${checking || updating || restarting ? "animate-spin" : ""}`}
+                        />
+                        <span>
+                            {restarting
+                                ? "Restarting..."
+                                : updating
+                                  ? "Updating..."
+                                  : updateAvailable
+                                    ? "Update Available"
+                                    : "Update"}
+                        </span>
                         {updateAvailable && (
                             <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
@@ -197,8 +243,14 @@ function UpdateModal({
     onClose: () => void;
     onConfirm: () => void;
 }) {
-    const localVersion = displayVersion(info?.localVersion, info?.localBuildTime);
-    const remoteVersion = displayVersion(info?.remoteVersion, info?.remoteBuildTime);
+    const localVersion = displayVersion(
+        info?.localVersion,
+        info?.localBuildTime,
+    );
+    const remoteVersion = displayVersion(
+        info?.remoteVersion,
+        info?.remoteBuildTime,
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
@@ -209,7 +261,9 @@ function UpdateModal({
                             <RefreshCw className="h-4 w-4" />
                         </span>
                         <div>
-                            <h2 className="text-sm font-semibold">Update server</h2>
+                            <h2 className="text-sm font-semibold">
+                                Update server
+                            </h2>
                             <p className="text-xs text-muted-foreground">
                                 Review the build before restarting the service.
                             </p>
@@ -241,7 +295,8 @@ function UpdateModal({
                     </div>
 
                     <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                        The server will download the new binary, replace the current executable, and restart.
+                        The server will download the new binary, replace the
+                        current executable, and restart.
                     </div>
 
                     {(updating || restarting) && (
@@ -249,7 +304,9 @@ function UpdateModal({
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                             <div className="space-y-1">
                                 <p className="font-semibold text-amber-800 dark:text-amber-200">
-                                    {restarting ? "System is restarting..." : "System is updating..."}
+                                    {restarting
+                                        ? "System is restarting..."
+                                        : "System is updating..."}
                                 </p>
                                 <p className="leading-relaxed">
                                     {restarting
@@ -269,7 +326,8 @@ function UpdateModal({
 
                     {success && (
                         <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-                            Update installed. The server is restarting; the page will reload shortly.
+                            Update installed. The server is restarting; the page
+                            will reload shortly.
                         </div>
                     )}
                 </div>
@@ -293,11 +351,20 @@ function UpdateModal({
                     </button>
                     <button
                         className="h-9 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        disabled={checking || updating || restarting || !info?.updateAvailable}
+                        disabled={
+                            checking ||
+                            updating ||
+                            restarting ||
+                            !info?.updateAvailable
+                        }
                         onClick={onConfirm}
                         type="button"
                     >
-                        {restarting ? "Restarting..." : updating ? "Updating..." : "Update and restart"}
+                        {restarting
+                            ? "Restarting..."
+                            : updating
+                              ? "Updating..."
+                              : "Update and restart"}
                     </button>
                 </div>
             </div>

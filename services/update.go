@@ -38,6 +38,8 @@ type UpdateService struct {
 	installPath    string
 	localVersion   string
 	localBuildTime string
+	cacheResult    *UpdateCheckResult
+	cacheExpires   time.Time
 }
 
 func NewUpdateService(localVersion, localBuildTime string) *UpdateService {
@@ -52,6 +54,10 @@ func NewUpdateService(localVersion, localBuildTime string) *UpdateService {
 }
 
 func (s *UpdateService) CheckUpdate(ctx context.Context) (UpdateCheckResult, error) {
+	if s.cacheResult != nil && time.Now().Before(s.cacheExpires) {
+		return *s.cacheResult, nil
+	}
+
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.versionURL, nil)
 	if err != nil {
 		return UpdateCheckResult{}, err
@@ -89,13 +95,18 @@ func (s *UpdateService) CheckUpdate(ctx context.Context) (UpdateCheckResult, err
 		updateAvailable = true
 	}
 
-	return UpdateCheckResult{
+	res := UpdateCheckResult{
 		UpdateAvailable: updateAvailable,
 		LocalVersion:    s.localVersion,
 		RemoteVersion:   remote.Version,
 		LocalBuildTime:  s.localBuildTime,
 		RemoteBuildTime: remote.BuildTime,
-	}, nil
+	}
+
+	s.cacheResult = &res
+	s.cacheExpires = time.Now().Add(15 * time.Second)
+
+	return res, nil
 }
 
 func (s *UpdateService) SelfUpdate(ctx context.Context) (UpdateResult, error) {
