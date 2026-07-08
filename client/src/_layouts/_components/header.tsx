@@ -183,7 +183,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                                   ? "Updating..."
                                   : updateAvailable
                                     ? "Update Available"
-                                    : "Update"}
+                                    : "Check Update"}
                         </span>
                         {updateAvailable && (
                             <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">

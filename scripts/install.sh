@@ -4,7 +4,7 @@ set -euo pipefail
 APP_NAME="mthan-vps"
 CTL_NAME="mthanctl"
 SERVICE_NAME="mthan-vps"
-BIN_URL="${BIN_URL:-https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin}"
+BIN_URL="${BIN_URL:-https://cdn.jsdelivr.net/gh/antoine-mai/mthan-tools-vps@main/bin}"
 BINARY_URL="${BINARY_URL:-${BIN_URL}/${APP_NAME}}"
 CTL_BINARY_URL="${CTL_BINARY_URL:-${BIN_URL}/${CTL_NAME}}"
 INSTALL_PATH="${INSTALL_PATH:-/usr/local/bin/${APP_NAME}}"
@@ -21,6 +21,14 @@ Usage: install.sh [--reinstall]
 Options:
   --reinstall   Stop old service instances, replace binaries, recreate service files, and restart root service.
   -h, --help    Show this help message.
+
+Environment:
+  ROOT_ADDR         Root panel bind address. Default: ${ROOT_ADDR}
+  BIN_URL           Base URL for both binaries. Default: ${BIN_URL}
+  BINARY_URL        Full URL for ${APP_NAME}. Default: ${BINARY_URL}
+  CTL_BINARY_URL    Full URL for ${CTL_NAME}. Default: ${CTL_BINARY_URL}
+  INSTALL_PATH      Install path for ${APP_NAME}. Default: ${INSTALL_PATH}
+  CTL_INSTALL_PATH  Install path for ${CTL_NAME}. Default: ${CTL_INSTALL_PATH}
 EOF
 }
 
@@ -57,6 +65,48 @@ require_command() {
 
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     echo "missing required command: ${command_name}" >&2
+    exit 1
+  fi
+}
+
+has_libcrypt() {
+  if command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q 'libcrypt\.so\.1'; then
+    return 0
+  fi
+
+  [[ -e /lib/libcrypt.so.1 ]] ||
+    [[ -e /usr/lib/libcrypt.so.1 ]] ||
+    [[ -e /lib64/libcrypt.so.1 ]] ||
+    [[ -e /usr/lib64/libcrypt.so.1 ]] ||
+    [[ -e /lib/x86_64-linux-gnu/libcrypt.so.1 ]] ||
+    [[ -e /usr/lib/x86_64-linux-gnu/libcrypt.so.1 ]]
+}
+
+install_libcrypt() {
+  if has_libcrypt; then
+    return
+  fi
+
+  echo "Missing runtime dependency: libcrypt.so.1"
+
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y libcrypt1
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y libxcrypt-compat
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y libxcrypt-compat
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm libxcrypt-compat
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache libxcrypt-compat
+  else
+    echo "unable to install libcrypt.so.1 automatically; install libcrypt1 or libxcrypt-compat and rerun this script" >&2
+    exit 1
+  fi
+
+  if ! has_libcrypt; then
+    echo "libcrypt.so.1 is still missing after package installation" >&2
     exit 1
   fi
 }
@@ -198,6 +248,8 @@ main() {
   require_command install
   require_command mktemp
   require_command systemctl
+
+  install_libcrypt
 
   if [[ "${REINSTALL}" == "1" ]]; then
     cleanup_old_install

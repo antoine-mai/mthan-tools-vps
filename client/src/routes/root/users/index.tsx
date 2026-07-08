@@ -213,7 +213,7 @@ export default function UsersRoute() {
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => fetchUsers(true)}
-                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                className="p-1 rounded-none text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                                 title="Refresh Users"
                                 disabled={isLoading || isRefreshing}
                             >
@@ -221,7 +221,7 @@ export default function UsersRoute() {
                             </button>
                             <button
                                 onClick={() => setIsModalOpen(true)}
-                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                className="p-1 rounded-none text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                                 title="Create User"
                             >
                                 <Plus className="h-3.5 w-3.5" />
@@ -249,7 +249,7 @@ export default function UsersRoute() {
                                 return (
                                     <div
                                         key={u.username}
-                                        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-md cursor-pointer hover:bg-muted/60 transition-colors text-xs ${
+                                        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-none cursor-pointer hover:bg-muted/60 transition-colors text-xs ${
                                             isSelected
                                                 ? "bg-primary/10 text-primary font-semibold"
                                                 : "text-foreground/90"
@@ -276,7 +276,7 @@ export default function UsersRoute() {
                                         <h2 className="text-2xl font-bold tracking-tight text-foreground">
                                             {selectedUser.username}
                                         </h2>
-                                        <span className="inline-flex items-center text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase tracking-wide">
+                                        <span className="inline-flex items-center text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-none border border-primary/20 uppercase tracking-wide">
                                             {selectedUser.uid === 0 ? "Superuser" : "Standard User"}
                                         </span>
                                     </div>
@@ -289,7 +289,7 @@ export default function UsersRoute() {
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0"
+                                        className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
                                         onClick={() => handleDeleteUser(selectedUser.username)}
                                         disabled={isDeleting}
                                     >
@@ -303,42 +303,42 @@ export default function UsersRoute() {
                                 )}
                             </div>
 
-                             {/* Details Grid */}
-                             <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border bg-card/20">
-                                 <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
-                                     <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                     <div className="space-y-1">
-                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                             User ID (UID)
-                                         </span>
-                                         <p className="font-semibold text-sm text-foreground">{selectedUser.uid}</p>
-                                     </div>
-                                 </div>
- 
-                                 <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
-                                     <Home className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                     <div className="space-y-1 min-w-0">
-                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                             Home Folder
-                                         </span>
-                                         <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.home}>
-                                             {selectedUser.home}
-                                         </p>
-                                     </div>
-                                 </div>
- 
-                                 <div className="p-5 flex items-start gap-3">
-                                     <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                     <div className="space-y-1 min-w-0">
-                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                             Login Shell
-                                         </span>
-                                         <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.shell || "/bin/bash"}>
-                                             {selectedUser.shell || "/bin/bash"}
-                                         </p>
-                                     </div>
-                                 </div>
-                             </div>
+                            {/* Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border bg-card/20">
+                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
+                                    <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                            User ID (UID)
+                                        </span>
+                                        <p className="font-semibold text-sm text-foreground">{selectedUser.uid}</p>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
+                                    <Home className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                    <div className="space-y-1 min-w-0">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                            Home Folder
+                                        </span>
+                                        <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.home}>
+                                            {selectedUser.home}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 flex items-start gap-3">
+                                    <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                    <div className="space-y-1 min-w-0">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                                            Login Shell
+                                        </span>
+                                        <p className="font-mono text-xs text-foreground truncate select-all" title={selectedUser.shell || "/bin/bash"}>
+                                            {selectedUser.shell || "/bin/bash"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         /* Empty state */
@@ -353,13 +353,13 @@ export default function UsersRoute() {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="relative w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg animate-in zoom-in-95 duration-200">
+                    <div className="relative w-full max-w-md overflow-hidden rounded-none border border-border bg-card shadow-lg animate-in zoom-in-95 duration-200">
                         {/* Header */}
                         <div className="flex items-center justify-between border-b border-border px-6 py-4">
                             <h3 className="text-lg font-semibold tracking-tight">Create Linux User</h3>
                             <button
                                 onClick={handleCloseModal}
-                                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                className="rounded-none opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                             >
                                 <X className="h-4 w-4" />
                                 <span className="sr-only">Close</span>
@@ -370,12 +370,12 @@ export default function UsersRoute() {
                         <div className="p-6">
                             {createdUser ? (
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+                                    <div className="flex items-center gap-3 rounded-none bg-emerald-500/10 border border-emerald-500/20 p-3 text-sm text-emerald-600 dark:text-emerald-400">
                                         <CheckCircle className="h-5 w-5 shrink-0" />
                                         <span>User created successfully!</span>
                                     </div>
 
-                                    <div className="rounded-md bg-muted p-4 space-y-3">
+                                    <div className="rounded-none bg-muted p-4 space-y-3">
                                         <div>
                                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Username</label>
                                             <span className="text-base font-mono font-bold select-all block mt-1">{createdUser.username}</span>
@@ -386,22 +386,22 @@ export default function UsersRoute() {
                                         </div>
                                     </div>
 
-                                    <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded p-2.5">
+                                    <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-none p-2.5">
                                         Please record this username and password. You will need them to log in to this account.
                                     </div>
 
-                                    <Button onClick={handleCloseModal} className="w-full mt-4">
+                                    <Button onClick={handleCloseModal} className="w-full mt-4 rounded-none">
                                         Done
                                     </Button>
                                 </div>
                             ) : (
                                 <form onSubmit={handleCreateUser} className="space-y-4">
-                                    <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-600 dark:text-blue-400 leading-normal">
-                                        <strong>Username Notice:</strong> The username will be generated automatically using the prefix <code className="font-mono bg-blue-500/10 px-1 rounded">user-</code> followed by 8 random characters (e.g. <code className="font-mono bg-blue-500/10 px-1 rounded">user-ax9h2b7m</code>).
+                                    <div className="rounded-none border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-600 dark:text-blue-400 leading-normal">
+                                        <strong>Username Notice:</strong> The username will be generated automatically using the prefix <code className="font-mono bg-blue-500/10 px-1 rounded-none">user-</code> followed by 8 random characters (e.g. <code className="font-mono bg-blue-500/10 px-1 rounded-none">user-ax9h2b7m</code>).
                                     </div>
 
                                     {modalError && (
-                                        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                                        <div className="rounded-none border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
                                             {modalError}
                                         </div>
                                     )}
@@ -422,7 +422,7 @@ export default function UsersRoute() {
                                             <input
                                                 id="password"
                                                 type={showPassword ? "text" : "password"}
-                                                className="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="flex h-9 w-full rounded-none border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                                 placeholder="Enter account password"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
@@ -449,7 +449,7 @@ export default function UsersRoute() {
                                             <input
                                                 id="confirmPassword"
                                                 type={showPassword ? "text" : "password"}
-                                                className="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="flex h-9 w-full rounded-none border border-input bg-transparent pl-9 pr-10 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                                 placeholder="Confirm account password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -464,13 +464,14 @@ export default function UsersRoute() {
                                             variant="outline"
                                             onClick={handleCloseModal}
                                             disabled={isSubmitting}
+                                            className="rounded-none"
                                         >
                                             Cancel
                                         </Button>
                                         <Button
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="gap-2"
+                                            className="gap-2 rounded-none"
                                         >
                                             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                                             Create User
