@@ -14,12 +14,12 @@ dev:
 build: build-app build-ctl
 
 build-app:
-	mkdir -p bin
-	go build $(GO_BUILD_FLAGS) -o bin/$(APP_NAME) .
+	mkdir -p public/dist
+	go build $(GO_BUILD_FLAGS) -o public/dist/$(APP_NAME) .
 
 build-ctl:
-	mkdir -p bin
-	go build $(GO_BUILD_FLAGS) -tags ctl -o bin/$(CTL_NAME) .
+	mkdir -p public/dist
+	go build $(GO_BUILD_FLAGS) -tags ctl -o public/dist/$(CTL_NAME) .
 
 test:
 	go test $(GO_PACKAGES)
@@ -31,4 +31,4 @@ tidy:
 	go mod tidy
 
 clean:
-	rm -rf bin tmp
+	rm -rf public/dist tmp

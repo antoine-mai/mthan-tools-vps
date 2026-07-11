@@ -10,8 +10,8 @@ func registerRootRoutes(mux *http.ServeMux, runtime ClientRuntime, embeddedFS fs
 		runtime,
 		embeddedFS,
 		"client/build/root",
-		"bin/client/root",
+		"public/dist/client/root",
 		"client/build",
-		"bin/client",
+		"public/dist/client",
 	))
 }

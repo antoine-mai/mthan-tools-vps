@@ -3,8 +3,8 @@ set -euo pipefail
 
 APP_NAME="mthanctl"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_DIR="${BIN_DIR:-${ROOT_DIR}/bin}"
-BINARY_PATH="${BIN_DIR}/${APP_NAME}"
+DIST_DIR="${DIST_DIR:-${ROOT_DIR}/public/dist}"
+BINARY_PATH="${DIST_DIR}/${APP_NAME}"
 
 GOOS="${GOOS:-linux}"
 GOARCH="${GOARCH:-amd64}"
@@ -23,7 +23,7 @@ require_command() {
 build_binary() {
   require_command go
 
-  mkdir -p "${BIN_DIR}"
+  mkdir -p "${DIST_DIR}"
 
   echo "Building ${APP_NAME} binary for ${GOOS}/${GOARCH}"
   (

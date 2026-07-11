@@ -22,7 +22,7 @@ file_state() {
     find . \
       -path "./client/node_modules" -prune -o \
       -path "./client/build" -prune -o \
-      -path "./bin" -prune -o \
+      -path "./public/dist" -prune -o \
       -path "./tmp" -prune -o \
       -type f \( -name "*.go" -o -name "go.mod" -o -name "go.sum" \) \
       -exec stat -c "%n:%Y:%s" {} \; | sort

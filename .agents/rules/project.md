@@ -10,7 +10,7 @@
 
 - Backend: Go, entrypoint in `main.go`, routes under `routes/`, services under `services/`.
 - Frontend: React 18 + TypeScript under `client/`, using `react-scripts`, Tailwind, Radix UI, and `lucide-react`.
-- Build outputs live in `bin/` and `client/build/`.
+- Go build outputs live in `public/dist/`; the published installer lives at `public/install.sh`. React build output lives in `client/build/`.
 
 ## Commands
 

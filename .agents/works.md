@@ -102,3 +102,8 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 - Important decisions:
 - Validation:
 - Known follow-up:
+# Public distribution layout migration
+
+- Goal: Move the published installer to `public/install.sh` and all distribution artifacts from `bin`/`dist` into `public/dist`.
+- Changed: build scripts, Makefile, development watcher exclusions, updater URLs, static-client fallbacks, README, and project rules now use the public layout.
+- Validation: `bash -n` passed for build, control build, deploy, and installer scripts; `git diff --check` passed. Full builds were not run.

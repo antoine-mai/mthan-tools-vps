@@ -4,9 +4,9 @@ set -euo pipefail
 APP_NAME="mthan-vps"
 CTL_NAME="mthanctl"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_DIR="${BIN_DIR:-${ROOT_DIR}/bin}"
-BINARY_PATH="${BIN_DIR}/${APP_NAME}"
-CTL_BINARY_PATH="${BIN_DIR}/${CTL_NAME}"
+DIST_DIR="${DIST_DIR:-${ROOT_DIR}/public/dist}"
+BINARY_PATH="${DIST_DIR}/${APP_NAME}"
+CTL_BINARY_PATH="${DIST_DIR}/${CTL_NAME}"
 
 GOOS="${GOOS:-linux}"
 GOARCH="${GOARCH:-amd64}"
@@ -19,8 +19,9 @@ PUSH_DIST=1
 DIST_REPO_DIR="${DIST_REPO_DIR:-}"
 DIST_REPO_URL="${DIST_REPO_URL:-}"
 DIST_REPO_BRANCH="${DIST_REPO_BRANCH:-}"
-DIST_REPO_BIN_TARGET="${DIST_REPO_BIN_TARGET:-bin}"
-DIST_REPO_CLIENT_TARGET="${DIST_REPO_CLIENT_TARGET:-dist/client}"
+DIST_REPO_PUBLIC_TARGET="${DIST_REPO_PUBLIC_TARGET:-public}"
+DIST_REPO_BIN_TARGET="${DIST_REPO_BIN_TARGET:-${DIST_REPO_PUBLIC_TARGET}/dist}"
+DIST_REPO_CLIENT_TARGET="${DIST_REPO_CLIENT_TARGET:-${DIST_REPO_PUBLIC_TARGET}/dist/client}"
 COMMIT_MESSAGE="${COMMIT_MESSAGE:-build: update ${APP_NAME} dist}"
 
 TMP_REPO_DIR=""
@@ -34,8 +35,9 @@ Environment:
   DIST_REPO_DIR      Local git repo to copy dist files into before pushing.
   DIST_REPO_URL      Git URL to clone and push if DIST_REPO_DIR is not set.
   DIST_REPO_BRANCH   Optional branch to checkout/clone.
-  DIST_REPO_BIN_TARGET     Binary target directory inside dist repo. Default: bin
-  DIST_REPO_CLIENT_TARGET  Client target directory inside dist repo. Default: dist/client
+  DIST_REPO_PUBLIC_TARGET  Public target directory inside dist repo. Default: public
+  DIST_REPO_BIN_TARGET     Binary target directory inside dist repo. Default: public/dist
+  DIST_REPO_CLIENT_TARGET  Client target directory inside dist repo. Default: public/dist/client
   BUILD_CLIENT       Build React client. Default: 1
   GOOS               Go target OS. Default: linux
   GOARCH             Go target arch. Default: amd64
@@ -104,7 +106,7 @@ build_client() {
 build_binaries() {
   require_command go
 
-  mkdir -p "${BIN_DIR}"
+  mkdir -p "${DIST_DIR}"
 
   echo "Running Go tests"
   (
@@ -179,9 +181,10 @@ push_dist() {
   mkdir -p "${bin_target_dir}"
   install -m 0755 "${BINARY_PATH}" "${bin_target_dir}/${APP_NAME}"
   install -m 0755 "${CTL_BINARY_PATH}" "${bin_target_dir}/${CTL_NAME}"
-  if [[ -f "${BIN_DIR}/version.json" ]]; then
-    install -m 0644 "${BIN_DIR}/version.json" "${bin_target_dir}/version.json"
+  if [[ -f "${DIST_DIR}/version.json" ]]; then
+    install -m 0644 "${DIST_DIR}/version.json" "${bin_target_dir}/version.json"
   fi
+  install -m 0755 "${ROOT_DIR}/public/install.sh" "${repo_dir}/${DIST_REPO_PUBLIC_TARGET}/install.sh"
 
   if [[ -d "${ROOT_DIR}/client/build" ]]; then
     rm -rf "${client_target_dir}"
@@ -189,7 +192,7 @@ push_dist() {
     cp -R "${ROOT_DIR}/client/build" "${client_target_dir}"
   fi
 
-  git -C "${repo_dir}" add "${DIST_REPO_BIN_TARGET}"
+  git -C "${repo_dir}" add "${DIST_REPO_PUBLIC_TARGET}"
   if [[ -d "${ROOT_DIR}/client/build" ]]; then
     git -C "${repo_dir}" add "${DIST_REPO_CLIENT_TARGET}"
   fi
@@ -213,8 +216,8 @@ main() {
   local version
   build_time="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   version="$(date -u +'%Y%m%d%H%M%S')"
-  mkdir -p "${BIN_DIR}"
-  echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${BIN_DIR}/version.json"
+  mkdir -p "${DIST_DIR}"
+  echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${DIST_DIR}/version.json"
   echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/public/version.json"
   if [[ -d "${ROOT_DIR}/client/build" ]]; then
     echo "{\"version\":\"${version}\",\"buildTime\":\"${build_time}\"}" > "${ROOT_DIR}/client/build/version.json"

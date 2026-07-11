@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-const defaultBinaryURL = "https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin/mthan-vps"
-const defaultVersionURL = "https://github.com/antoine-mai/mthan-tools-vps/raw/main/bin/version.json"
+const defaultBinaryURL = "https://github.com/antoine-mai/mthan-tools-vps/raw/main/public/dist/mthan-vps"
+const defaultVersionURL = "https://github.com/antoine-mai/mthan-tools-vps/raw/main/public/dist/version.json"
 
 var ErrUpdateRequiresRoot = errors.New("self update requires root")
 
