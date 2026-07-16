@@ -1,21 +1,22 @@
 package post
 
 import (
+	"encoding/json"
+	"net"
 	"net/http"
 	"net/url"
-	"net"
 	"strings"
 
+	postfiles "mthan/vps/routes/post/files"
 	postlogin "mthan/vps/routes/post/login"
 	"mthan/vps/routes/post/ping"
 	"mthan/vps/routes/post/session"
 	"mthan/vps/routes/post/terminal"
 	"mthan/vps/routes/post/update"
-	"mthan/vps/routes/post/users"
-	userlogin "mthan/vps/routes/post/user/login"
 	useradd "mthan/vps/routes/post/user/add"
 	userdelete "mthan/vps/routes/post/user/delete"
-	postfiles "mthan/vps/routes/post/files"
+	userlogin "mthan/vps/routes/post/user/login"
+	"mthan/vps/routes/post/users"
 	"mthan/vps/services"
 )
 
@@ -24,6 +25,7 @@ type Dependencies struct {
 	Sessions *services.SessionService
 	Startup  services.StartupConfig
 	Update   *services.UpdateService
+	System   *services.SystemService
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
@@ -33,12 +35,36 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("POST /post/user/add", postOnly(deps.Startup, useradd.Handler()))
 	mux.Handle("POST /post/user/delete", postOnly(deps.Startup, userdelete.Handler()))
 	mux.Handle("GET /post/session", postOnly(deps.Startup, session.Handler(deps.Sessions)))
+	mux.Handle("GET /post/system", postOnly(deps.Startup, authenticatedSystemHandler(deps.Sessions, deps.System)))
 	mux.Handle("GET /post/update", postOnly(deps.Startup, update.CheckHandler(deps.Update)))
 	mux.Handle("POST /post/update", postOnly(deps.Startup, update.SelfUpdateHandler(deps.Update)))
 	mux.Handle("POST /post/ping", postOnly(deps.Startup, ping.Handler()))
 	mux.Handle("GET /post/users", postOnly(deps.Startup, users.Handler()))
 	mux.Handle("GET /post/files", postOnly(deps.Startup, postfiles.Handler(deps.Sessions)))
 	mux.Handle("GET /post/terminal", postOnly(deps.Startup, terminal.Handler(deps.Sessions)))
+}
+
+func authenticatedSystemHandler(sessions *services.SessionService, system *services.SystemService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(services.SessionCookieName)
+		if err != nil {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		if _, ok := sessions.Get(cookie.Value); !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		status, err := system.Status()
+		if err != nil {
+			http.Error(w, "system information unavailable", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(status); err != nil {
+			http.Error(w, "system information unavailable", http.StatusInternalServerError)
+		}
+	})
 }
 
 func postOnly(startup services.StartupConfig, next http.Handler) http.Handler {

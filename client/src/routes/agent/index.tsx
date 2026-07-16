@@ -37,7 +37,7 @@ export default function AgentRoute() {
                 {
                     id: "m1",
                     sender: "agent",
-                    text: "Hello! I am your MThan VPS AI Assistant. I can help you monitor server metrics, draft Nginx virtual host configs, check active modules, or manage system users. What would you like to do today?",
+                    text: "Hello! I am your MThan VPS AI Assistant. I can help you monitor server metrics, draft Nginx virtual host configs, check active apps, or manage system users. What would you like to do today?",
                     timestamp: new Date(),
                 },
             ],
@@ -103,10 +103,10 @@ export default function AgentRoute() {
                 replyText = "To configure web domains or proxy routes, you can head over to the VHosts tab. For root configurations, you can inspect `/etc/nginx` inside the Files explorer.";
             } else if (promptText.includes("user") || promptText.includes("password")) {
                 replyText = "You can manage standard Linux system users (adding accounts, configuring environments) inside the Users section. Superusers can also manage passwords via terminal.";
-            } else if (promptText.includes("module") || promptText.includes("mariadb") || promptText.includes("redis") || promptText.includes("php")) {
-                replyText = "Active system services like MariaDB, Redis, and PHP-FPM can be checked, stopped, or restarted inside the Modules tab.";
+            } else if (promptText.includes("app") || promptText.includes("module") || promptText.includes("mariadb") || promptText.includes("redis") || promptText.includes("php")) {
+                replyText = "Active system services like MariaDB, Redis, and PHP-FPM can be checked, stopped, or restarted inside the Apps tab.";
             } else if (promptText.includes("help") || promptText.includes("what can you do")) {
-                replyText = "I can guide you on how to manage Virtual Hosts, monitor system Modules (Nginx, MariaDB, PHP-FPM, Redis), edit system configurations in Files, and add or manage Linux users.";
+                replyText = "I can guide you on how to manage Virtual Hosts, monitor system Apps (Nginx, MariaDB, PHP-FPM, Redis), edit system configurations in Files, and add or manage Linux users.";
             }
 
             const agentMsg: ChatMessage = {

@@ -15,6 +15,7 @@ type StartupConfig struct {
 	Env         string
 	Mode        string
 	OSName      string
+	OSBranch    string
 	PostBaseURL string
 	UID         int
 	Username    string
@@ -46,12 +47,14 @@ func (s *RootService) Startup() StartupConfig {
 func startupConfig(mode string, isRoot bool) StartupConfig {
 	uid := os.Geteuid()
 	port := loadOrInitializePort()
+	release := readOSRelease()
 
 	return StartupConfig{
 		Addr:        ":" + strconv.Itoa(port),
 		Env:         getEnv("APP_ENV", "development"),
 		Mode:        mode,
-		OSName:      osName(),
+		OSName:      osName(release),
+		OSBranch:    osBranch(release),
 		PostBaseURL: os.Getenv("POST_BASE_URL"),
 		UID:         uid,
 		Username:    username(uid),
@@ -119,31 +122,80 @@ func defaultPortFromEnv() int {
 	return 2205
 }
 
-func osName() string {
+func readOSRelease() map[string]string {
+	values := make(map[string]string)
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
-		return "Linux"
+		return values
 	}
 	defer file.Close()
 
-	values := make(map[string]string)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		key, value, ok := strings.Cut(scanner.Text(), "=")
 		if !ok {
 			continue
 		}
-		values[key] = strings.Trim(value, `"`)
+		values[key] = strings.Trim(value, `"'`)
 	}
+	return values
+}
 
-	if name := values["PRETTY_NAME"]; name != "" {
+func osName(release map[string]string) string {
+	if name := release["PRETTY_NAME"]; name != "" {
 		return name
 	}
-	if name := values["NAME"]; name != "" {
+	if name := release["NAME"]; name != "" {
 		return name
 	}
-
 	return "Linux"
+}
+
+func osBranch(release map[string]string) string {
+	id := strings.ToLower(release["ID"])
+	idLike := strings.ToLower(release["ID_LIKE"])
+
+	// Check ID and ID_LIKE
+	isDebian := strings.Contains(id, "debian") || strings.Contains(id, "ubuntu") ||
+		strings.Contains(idLike, "debian") || strings.Contains(idLike, "ubuntu")
+	isRhel := strings.Contains(id, "rhel") || strings.Contains(id, "fedora") || strings.Contains(id, "centos") || strings.Contains(id, "almalinux") || strings.Contains(id, "rocky") || strings.Contains(id, "amzn") ||
+		strings.Contains(idLike, "rhel") || strings.Contains(idLike, "fedora") || strings.Contains(idLike, "centos")
+	isArch := strings.Contains(id, "arch") || strings.Contains(idLike, "arch")
+	isAlpine := strings.Contains(id, "alpine") || strings.Contains(idLike, "alpine")
+
+	if isDebian {
+		return "debian"
+	}
+	if isRhel {
+		return "rhel"
+	}
+	if isArch {
+		return "arch"
+	}
+	if isAlpine {
+		return "alpine"
+	}
+
+	// Fallback to checking package managers or command existence
+	if exists("/usr/bin/apt-get") || exists("/usr/bin/apt") {
+		return "debian"
+	}
+	if exists("/usr/bin/dnf") || exists("/usr/bin/yum") {
+		return "rhel"
+	}
+	if exists("/usr/bin/pacman") {
+		return "arch"
+	}
+	if exists("/sbin/apk") || exists("/usr/bin/apk") {
+		return "alpine"
+	}
+
+	return "other"
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func getEnv(key, fallback string) string {

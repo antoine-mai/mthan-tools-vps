@@ -17,6 +17,7 @@ type Dependencies struct {
 	Sessions *services.SessionService
 	Startup  services.StartupConfig
 	Update   *services.UpdateService
+	System   *services.SystemService
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
@@ -24,6 +25,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		Health:      deps.Health,
 		PostBaseURL: router.PostBaseURL(deps.Startup),
 		Sessions:    deps.Sessions,
+		System:      deps.System,
 	})
 
 	post.Register(mux, post.Dependencies{
@@ -31,6 +33,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		Sessions: deps.Sessions,
 		Startup:  deps.Startup,
 		Update:   deps.Update,
+		System:   deps.System,
 	})
 
 	router.Register(mux, deps.Startup, deps.ClientFS)

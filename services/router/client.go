@@ -20,6 +20,7 @@ type ClientRuntime struct {
 	IsRoot   bool   `json:"isRoot"`
 	Mode     string `json:"mode"`
 	OSName   string `json:"osName"`
+	OSBranch string `json:"osBranch"`
 	UID      int    `json:"uid"`
 	Username string `json:"username"`
 }
@@ -65,6 +66,7 @@ func newClientRuntime(startup services.StartupConfig) ClientRuntime {
 		IsRoot:   startup.IsRoot,
 		Mode:     startup.Mode,
 		OSName:   startup.OSName,
+		OSBranch: startup.OSBranch,
 		UID:      startup.UID,
 		Username: startup.Username,
 	}

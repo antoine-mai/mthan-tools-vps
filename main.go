@@ -57,6 +57,7 @@ func main() {
 		Sessions: sessions,
 		Startup:  startup,
 		Update:   updater,
+		System:   services.NewSystemService(),
 	})
 
 	srv := &http.Server{

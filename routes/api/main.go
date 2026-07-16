@@ -17,6 +17,7 @@ type Dependencies struct {
 	Health      *services.HealthService
 	PostBaseURL string
 	Sessions    *services.SessionService
+	System      *services.SystemService
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
@@ -47,6 +48,19 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 			"session": session,
 			"status":  "ok",
 		})
+	})))
+
+	mux.Handle("GET /api/system", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := requestSession(r, deps.Sessions); !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		status, err := deps.System.Status()
+		if err != nil {
+			http.Error(w, "system information unavailable", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, status)
 	})))
 
 	mux.Handle("POST /api/login", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

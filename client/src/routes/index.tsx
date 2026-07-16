@@ -5,7 +5,7 @@ import UsersRoute from "./root/users";
 import UserRoutes from "./user";
 import FilesRoute from "./files";
 import VHostsRoute from "./vhosts";
-import ModulesRoute from "./modules";
+import AppsRoute from "./apps";
 import AgentRoute from "./agent";
 
 export default function Routes() {
@@ -21,8 +21,8 @@ export default function Routes() {
         return <VHostsRoute />;
     }
 
-    if (isRoute("/modules")) {
-        return <ModulesRoute />;
+    if (isRoute("/apps")) {
+        return <AppsRoute />;
     }
 
     if (isRoute("/agent")) {
