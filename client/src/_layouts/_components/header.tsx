@@ -31,46 +31,23 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     const checkUpdate = useCallback(async () => {
         if (!isRoot) return null;
         setChecking(true);
+        setUpdateError("");
         try {
-            const localRes = await fetch("/version.json");
-            if (!localRes.ok) throw new Error("Failed to load local version");
-            const local = await localRes.json();
-
-            const remoteRes = await fetch(
-                "https://raw.githubusercontent.com/antoine-mai/mthan-tools-vps/main/bin/version.json",
-            );
-            if (!remoteRes.ok) throw new Error("Failed to load remote version");
-            const remote = await remoteRes.json();
-
-            let updateAvailable = false;
-            if (remote.buildTime && local.buildTime) {
-                const tRemote = new Date(remote.buildTime).getTime();
-                const tLocal = new Date(local.buildTime).getTime();
-                if (!isNaN(tRemote) && !isNaN(tLocal)) {
-                    updateAvailable = tRemote > tLocal;
-                } else {
-                    updateAvailable = remote.buildTime !== local.buildTime;
-                }
-            } else if (remote.buildTime) {
-                updateAvailable = true;
+            const response = await fetch("/post/update", { cache: "no-store" });
+            if (!response.ok) {
+                const message = await response.text();
+                throw new Error(message.trim() || "Failed to check for updates");
             }
+            const info: UpdateInfo = await response.json();
 
-            const info: UpdateInfo = {
-                updateAvailable,
-                localVersion: local.version,
-                remoteVersion: remote.version,
-                localBuildTime: local.buildTime,
-                remoteBuildTime: remote.buildTime,
-            };
-
-            setUpdateAvailable(updateAvailable);
+            setUpdateAvailable(info.updateAvailable);
             setUpdateInfo(info);
             return info;
-        } catch (err) {
-            console.error(
-                "Failed to check for updates directly from client:",
-                err,
-            );
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Failed to check for updates";
+            setUpdateError(message);
+            console.error("Failed to check for updates:", err);
         } finally {
             setChecking(false);
         }
