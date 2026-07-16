@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import ColorModeSwitch from "_components/color-mode-switch";
 import { AlertTriangle, User, Menu, RefreshCw, X } from "lucide-react";
 import { useApp } from "../../_contexts/app";
@@ -26,6 +26,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     const [updateModalOpen, setUpdateModalOpen] = useState(false);
     const [updateError, setUpdateError] = useState("");
     const [updateSuccess, setUpdateSuccess] = useState(false);
+    const allowReload = useRef(false);
 
     const checkUpdate = useCallback(async () => {
         if (!isRoot) return null;
@@ -65,6 +66,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         if (!updating && !restarting) return;
 
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (allowReload.current) return;
             e.preventDefault();
             e.returnValue =
                 "The system is updating or restarting. Please do not close the browser or reload the page.";
@@ -109,6 +111,8 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                 }
                 setUpdateSuccess(true);
                 setUpdateAvailable(false);
+                allowReload.current = true;
+                window.location.reload();
             } else {
                 setUpdateError(await responseError(response, "Update failed"));
             }

@@ -26,6 +26,7 @@ interface ServerApp {
     uptime: string;
     installed: boolean;
     manageable: boolean;
+    versions?: string[];
 }
 
 export default function AppsRoute() {
@@ -58,11 +59,11 @@ export default function AppsRoute() {
         },
         {
             id: "3",
-            name: "php8.2",
-            displayName: "PHP 8.2",
-            serviceName: "php8.2-fpm.service",
-            version: "8.2.18",
-            port: "Unix Socket",
+            name: "php",
+            displayName: "PHP",
+            serviceName: "php-fpm.service",
+            version: "Multiple",
+            port: "Unix sockets",
             description: "PHP FastCGI Process Manager for processing dynamic web scripts.",
             running: true,
             uptime: "5 hours, 12 minutes",
@@ -121,45 +122,6 @@ export default function AppsRoute() {
             installed: false,
             manageable: false,
         },
-        {
-            id: "8",
-            name: "php8.1",
-            displayName: "PHP 8.1",
-            serviceName: "php8.1-fpm.service",
-            version: "8.1",
-            port: "Unix socket",
-            description: "PHP FastCGI Process Manager.",
-            running: false,
-            uptime: "Stopped",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "9",
-            name: "php8.3",
-            displayName: "PHP 8.3",
-            serviceName: "php8.3-fpm.service",
-            version: "8.3",
-            port: "Unix socket",
-            description: "PHP FastCGI Process Manager.",
-            running: false,
-            uptime: "Stopped",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "10",
-            name: "php8.4",
-            displayName: "PHP 8.4",
-            serviceName: "php8.4-fpm.service",
-            version: "8.4",
-            port: "Unix socket",
-            description: "PHP FastCGI Process Manager.",
-            running: false,
-            uptime: "Stopped",
-            installed: false,
-            manageable: true,
-        },
     ]);
 
     const [selectedApp, setSelectedApp] = useState<ServerApp | null>(apps[0]);
@@ -173,7 +135,7 @@ export default function AppsRoute() {
                 const response = await fetch(Api.current.apps, { cache: "no-store" });
                 if (!response.ok) throw new Error("Failed to load app status");
                 const data: {
-                    apps: Array<Pick<ServerApp, "name" | "installed" | "manageable" | "running" | "serviceName">>;
+                    apps: Array<Pick<ServerApp, "name" | "installed" | "manageable" | "running" | "serviceName" | "versions">>;
                 } = await response.json();
                 setApps((current) =>
                     current.map((app) => ({
@@ -367,6 +329,29 @@ export default function AppsRoute() {
                                     </div>
                                 ) : null}
                             </div>
+
+                            {selectedApp.name === "php" ? (
+                                <section className="space-y-3">
+                                    <h3 className="text-sm font-semibold text-foreground">PHP configuration</h3>
+                                    <div className="rounded-md border border-border bg-card p-4">
+                                        <p className="text-xs font-medium text-muted-foreground">Installed versions</p>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {selectedApp.versions?.length ? (
+                                                selectedApp.versions.map((version) => (
+                                                    <span
+                                                        key={version}
+                                                        className="rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs text-foreground"
+                                                    >
+                                                        PHP {version}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">No supported PHP version detected.</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
+                            ) : null}
                         </div>
                     ) : (
                         /* Empty state */

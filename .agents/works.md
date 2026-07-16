@@ -23,6 +23,21 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-16 - Update reload and consolidated PHP app
+
+- Goal: Reload safely after update reconnect and represent PHP versions as configuration of one app.
+- Files changed:
+  - `client/src/_layouts/_components/header.tsx`
+  - `client/src/routes/apps/index.tsx`
+  - `services/apps.go`
+  - `services/apps_test.go`
+- Important decisions:
+  - Window reload occurs only after two successful health responses and update confirmation.
+  - PHP is a single Apps sidebar entry; detected PHP 8.1–8.4 versions appear in its configuration panel.
+  - PHP service detection is limited to services matching detected versions.
+- Validation: targeted Go tests and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-16 - Cross-distribution app detection
 
 - Goal: Add Docker, Podman, Node.js, and parallel PHP versions to the Apps panel.

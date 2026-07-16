@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestKnownAppsIncludeContainerNodeAndPHPVersions(t *testing.T) {
-	want := []string{"docker", "podman", "node", "php8.1", "php8.2", "php8.3", "php8.4"}
+func TestKnownAppsIncludeContainerNodeAndPHP(t *testing.T) {
+	want := []string{"docker", "podman", "node", "php"}
 	found := make(map[string]appDefinition, len(knownApps))
 	for _, app := range knownApps {
 		found[app.name] = app

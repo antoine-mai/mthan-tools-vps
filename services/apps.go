@@ -8,18 +8,18 @@ import (
 )
 
 type AppStatus struct {
-	Name       string `json:"name"`
-	Installed  bool   `json:"installed"`
-	Manageable bool   `json:"manageable"`
-	Running    bool   `json:"running"`
-	Service    string `json:"serviceName,omitempty"`
+	Name       string   `json:"name"`
+	Installed  bool     `json:"installed"`
+	Manageable bool     `json:"manageable"`
+	Running    bool     `json:"running"`
+	Service    string   `json:"serviceName,omitempty"`
+	Versions   []string `json:"versions,omitempty"`
 }
 
 type appDefinition struct {
-	name       string
-	binaries   []string
-	services   []string
-	phpVersion string
+	name     string
+	binaries []string
+	services []string
 }
 
 var knownApps = []appDefinition{
@@ -29,19 +29,21 @@ var knownApps = []appDefinition{
 	{name: "docker", binaries: []string{"docker", "/usr/bin/docker", "/usr/local/bin/docker"}, services: []string{"docker.service"}},
 	{name: "podman", binaries: []string{"podman", "/usr/bin/podman", "/usr/local/bin/podman"}, services: []string{"podman.service", "podman.socket"}},
 	{name: "node", binaries: []string{"node", "nodejs", "/usr/bin/node", "/usr/local/bin/node"}},
-	{name: "php8.1", phpVersion: "8.1", binaries: phpBinaries("8.1"), services: phpServices("8.1")},
-	{name: "php8.2", phpVersion: "8.2", binaries: phpBinaries("8.2"), services: phpServices("8.2")},
-	{name: "php8.3", phpVersion: "8.3", binaries: phpBinaries("8.3"), services: phpServices("8.3")},
-	{name: "php8.4", phpVersion: "8.4", binaries: phpBinaries("8.4"), services: phpServices("8.4")},
+	{name: "php", services: allPHPServices()},
 }
 
 func DetectApps() []AppStatus {
 	statuses := make([]AppStatus, 0, len(knownApps))
-	phpVersion := genericPHPVersion()
 	for _, app := range knownApps {
 		installed := hasBinary(app.binaries)
-		if !installed && app.phpVersion != "" {
-			installed = phpVersion == app.phpVersion
+		var versions []string
+		if app.name == "php" {
+			versions = installedPHPVersions()
+			installed = len(versions) > 0
+			app.services = nil
+			for _, version := range versions {
+				app.services = append(app.services, phpServices(version)...)
+			}
 		}
 
 		service := ""
@@ -59,9 +61,31 @@ func DetectApps() []AppStatus {
 			Manageable: len(app.services) > 0,
 			Running:    running,
 			Service:    service,
+			Versions:   versions,
 		})
 	}
 	return statuses
+}
+
+var supportedPHPVersions = []string{"8.1", "8.2", "8.3", "8.4"}
+
+func installedPHPVersions() []string {
+	genericVersion := genericPHPVersion()
+	versions := make([]string, 0, len(supportedPHPVersions))
+	for _, version := range supportedPHPVersions {
+		if hasBinary(phpBinaries(version)) || genericVersion == version {
+			versions = append(versions, version)
+		}
+	}
+	return versions
+}
+
+func allPHPServices() []string {
+	services := make([]string, 0, len(supportedPHPVersions)*4)
+	for _, version := range supportedPHPVersions {
+		services = append(services, phpServices(version)...)
+	}
+	return services
 }
 
 func hasBinary(names []string) bool {
