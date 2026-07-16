@@ -7,8 +7,6 @@ import {
     Square,
     CheckCircle2,
     XCircle,
-    Info,
-    Terminal,
     Loader2,
 } from "lucide-react";
 
@@ -199,14 +197,13 @@ export default function AppsRoute() {
                 {/* Right Panel - App Detail View */}
                 <main className="bg-background flex flex-col h-full overflow-hidden">
                     {selectedApp ? (
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            {/* Profile Header */}
-                            <div className="flex items-start justify-between border-b border-border pb-5">
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                                            {selectedApp.displayName}
-                                        </h2>
+                        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                            {/* Compact app header */}
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-4">
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                                        {selectedApp.displayName}
+                                    </h2>
                                         {!selectedApp.installed ? (
                                             <span className="inline-flex items-center gap-1 rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                                                 <XCircle className="h-3 w-3 shrink-0" />
@@ -223,52 +220,22 @@ export default function AppsRoute() {
                                                 Stopped
                                             </span>
                                         )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-                                        {selectedApp.description}
-                                    </p>
                                 </div>
-                            </div>
-
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border bg-card/20">
-                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
-                                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            Software Version
-                                        </span>
-                                        <p className="font-semibold text-sm text-foreground">{selectedApp.version}</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-5 border-b md:border-b-0 md:border-r border-border flex items-start gap-3">
-                                    <Terminal className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1 min-w-0">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            Systemd Service
-                                        </span>
-                                        <p className="font-mono text-xs text-foreground truncate select-all" title={selectedApp.serviceName}>
-                                            {selectedApp.serviceName}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="p-5 flex items-start gap-3">
-                                    <Cpu className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                    <div className="space-y-1 min-w-0">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                            Listen Port / Socket
-                                        </span>
-                                        <p className="font-mono text-xs text-foreground truncate select-all" title={String(selectedApp.port)}>
-                                            {selectedApp.port}
-                                        </p>
-                                    </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                    <span>
+                                        Version <strong className="font-medium text-foreground">{selectedApp.version}</strong>
+                                    </span>
+                                    <span>
+                                        Service <code className="text-foreground">{selectedApp.serviceName}</code>
+                                    </span>
+                                    <span>
+                                        Port <code className="text-foreground">{selectedApp.port}</code>
+                                    </span>
                                 </div>
                             </div>
 
                             {/* Service Control Panel */}
-                            <div className="p-6 space-y-4">
+                            <div className="space-y-3">
                                 <div className="flex items-center justify-between border-b border-border pb-2">
                                     <h3 className="text-sm font-semibold text-foreground">
                                         Service Management Console
@@ -279,9 +246,6 @@ export default function AppsRoute() {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                    Control status of {selectedApp.displayName} service block. Restart is recommended only during server configuration updates.
-                                </p>
                                 <div className="flex flex-wrap gap-2 pt-2">
                                     {!selectedApp.installed ? (
                                         <p className="text-xs text-muted-foreground">

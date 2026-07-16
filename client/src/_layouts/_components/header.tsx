@@ -34,8 +34,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         try {
             const response = await fetch("/post/update", { cache: "no-store" });
             if (!response.ok) {
-                const message = await response.text();
-                throw new Error(message.trim() || "Failed to check for updates");
+                throw new Error(await responseError(response, "Failed to check for updates"));
             }
             const info: UpdateInfo = await response.json();
 
@@ -96,16 +95,22 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         setUpdateSuccess(false);
         try {
             const response = await fetch("/post/update", { method: "POST" });
-            if (response.ok) {
+            if (response.ok || isRestartResponse(response.status)) {
+                const updateWasAccepted = response.ok;
                 setRestarting(true);
                 await waitForServer();
                 setRestarting(false);
+                const info = await checkUpdate();
+                if (!updateWasAccepted && !info) {
+                    throw new Error("The server reconnected, but the update status could not be confirmed.");
+                }
+                if (info?.updateAvailable) {
+                    throw new Error("The server reconnected, but the update could not be confirmed.");
+                }
                 setUpdateSuccess(true);
                 setUpdateAvailable(false);
-                await checkUpdate();
             } else {
-                const msg = await response.text();
-                setUpdateError(msg.trim() || "Update failed");
+                setUpdateError(await responseError(response, "Update failed"));
             }
         } catch (err: any) {
             setUpdateError(err.message || "Update failed");
@@ -406,4 +411,22 @@ async function waitForServer() {
 
 function delay(milliseconds: number) {
     return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function isRestartResponse(status: number) {
+    return status === 502 || status === 503 || status === 504;
+}
+
+async function responseError(response: Response, fallback: string) {
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("text/plain") && !contentType.includes("application/json")) {
+        return `${fallback} (${response.status})`;
+    }
+
+    const message = (await response.text()).trim();
+    if (!message || /<\/?[a-z][\s\S]*>/i.test(message)) {
+        return `${fallback} (${response.status})`;
+    }
+
+    return message.length > 240 ? `${message.slice(0, 237)}...` : message;
 }
