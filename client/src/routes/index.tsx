@@ -3,6 +3,7 @@ import { Route, Routes as RouterRoutes } from "react-router-dom";
 import { runtime } from "../runtime";
 import AgentRoute from "./agent";
 import AppsRoute from "./apps";
+import APIsRoute from "./apis";
 import FilesRoute from "./files";
 import LoginRoute from "./login";
 import RootRoutes from "./root";
@@ -19,6 +20,7 @@ export default function AppRoutes() {
             <Route path="/vhosts" element={<VHostsRoute />} />
             <Route path="/apps" element={<AppsRoute />} />
             <Route path="/apps/:app" element={<AppsRoute />} />
+            <Route path="/apis" element={<APIsRoute />} />
             <Route path="/agent" element={<AgentRoute />} />
             <Route path="/settings" element={<SettingsRoute />} />
             <Route path="/settings/:section" element={<SettingsRoute />} />

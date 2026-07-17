@@ -23,6 +23,22 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - API credential management
+
+- Goal: Implement the APIs page and persistent `apis` SQLite table, including accepted IP restrictions.
+- Files changed: settings database migration, API credential service/tests, authenticated root routes, APIs page, and work log.
+- Important decisions: secrets are returned once and only SHA-256 hashes are stored; accepted IPs are stored as a JSON array and validated as IP addresses or CIDR ranges; an empty list allows all IPs; keys can be enabled, disabled, edited, and deleted.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: API key authentication for product endpoints is not implemented yet.
+
+### 2026-07-17 - APIs sidebar item
+
+- Goal: Add APIs navigation immediately above Settings in the global sidebar.
+- Files changed: sidebar, React route table, APIs placeholder route, and work log.
+- Important decisions: `/apis` is a real React Router destination with an English Coming soon state, avoiding a dead navigation item.
+- Validation: TypeScript type-check and `git diff --check`; no frontend production build.
+- Known follow-up: API management functionality is not implemented yet.
+
 ### 2026-07-17 - User overview system app status
 
 - Goal: Show installation and version information from the system Apps route in User Overview.

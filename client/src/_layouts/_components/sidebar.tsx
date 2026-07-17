@@ -11,6 +11,7 @@ import {
     Globe,
     Boxes,
     Settings,
+    Braces,
 } from "lucide-react";
 import { useUser } from "../../_contexts/user";
 import { runtime } from "../../runtime";
@@ -76,6 +77,20 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
 
                 {/* Spacer to push Terminal to bottom */}
                 <div className="flex-1" />
+
+                <Link
+                    to="/apis"
+                    className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                        location.pathname === "/apis" || location.pathname.startsWith("/apis/")
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                >
+                    <Braces className="h-5 w-5 shrink-0" />
+                    <span className="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 translate-x-1 whitespace-nowrap rounded border border-border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100">
+                        APIs
+                    </span>
+                </Link>
 
                 <Link
                     to="/settings/general"
