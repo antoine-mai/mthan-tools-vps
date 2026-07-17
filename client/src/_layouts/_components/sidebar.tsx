@@ -54,7 +54,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                     const Icon = item.icon;
                     const isActive =
                         window.location.pathname === item.href ||
-                        (item.href === "/apps" && window.location.pathname.startsWith("/apps/"));
+                        (item.href !== "/" && window.location.pathname.startsWith(`${item.href}/`));
                     return (
                         <a
                             key={item.label}
@@ -78,9 +78,9 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                 <div className="flex-1" />
 
                 <a
-                    href="/settings"
+                    href="/settings/general"
                     className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
-                        window.location.pathname === "/settings"
+                        window.location.pathname === "/settings" || window.location.pathname.startsWith("/settings/")
                             ? "bg-primary text-primary-foreground"
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}

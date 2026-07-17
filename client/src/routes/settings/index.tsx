@@ -24,7 +24,7 @@ type SettingsSection = "general" | "users" | "apps";
 
 export default function SettingsRoute() {
     const { appName, setAppName, headerApps, setHeaderApps, setDefaultColorMode, settings, setSetting } = useApp();
-    const [section, setSection] = useState<SettingsSection>("general");
+    const section = getSettingsSection();
     const [appNameDraft, setAppNameDraft] = useState(appName);
     const [colorMode, setCurrentColorMode] = useState<ColorModePreference>(getColorModePreference);
     const [installedApps, setInstalledApps] = useState<string[]>([]);
@@ -91,9 +91,9 @@ export default function SettingsRoute() {
         <DashboardLayout title="Settings" fullWidth>
             <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[240px_1fr]">
                 <aside className="flex h-full flex-col gap-1 border-r border-border bg-card/60 p-2">
-                    <SettingsNavItem active={section === "general"} icon={Settings} label="General Settings" onClick={() => setSection("general")} />
-                    <SettingsNavItem active={section === "users"} icon={User} label="Users Settings" onClick={() => setSection("users")} />
-                    <SettingsNavItem active={section === "apps"} icon={Boxes} label="Apps Settings" onClick={() => setSection("apps")} />
+                    <SettingsNavItem active={section === "general"} href="/settings/general" icon={Settings} label="General Settings" />
+                    <SettingsNavItem active={section === "users"} href="/settings/users" icon={User} label="Users Settings" />
+                    <SettingsNavItem active={section === "apps"} href="/settings/apps" icon={Boxes} label="Apps Settings" />
                 </aside>
 
                 <main className="overflow-y-auto p-6">
@@ -254,22 +254,26 @@ export default function SettingsRoute() {
     );
 }
 
-function SettingsNavItem({ active, icon: Icon, label, onClick }: {
+function getSettingsSection(): SettingsSection {
+    const section = window.location.pathname.split("/")[2];
+    return section === "users" || section === "apps" ? section : "general";
+}
+
+function SettingsNavItem({ active, href, icon: Icon, label }: {
     active: boolean;
+    href: string;
     icon: typeof Settings;
     label: string;
-    onClick: () => void;
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
+        <a
+            href={href}
             className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold ${
                 active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
         >
             <Icon className="h-4 w-4" />
             {label}
-        </button>
+        </a>
     );
 }

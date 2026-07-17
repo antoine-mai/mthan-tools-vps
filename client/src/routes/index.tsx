@@ -30,7 +30,7 @@ export default function Routes() {
         return <AgentRoute />;
     }
 
-    if (isRoute("/settings")) {
+    if (isRoute("/settings") || isNestedRoute("/settings")) {
         return <SettingsRoute />;
     }
 

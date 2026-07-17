@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - Nested settings routes
+
+- Goal: Give each Settings section a dedicated URL.
+- Files changed: route matcher, main sidebar, Settings route, and work log.
+- Important decisions: routes are `/settings/general`, `/settings/users`, and `/settings/apps`; `/settings` falls back to General Settings.
+- Validation: TypeScript syntax parser and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - Prefixed settings and Linux user defaults
 
 - Goal: Rename User Settings to Users Settings and persist defaults used by Linux user creation.
