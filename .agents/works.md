@@ -27,7 +27,7 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 - Goal: List a user's apps from the direct child directories of their `htdocs` folder.
 - Files changed: Linux user service/tests, root-only user apps route registration and handler, Users UI, and work log.
-- Important decisions: only immediate directories under `<home>/htdocs` are returned; regular files and nested descendants are excluded; usernames resolve through the existing `/home` user list instead of becoming raw filesystem paths.
+- Important decisions: only immediate directories under `<home>/htdocs` are returned; regular files and nested descendants are excluded; usernames resolve through the existing `/home` user list instead of becoming raw filesystem paths; each app renders as an expandable accordion item ready for additional details and configuration.
 - Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
 - Known follow-up: none.
 

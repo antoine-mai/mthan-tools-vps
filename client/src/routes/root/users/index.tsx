@@ -17,6 +17,7 @@ import {
     LayoutDashboard,
     Folder,
     Boxes,
+    ChevronRight,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -395,12 +396,19 @@ export default function UsersRoute() {
                                     ) : userApps.length === 0 ? (
                                         <p className="p-4 text-xs text-muted-foreground">No apps found.</p>
                                     ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                                        <div className="divide-y divide-border">
                                             {userApps.map((app) => (
-                                                <div key={app} className="flex items-center gap-2 border-b border-r border-border px-4 py-3 text-sm">
-                                                    <Boxes className="h-4 w-4 shrink-0 text-primary" />
-                                                    <span className="truncate font-medium" title={app}>{app}</span>
-                                                </div>
+                                                <details key={app} className="group">
+                                                    <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                                                        <Boxes className="h-4 w-4 shrink-0 text-primary" />
+                                                        <span className="min-w-0 flex-1 truncate font-medium" title={app}>{app}</span>
+                                                    </summary>
+                                                    <div className="border-t border-border bg-muted/20 px-10 py-5">
+                                                        <p className="text-xs font-medium text-foreground">Coming soon</p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">App details and configuration will be available here.</p>
+                                                    </div>
+                                                </details>
                                             ))}
                                         </div>
                                     )}
