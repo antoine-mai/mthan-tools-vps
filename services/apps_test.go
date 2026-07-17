@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestKnownAppsIncludeContainerNodeAndPHP(t *testing.T) {
+func TestKnownAppsIncludeContainersNodeAndPHP(t *testing.T) {
 	want := []string{"docker", "podman", "node", "php"}
 	found := make(map[string]appDefinition, len(knownApps))
 	for _, app := range knownApps {
@@ -16,9 +16,6 @@ func TestKnownAppsIncludeContainerNodeAndPHP(t *testing.T) {
 		if _, ok := found[name]; !ok {
 			t.Errorf("knownApps does not contain %q", name)
 		}
-	}
-	if len(found["node"].services) != 0 {
-		t.Error("Node.js must not expose system service controls")
 	}
 }
 

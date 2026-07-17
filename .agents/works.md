@@ -23,6 +23,22 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - Restore system Node.js 22
+
+- Goal: Restore Node.js as a system app and make Node.js 22 the default installation target.
+- Files changed: app detection/install plans and tests, Apps/User Overview/Settings/Header UI, settings validation, and work log.
+- Important decisions: Debian/RHEL families configure the fixed NodeSource 22.x repository before package installation; Arch installs `nodejs-lts-jod`; Node.js is again detectable, installable, and pinnable.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: existing non-22 Node.js installations are reported as installed and are not automatically replaced.
+
+### 2026-07-17 - Remove system Node.js app
+
+- Goal: Remove Node.js from system Apps because Node versions will be managed per Linux user through NVM.
+- Files changed: app detection/install plans and tests, Apps/User Overview/Settings/Header UI, settings validation and stale header-pin cleanup, and work log.
+- Important decisions: Node.js is no longer detected, installable, pinnable, or displayed as a system app; existing `node` header pins are removed when settings load.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: per-user NVM management is not implemented yet.
+
 ### 2026-07-17 - System app installation
 
 - Goal: Install supported apps directly from `/apps` and simplify app display names.
