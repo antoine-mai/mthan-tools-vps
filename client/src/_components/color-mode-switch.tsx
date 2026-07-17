@@ -20,6 +20,8 @@ export default function ColorModeSwitch() {
     useEffect(() => {
         const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
+        const handlePreferenceChange = () => setCurrentColorMode(getColorMode());
+
         function handleSystemColorModeChange() {
             if (getStoredColorMode() === null) {
                 setCurrentColorMode(getSystemColorMode());
@@ -27,12 +29,14 @@ export default function ColorModeSwitch() {
         }
 
         mediaQuery.addEventListener("change", handleSystemColorModeChange);
+        window.addEventListener("vps-color-mode-change", handlePreferenceChange);
 
         return () => {
             mediaQuery.removeEventListener(
                 "change",
                 handleSystemColorModeChange,
             );
+            window.removeEventListener("vps-color-mode-change", handlePreferenceChange);
         };
     }, []);
 

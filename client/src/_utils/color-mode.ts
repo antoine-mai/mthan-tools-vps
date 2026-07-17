@@ -1,4 +1,5 @@
 export type ColorMode = "dark" | "light";
+export type ColorModePreference = ColorMode | "system";
 
 const colorModeStorageKey = "vps-color-mode";
 
@@ -34,6 +35,20 @@ export function applyColorMode(colorMode: ColorMode) {
 export function setColorMode(colorMode: ColorMode) {
     window.localStorage.setItem(colorModeStorageKey, colorMode);
     applyColorMode(colorMode);
+}
+
+export function getColorModePreference(): ColorModePreference {
+    return getStoredColorMode() ?? "system";
+}
+
+export function setColorModePreference(preference: ColorModePreference) {
+    if (preference === "system") {
+        window.localStorage.removeItem(colorModeStorageKey);
+        applyColorMode(getSystemColorMode());
+    } else {
+        setColorMode(preference);
+    }
+    window.dispatchEvent(new Event("vps-color-mode-change"));
 }
 
 export function toggleColorMode(colorMode: ColorMode): ColorMode {

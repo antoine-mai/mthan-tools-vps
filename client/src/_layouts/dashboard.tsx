@@ -5,6 +5,7 @@ import Sidebar from "./_components/sidebar";
 import Header from "./_components/header";
 import TerminalPanel from "_components/terminal-panel";
 import { runtime } from "../runtime";
+import { useApp } from "../_contexts/app";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -22,6 +23,7 @@ function DashboardLayoutContent({
     fullWidth,
 }: DashboardLayoutProps) {
     const { isLoggedIn } = useUser();
+    const { appName } = useApp();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [isTerminalOpen, setIsTerminalOpen] = useState(false);
 
@@ -33,11 +35,11 @@ function DashboardLayoutContent({
 
     useEffect(() => {
         if (title) {
-            document.title = `${title} | MThan VPS`;
+            document.title = `${title} | ${appName}`;
         } else {
-            document.title = "MThan VPS";
+            document.title = appName;
         }
-    }, [title]);
+    }, [appName, title]);
 
     useEffect(() => {
         if (!runtime.isRoot) return;
@@ -81,7 +83,7 @@ function DashboardLayoutContent({
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col overflow-hidden">
-                <Header title="MThan VPS Panel" onMenuClick={() => setIsMobileOpen(true)} />
+                <Header title={appName} onMenuClick={() => setIsMobileOpen(true)} />
 
                 <div className="relative flex flex-1 flex-col overflow-hidden">
                     {fullWidth ? (

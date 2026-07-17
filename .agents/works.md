@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - General settings sidebar
+
+- Goal: Add the first Settings section with persistent app identity and appearance preferences.
+- Files changed: app context, dashboard layout, color-mode utilities/switch, Settings route, and app-settings utility.
+- Important decisions: Settings uses a left sidebar with `General Settings`; App Name updates the header/document title; color mode supports System, Light, and Dark and applies immediately.
+- Validation: `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - Post-update reload countdown
 
 - Goal: Avoid reloading while the reverse proxy may still return a transient 502 after API restart.
