@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - List all home-directory users
+
+- Goal: Make `/users` list every directory directly under `/home`.
+- Files changed: Linux users service/tests and work log.
+- Important decisions: removed the `user-` prefix filter; directories without an `/etc/passwd` account are still listed with UID -1; regular files are ignored.
+- Validation: targeted Go tests and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - Configurable automatic Linux usernames
 
 - Goal: Make automatic username generation optional for new Linux users.

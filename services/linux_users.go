@@ -3,7 +3,6 @@ package services
 import (
 	"bufio"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,7 +17,11 @@ type LinuxUser struct {
 }
 
 func HomeUsers() ([]LinuxUser, error) {
-	entries, err := os.ReadDir("/home")
+	return homeUsersIn("/home", passwdUsersByName())
+}
+
+func homeUsersIn(homeRoot string, passwdUsers map[string]passwdUser) ([]LinuxUser, error) {
+	entries, err := os.ReadDir(homeRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []LinuxUser{}, nil
@@ -26,7 +29,6 @@ func HomeUsers() ([]LinuxUser, error) {
 		return nil, err
 	}
 
-	passwdUsers := passwdUsersByName()
 	users := make([]LinuxUser, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -34,10 +36,7 @@ func HomeUsers() ([]LinuxUser, error) {
 		}
 
 		name := entry.Name()
-		if !strings.HasPrefix(name, "user-") {
-			continue
-		}
-		home := filepath.Join("/home", name)
+		home := filepath.Join(homeRoot, name)
 		linuxUser := LinuxUser{
 			Home:     home,
 			Name:     name,
@@ -46,12 +45,7 @@ func HomeUsers() ([]LinuxUser, error) {
 			Username: name,
 		}
 
-		if lookup, err := user.Lookup(name); err == nil {
-			linuxUser.Username = lookup.Username
-			if uid, err := strconv.Atoi(lookup.Uid); err == nil {
-				linuxUser.UID = uid
-			}
-		} else if passwdUsers[name].Username != "" {
+		if passwdUsers[name].Username != "" {
 			linuxUser.Username = passwdUsers[name].Username
 			linuxUser.UID = passwdUsers[name].UID
 		}
