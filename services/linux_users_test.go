@@ -33,3 +33,25 @@ func TestHomeUsersIncludesEveryDirectory(t *testing.T) {
 		t.Fatalf("folder-only user metadata = %+v", users[1])
 	}
 }
+
+func TestUserAppsReturnsOnlyDirectChildDirectories(t *testing.T) {
+	home := t.TempDir()
+	htdocs := filepath.Join(home, "htdocs")
+	if err := os.MkdirAll(filepath.Join(htdocs, "alpha", "nested"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(htdocs, "beta"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(htdocs, "index.html"), []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	apps, err := UserApps(home)
+	if err != nil {
+		t.Fatalf("UserApps() error = %v", err)
+	}
+	if len(apps) != 2 || apps[0] != "alpha" || apps[1] != "beta" {
+		t.Fatalf("UserApps() = %v, want [alpha beta]", apps)
+	}
+}

@@ -45,6 +45,9 @@ export default function UsersRoute() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [userApps, setUserApps] = useState<string[]>([]);
+    const [appsError, setAppsError] = useState<string | null>(null);
+    const [appsLoading, setAppsLoading] = useState(false);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -127,6 +130,28 @@ export default function UsersRoute() {
         const routed = users.find((user) => user.username === routeUsername);
         if (routed) setSelectedUser(routed);
     }, [routeUsername, users]);
+
+    useEffect(() => {
+        if (activeSection !== "apps" || !selectedUser) return;
+
+        const controller = new AbortController();
+        setAppsLoading(true);
+        setAppsError(null);
+        fetch(`/post/user/apps?username=${encodeURIComponent(selectedUser.username)}`, { signal: controller.signal })
+            .then(async (response) => {
+                if (!response.ok) throw new Error((await response.text()) || "Failed to load user apps");
+                return response.json();
+            })
+            .then((data) => setUserApps(data.apps || []))
+            .catch((requestError) => {
+                if (requestError.name !== "AbortError") setAppsError(requestError.message || "Failed to load user apps");
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setAppsLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [activeSection, selectedUser]);
 
     const handleCreateUser = async (e: FormEvent) => {
         e.preventDefault();
@@ -314,19 +339,14 @@ export default function UsersRoute() {
                     {selectedUser ? (
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Profile Header */}
-                            <div className="flex items-center justify-between border-b border-border pb-5">
-                                <div className="min-w-0 flex-1 space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                                            {selectedUser.username}
-                                        </h2>
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-2">
-                                        <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
-                                        <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
-                                        <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
-                                    </div>
+                            <div className="flex items-center gap-3 border-b border-border pb-5">
+                                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                                    <h2 className="mr-1 shrink-0 text-2xl font-bold tracking-tight text-foreground">
+                                        {selectedUser.username}
+                                    </h2>
+                                    <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
+                                    <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
+                                    <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
                                 </div>
 
                                 {selectedUser.uid !== 0 && (
@@ -363,9 +383,27 @@ export default function UsersRoute() {
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="rounded-md border border-border bg-card p-5">
-                                    <h3 className="text-sm font-semibold">User Apps</h3>
-                                    <p className="mt-2 text-xs text-muted-foreground">No user-specific apps are configured.</p>
+                                <div className="border border-border bg-card">
+                                    <div className="border-b border-border px-4 py-3">
+                                        <h3 className="text-sm font-semibold">User Apps</h3>
+                                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p>
+                                    </div>
+                                    {appsLoading ? (
+                                        <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                                    ) : appsError ? (
+                                        <p className="p-4 text-xs text-destructive">{appsError}</p>
+                                    ) : userApps.length === 0 ? (
+                                        <p className="p-4 text-xs text-muted-foreground">No apps found.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                                            {userApps.map((app) => (
+                                                <div key={app} className="flex items-center gap-2 border-b border-r border-border px-4 py-3 text-sm">
+                                                    <Boxes className="h-4 w-4 shrink-0 text-primary" />
+                                                    <span className="truncate font-medium" title={app}>{app}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

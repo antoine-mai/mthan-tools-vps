@@ -39,6 +39,37 @@ type LinuxUser struct {
 	Username string `json:"username"`
 }
 
+func UserApps(home string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(home, "htdocs"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	apps := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			apps = append(apps, entry.Name())
+		}
+	}
+	return apps, nil
+}
+
+func HomeUser(username string) (LinuxUser, bool, error) {
+	users, err := HomeUsers()
+	if err != nil {
+		return LinuxUser{}, false, err
+	}
+	for _, linuxUser := range users {
+		if linuxUser.Username == username {
+			return linuxUser, true, nil
+		}
+	}
+	return LinuxUser{}, false, nil
+}
+
 func HomeUsers() ([]LinuxUser, error) {
 	return homeUsersIn("/home", passwdUsersByName())
 }
