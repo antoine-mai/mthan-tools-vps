@@ -23,6 +23,30 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - User settings and sortable app shortcuts
+
+- Goal: Add User Settings and redesign Apps Settings for installed and pinned apps.
+- Files changed: Settings route and work log.
+- Important decisions: Apps Settings uses installed/header columns; pinned apps support drag/drop and accessible up/down sorting; the narrow header-pin subtitle was removed.
+- Validation: `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
+### 2026-07-17 - App header pin action
+
+- Goal: Add or remove each app from the global header directly from its app page.
+- Files changed: Apps route and work log.
+- Important decisions: icon-only Pin/PinOff action sits beside service controls and uses the existing SQLite-backed `header_apps` setting.
+- Validation: `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
+### 2026-07-17 - Nested app routes
+
+- Goal: Give every app a dedicated URL such as `/apps/nginx` and `/apps/docker`.
+- Files changed: route matcher, main sidebar, Header shortcuts, Apps route, and work log.
+- Important decisions: `/apps` remains valid; app selection updates browser history; Back/Forward restores the selected app.
+- Validation: `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - SQLite settings and app header shortcuts
 
 - Goal: Persist panel settings and configurable app shortcuts in SQLite.

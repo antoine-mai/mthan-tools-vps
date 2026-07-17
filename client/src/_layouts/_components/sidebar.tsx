@@ -52,7 +52,9 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
             <nav className="flex-1 flex flex-col items-center gap-4 px-2 py-6">
                 {topMenuItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = window.location.pathname === item.href;
+                    const isActive =
+                        window.location.pathname === item.href ||
+                        (item.href === "/apps" && window.location.pathname.startsWith("/apps/"));
                     return (
                         <a
                             key={item.label}

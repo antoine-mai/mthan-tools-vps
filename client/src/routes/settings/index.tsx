@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Boxes, Plus, Settings, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Boxes, GripVertical, Plus, Settings, User, X } from "lucide-react";
 
 import { useApp } from "_contexts/app";
 import DashboardLayout from "_layouts/dashboard";
 import { defaultAppName } from "_utils/app-settings";
+import Api from "_utils/api";
+import { runtime } from "../../runtime";
 import {
     getColorModePreference,
     type ColorModePreference,
@@ -19,13 +21,16 @@ const availableApps = [
     ["php", "PHP"],
 ] as const;
 
-type SettingsSection = "general" | "apps";
+type SettingsSection = "general" | "apps" | "user";
 
 export default function SettingsRoute() {
     const { appName, setAppName, headerApps, setHeaderApps, setDefaultColorMode } = useApp();
     const [section, setSection] = useState<SettingsSection>("general");
     const [appNameDraft, setAppNameDraft] = useState(appName);
     const [colorMode, setCurrentColorMode] = useState<ColorModePreference>(getColorModePreference);
+    const [installedApps, setInstalledApps] = useState<string[]>([]);
+    const [appsLoading, setAppsLoading] = useState(true);
+    const [draggedApp, setDraggedApp] = useState<string | null>(null);
 
     useEffect(() => {
         const syncColorMode = () => setCurrentColorMode(getColorModePreference());
@@ -34,6 +39,19 @@ export default function SettingsRoute() {
     }, []);
 
     useEffect(() => setAppNameDraft(appName), [appName]);
+
+    useEffect(() => {
+        void fetch(Api.current.apps, { cache: "no-store" })
+            .then((response) => response.ok ? response.json() : null)
+            .then((data) => {
+                const installed = (data?.apps as Array<{ name: string; installed: boolean }> | undefined)
+                    ?.filter((app) => app.installed)
+                    .map((app) => app.name) ?? [];
+                setInstalledApps(installed);
+            })
+            .catch(() => setInstalledApps([]))
+            .finally(() => setAppsLoading(false));
+    }, []);
 
     const saveAppName = () => {
         const value = appNameDraft.trim() || defaultAppName;
@@ -46,12 +64,30 @@ export default function SettingsRoute() {
         setDefaultColorMode(preference);
     };
 
+    const moveHeaderApp = (name: string, offset: number) => {
+        const index = headerApps.indexOf(name);
+        const nextIndex = index + offset;
+        if (index < 0 || nextIndex < 0 || nextIndex >= headerApps.length) return;
+        const next = [...headerApps];
+        [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+        setHeaderApps(next);
+    };
+
+    const dropHeaderApp = (target: string) => {
+        if (!draggedApp || draggedApp === target) return;
+        const next = headerApps.filter((app) => app !== draggedApp);
+        next.splice(next.indexOf(target), 0, draggedApp);
+        setHeaderApps(next);
+        setDraggedApp(null);
+    };
+
     return (
         <DashboardLayout title="Settings" fullWidth>
             <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[240px_1fr]">
                 <aside className="flex h-full flex-col gap-1 border-r border-border bg-card/60 p-2">
                     <SettingsNavItem active={section === "general"} icon={Settings} label="General Settings" onClick={() => setSection("general")} />
                     <SettingsNavItem active={section === "apps"} icon={Boxes} label="Apps Settings" onClick={() => setSection("apps")} />
+                    <SettingsNavItem active={section === "user"} icon={User} label="User Settings" onClick={() => setSection("user")} />
                 </aside>
 
                 <main className="overflow-y-auto p-6">
@@ -92,36 +128,94 @@ export default function SettingsRoute() {
                             </div>
                         </div>
                     </div>
-                    ) : (
+                    ) : section === "apps" ? (
                         <div className="mx-auto max-w-2xl space-y-6">
-                            <div>
-                                <h2 className="text-lg font-semibold">Apps Settings</h2>
-                                <p className="mt-1 text-sm text-muted-foreground">Choose app shortcuts to display in the header.</p>
-                            </div>
-                            <div className="divide-y divide-border rounded-md border border-border bg-card">
-                                {availableApps.map(([name, label]) => {
-                                    const added = headerApps.includes(name);
+                            <h2 className="text-lg font-semibold">Apps Settings</h2>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <section className="overflow-hidden rounded-md border border-border bg-card">
+                                    <h3 className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Installed Apps
+                                    </h3>
+                                    <div className="divide-y divide-border">
+                                    {appsLoading ? (
+                                        <p className="p-4 text-xs text-muted-foreground">Loading installed apps...</p>
+                                    ) : availableApps.filter(([name]) => installedApps.includes(name)).length === 0 ? (
+                                        <p className="p-4 text-xs text-muted-foreground">No supported apps detected.</p>
+                                    ) : availableApps.filter(([name]) => installedApps.includes(name)).map(([name, label]) => {
+                                        const added = headerApps.includes(name);
+                                        return (
+                                            <div key={name} className="flex items-center justify-between gap-3 p-3">
+                                                <span className="text-sm font-medium">{label}</span>
+                                                <button
+                                                    type="button"
+                                                    disabled={added}
+                                                    onClick={() => setHeaderApps([...headerApps, name])}
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-40"
+                                                    aria-label={`Add ${label} to header`}
+                                                    title={added ? "Already added" : "Add to header"}
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    </div>
+                                </section>
+
+                                <section className="overflow-hidden rounded-md border border-border bg-card">
+                                    <h3 className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Header Apps
+                                    </h3>
+                                    <div className="divide-y divide-border">
+                                    {headerApps.length === 0 ? (
+                                        <p className="p-4 text-xs text-muted-foreground">No apps added to the header.</p>
+                                    ) : headerApps.map((name, index) => {
+                                        const label = availableApps.find(([app]) => app === name)?.[1] ?? name;
                                     return (
-                                        <div key={name} className="flex items-center justify-between gap-4 p-4">
-                                            <div className="flex items-center gap-3">
-                                                <Boxes className="h-4 w-4 text-muted-foreground" />
+                                        <div
+                                            key={name}
+                                            draggable
+                                            onDragStart={() => setDraggedApp(name)}
+                                            onDragOver={(event) => event.preventDefault()}
+                                            onDrop={() => dropHeaderApp(name)}
+                                            className="flex items-center gap-2 p-3"
+                                        >
+                                            <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground" />
+                                            <div className="min-w-0 flex-1">
                                                 <span className="text-sm font-medium">{label}</span>
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => setHeaderApps(added ? headerApps.filter((app) => app !== name) : [...headerApps, name])}
-                                                className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium ${
-                                                    added
-                                                        ? "border-destructive/30 text-destructive hover:bg-destructive/10"
-                                                        : "border-border text-foreground hover:bg-muted"
-                                                }`}
+                                                disabled={index === 0}
+                                                onClick={() => moveHeaderApp(name, -1)}
+                                                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted disabled:opacity-30"
+                                                aria-label={`Move ${label} up`}
                                             >
-                                                {added ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                                                {added ? "Remove" : "Add"}
+                                                <ArrowUp className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button type="button" disabled={index === headerApps.length - 1} onClick={() => moveHeaderApp(name, 1)} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted disabled:opacity-30" aria-label={`Move ${label} down`}>
+                                                <ArrowDown className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button type="button" onClick={() => setHeaderApps(headerApps.filter((app) => app !== name))} className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10" aria-label={`Remove ${label} from header`}>
+                                                <X className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
                                     );
                                 })}
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mx-auto max-w-2xl space-y-6">
+                            <h2 className="text-lg font-semibold">User Settings</h2>
+                            <div className="rounded-md border border-border bg-card p-4">
+                                <dl className="grid gap-3 text-sm sm:grid-cols-[140px_1fr]">
+                                    <dt className="text-muted-foreground">Username</dt>
+                                    <dd className="font-medium">{runtime.username || "System User"}</dd>
+                                    <dt className="text-muted-foreground">Session mode</dt>
+                                    <dd className="font-medium capitalize">{runtime.mode}</dd>
+                                </dl>
                             </div>
                         </div>
                     )}

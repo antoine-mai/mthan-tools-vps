@@ -151,7 +151,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                 {headerApps.map((app) => (
                     <a
                         key={app}
-                        href={`/apps?app=${encodeURIComponent(app)}`}
+                        href={`/apps/${encodeURIComponent(app)}`}
                         className="hidden h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium capitalize text-muted-foreground hover:bg-muted hover:text-foreground sm:flex"
                         title={`Open ${app}`}
                     >

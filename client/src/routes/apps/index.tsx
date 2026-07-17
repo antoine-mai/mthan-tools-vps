@@ -8,8 +8,11 @@ import {
     CheckCircle2,
     XCircle,
     Loader2,
+    Pin,
+    PinOff,
 } from "lucide-react";
 
+import { useApp } from "_contexts/app";
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import Api from "_utils/api";
@@ -30,6 +33,7 @@ interface ServerApp {
 }
 
 export default function AppsRoute() {
+    const { headerApps, setHeaderApps } = useApp();
     const [apps, setApps] = useState<ServerApp[]>([
         {
             id: "1",
@@ -130,11 +134,18 @@ export default function AppsRoute() {
     const [statusError, setStatusError] = useState("");
 
     useEffect(() => {
-        const requestedApp = new URLSearchParams(window.location.search).get("app");
-        if (requestedApp) {
-            const match = apps.find((app) => app.name === requestedApp);
+        const selectFromPath = () => {
+            const requestedApp = window.location.pathname.split("/")[2];
+            if (!requestedApp) {
+                setSelectedApp(apps[0]);
+                return;
+            }
+            const match = apps.find((app) => app.name === decodeURIComponent(requestedApp));
             if (match) setSelectedApp(match);
-        }
+        };
+
+        selectFromPath();
+        window.addEventListener("popstate", selectFromPath);
 
         const loadStatuses = async () => {
             try {
@@ -163,7 +174,16 @@ export default function AppsRoute() {
         };
 
         loadStatuses();
+        return () => window.removeEventListener("popstate", selectFromPath);
     }, []);
+
+    const selectApp = (app: ServerApp) => {
+        setSelectedApp(app);
+        const path = `/apps/${encodeURIComponent(app.name)}`;
+        if (window.location.pathname !== path) {
+            window.history.pushState({}, "", path);
+        }
+    };
 
     const handleServiceAction = (id: string, action: "start" | "stop" | "restart") => {
         setActionLoading(action);
@@ -227,7 +247,7 @@ export default function AppsRoute() {
                                             ? "bg-primary/10 text-primary font-semibold"
                                             : "text-foreground/90"
                                     }`}
-                                    onClick={() => setSelectedApp(app)}
+                                    onClick={() => selectApp(app)}
                                 >
                                     <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
                                     <span className="truncate flex-1 min-w-0">{app.displayName}</span>
@@ -288,9 +308,9 @@ export default function AppsRoute() {
                                     </div>
                                 </div>
 
-                                {selectedApp.installed && selectedApp.manageable ? (
-                                    <div className="ml-auto flex shrink-0 items-center gap-2">
-                                        {selectedApp.running ? (
+                                <div className="ml-auto flex shrink-0 items-center gap-2">
+                                    {selectedApp.installed && selectedApp.manageable ? (
+                                        selectedApp.running ? (
                                         <>
                                             <Button
                                                 size="sm"
@@ -331,9 +351,30 @@ export default function AppsRoute() {
                                                 )}
                                                 Start Service
                                             </Button>
+                                        )
+                                    ) : null}
+
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        className="h-9 w-9"
+                                        aria-label={headerApps.includes(selectedApp.name) ? "Remove from header" : "Add to header"}
+                                        title={headerApps.includes(selectedApp.name) ? "Remove from header" : "Add to header"}
+                                        onClick={() =>
+                                            setHeaderApps(
+                                                headerApps.includes(selectedApp.name)
+                                                    ? headerApps.filter((app) => app !== selectedApp.name)
+                                                    : [...headerApps, selectedApp.name],
+                                            )
+                                        }
+                                    >
+                                        {headerApps.includes(selectedApp.name) ? (
+                                            <PinOff className="h-4 w-4" />
+                                        ) : (
+                                            <Pin className="h-4 w-4" />
                                         )}
-                                    </div>
-                                ) : null}
+                                    </Button>
+                                </div>
                             </div>
 
                             {selectedApp.name === "php" ? (

@@ -22,7 +22,7 @@ export default function Routes() {
         return <VHostsRoute />;
     }
 
-    if (isRoute("/apps")) {
+    if (isRoute("/apps") || isNestedRoute("/apps")) {
         return <AppsRoute />;
     }
 
@@ -47,6 +47,10 @@ export default function Routes() {
 
 function isRoute(pathname: string) {
     return trimTrailingSlash(window.location.pathname) === pathname;
+}
+
+function isNestedRoute(pathname: string) {
+    return trimTrailingSlash(window.location.pathname).startsWith(`${pathname}/`);
 }
 
 function trimTrailingSlash(pathname: string) {
