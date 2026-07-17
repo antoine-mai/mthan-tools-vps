@@ -151,7 +151,7 @@ export default function AppsRoute() {
                 const response = await fetch(Api.current.apps, { cache: "no-store" });
                 if (!response.ok) throw new Error("Failed to load app status");
                 const data: {
-                    apps: Array<Pick<ServerApp, "name" | "installed" | "manageable" | "running" | "serviceName" | "versions">>;
+                    apps: Array<Pick<ServerApp, "name" | "installed" | "manageable" | "running" | "serviceName" | "version" | "versions">>;
                 } = await response.json();
                 setApps((current) =>
                     current.map((app) => ({

@@ -18,6 +18,8 @@ import {
     Folder,
     Boxes,
     ChevronRight,
+    CheckCircle2,
+    XCircle,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -32,6 +34,23 @@ interface LinuxUser {
     uid: number;
     username: string;
 }
+
+interface SystemAppStatus {
+    installed: boolean;
+    name: string;
+    version?: string;
+    versions?: string[];
+}
+
+const systemAppNames: Record<string, string> = {
+    nginx: "Nginx",
+    mariadb: "MariaDB",
+    php: "PHP",
+    redis: "Redis",
+    docker: "Docker",
+    podman: "Podman",
+    node: "Node.js",
+};
 
 export default function UsersRoute() {
     const { settings } = useApp();
@@ -49,6 +68,9 @@ export default function UsersRoute() {
     const [userApps, setUserApps] = useState<string[]>([]);
     const [appsError, setAppsError] = useState<string | null>(null);
     const [appsLoading, setAppsLoading] = useState(false);
+    const [systemApps, setSystemApps] = useState<SystemAppStatus[]>([]);
+    const [systemAppsError, setSystemAppsError] = useState<string | null>(null);
+    const [systemAppsLoading, setSystemAppsLoading] = useState(false);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -153,6 +175,28 @@ export default function UsersRoute() {
 
         return () => controller.abort();
     }, [activeSection, selectedUser]);
+
+    useEffect(() => {
+        if (activeSection !== "overview") return;
+
+        const controller = new AbortController();
+        setSystemAppsLoading(true);
+        setSystemAppsError(null);
+        fetch("/post/apps", { cache: "no-store", signal: controller.signal })
+            .then(async (response) => {
+                if (!response.ok) throw new Error((await response.text()) || "Failed to load system apps");
+                return response.json();
+            })
+            .then((data) => setSystemApps(data.apps || []))
+            .catch((requestError) => {
+                if (requestError.name !== "AbortError") setSystemAppsError(requestError.message || "Failed to load system apps");
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setSystemAppsLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [activeSection]);
 
     const handleCreateUser = async (e: FormEvent) => {
         e.preventDefault();
@@ -369,11 +413,30 @@ export default function UsersRoute() {
                             </div>
 
                             {activeSection === "overview" ? (
-                            <div className="flex min-h-48 items-center justify-center border border-border bg-card/20 p-6 text-center">
-                                <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Coming soon</h3>
-                                    <p className="mt-1 text-xs text-muted-foreground">User overview is under development.</p>
+                            <div className="border border-border bg-card">
+                                <div className="border-b border-border px-4 py-3">
+                                    <h3 className="text-sm font-semibold">System Apps</h3>
+                                    <p className="mt-1 text-xs text-muted-foreground">Installation status and detected versions from the system Apps route.</p>
                                 </div>
+                                {systemAppsLoading ? (
+                                    <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                                ) : systemAppsError ? (
+                                    <p className="p-4 text-xs text-destructive">{systemAppsError}</p>
+                                ) : (
+                                    <div className="divide-y divide-border">
+                                        {systemApps.map((app) => (
+                                            <Link key={app.name} to={`/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
+                                                <Boxes className="h-4 w-4 shrink-0 text-primary" />
+                                                <span className="min-w-0 flex-1 truncate font-medium">{systemAppNames[app.name] || app.name}</span>
+                                                <span className="font-mono text-xs text-muted-foreground">{app.version || app.versions?.join(", ") || "—"}</span>
+                                                <span className={`inline-flex w-28 items-center gap-1.5 text-xs ${app.installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                                                    {app.installed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                                                    {app.installed ? "Installed" : "Not installed"}
+                                                </span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             ) : activeSection === "files" ? (
                                 <div className="rounded-md border border-border bg-card p-5">

@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - User overview system app status
+
+- Goal: Show installation and version information from the system Apps route in User Overview.
+- Files changed: app detection service/tests, system Apps route client merge, Users Overview UI, and work log.
+- Important decisions: `/post/apps` is the single source for both views; versions are detected from installed binaries across supported distros; PHP reports all detected versions; User Overview links each item to its `/apps/{app}` route.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - User app directory listing
 
 - Goal: List a user's apps from the direct child directories of their `htdocs` folder.

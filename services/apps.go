@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -13,37 +14,46 @@ type AppStatus struct {
 	Manageable bool     `json:"manageable"`
 	Running    bool     `json:"running"`
 	Service    string   `json:"serviceName,omitempty"`
+	Version    string   `json:"version"`
 	Versions   []string `json:"versions,omitempty"`
 }
 
 type appDefinition struct {
-	name     string
-	binaries []string
-	services []string
+	name        string
+	binaries    []string
+	services    []string
+	versionArgs []string
 }
 
 var knownApps = []appDefinition{
-	{name: "nginx", binaries: []string{"nginx"}, services: []string{"nginx.service"}},
-	{name: "mariadb", binaries: []string{"mariadbd", "mysqld", "mariadb"}, services: []string{"mariadb.service", "mysql.service"}},
-	{name: "redis", binaries: []string{"redis-server"}, services: []string{"redis-server.service", "redis.service"}},
-	{name: "docker", binaries: []string{"docker", "/usr/bin/docker", "/usr/local/bin/docker"}, services: []string{"docker.service"}},
-	{name: "podman", binaries: []string{"podman", "/usr/bin/podman", "/usr/local/bin/podman"}, services: []string{"podman.service", "podman.socket"}},
-	{name: "node", binaries: []string{"node", "nodejs", "/usr/bin/node", "/usr/local/bin/node"}},
+	{name: "nginx", binaries: []string{"nginx"}, services: []string{"nginx.service"}, versionArgs: []string{"-v"}},
+	{name: "mariadb", binaries: []string{"mariadbd", "mysqld", "mariadb"}, services: []string{"mariadb.service", "mysql.service"}, versionArgs: []string{"--version"}},
+	{name: "redis", binaries: []string{"redis-server"}, services: []string{"redis-server.service", "redis.service"}, versionArgs: []string{"--version"}},
+	{name: "docker", binaries: []string{"docker", "/usr/bin/docker", "/usr/local/bin/docker"}, services: []string{"docker.service"}, versionArgs: []string{"--version"}},
+	{name: "podman", binaries: []string{"podman", "/usr/bin/podman", "/usr/local/bin/podman"}, services: []string{"podman.service", "podman.socket"}, versionArgs: []string{"--version"}},
+	{name: "node", binaries: []string{"node", "nodejs", "/usr/bin/node", "/usr/local/bin/node"}, versionArgs: []string{"--version"}},
 	{name: "php", services: allPHPServices()},
 }
+
+var semanticVersionPattern = regexp.MustCompile(`\d+(?:\.\d+){1,3}`)
 
 func DetectApps() []AppStatus {
 	statuses := make([]AppStatus, 0, len(knownApps))
 	for _, app := range knownApps {
 		installed := hasBinary(app.binaries)
 		var versions []string
+		version := ""
 		if app.name == "php" {
 			versions = installedPHPVersions()
 			installed = len(versions) > 0
+			version = strings.Join(versions, ", ")
 			app.services = nil
 			for _, version := range versions {
 				app.services = append(app.services, phpServices(version)...)
 			}
+		}
+		if installed && app.name != "php" {
+			version = detectedAppVersion(app.binaries, app.versionArgs)
 		}
 
 		service := ""
@@ -61,10 +71,27 @@ func DetectApps() []AppStatus {
 			Manageable: len(app.services) > 0,
 			Running:    running,
 			Service:    service,
+			Version:    version,
 			Versions:   versions,
 		})
 	}
 	return statuses
+}
+
+func detectedAppVersion(binaries, args []string) string {
+	for _, name := range binaries {
+		binary, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		output, _ := exec.CommandContext(ctx, binary, args...).CombinedOutput()
+		cancel()
+		if version := semanticVersionPattern.FindString(string(output)); version != "" {
+			return version
+		}
+	}
+	return ""
 }
 
 var supportedPHPVersions = []string{"8.1", "8.2", "8.3", "8.4"}

@@ -47,3 +47,18 @@ func TestPHPBinariesCoverVersionedAndRemiLayouts(t *testing.T) {
 		}
 	}
 }
+
+func TestSemanticVersionPattern(t *testing.T) {
+	for _, test := range []struct {
+		output string
+		want   string
+	}{
+		{output: "nginx version: nginx/1.24.0", want: "1.24.0"},
+		{output: "Docker version 27.3.1, build ce12230", want: "27.3.1"},
+		{output: "v22.14.0", want: "22.14.0"},
+	} {
+		if got := semanticVersionPattern.FindString(test.output); got != test.want {
+			t.Errorf("version from %q = %q, want %q", test.output, got, test.want)
+		}
+	}
+}
