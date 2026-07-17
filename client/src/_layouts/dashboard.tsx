@@ -3,9 +3,8 @@ import { type ReactNode, useEffect, useState } from "react";
 import { UserProvider, useUser } from "../_contexts/user";
 import Sidebar from "./_components/sidebar";
 import Header from "./_components/header";
-import TerminalPanel from "_components/terminal-panel";
-import { runtime } from "../runtime";
 import { useApp } from "../_contexts/app";
+import { useTerminal } from "../_contexts/terminal";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -25,7 +24,7 @@ function DashboardLayoutContent({
     const { isLoggedIn } = useUser();
     const { appName } = useApp();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
-    const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+    const { isOpen: isTerminalOpen, openRoot } = useTerminal();
 
     useEffect(() => {
         if (!isLoggedIn) {
@@ -41,28 +40,10 @@ function DashboardLayoutContent({
         }
     }, [appName, title]);
 
-    useEffect(() => {
-        if (!runtime.isRoot) return;
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.ctrlKey && e.key === "`") {
-                e.preventDefault();
-                setIsTerminalOpen((prev) => !prev);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
-
-    const toggleTerminal = () => {
-        if (runtime.isRoot) {
-            setIsTerminalOpen((prev) => !prev);
-        }
-    };
-
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
             {/* Desktop Sidebar */}
-            <Sidebar className="hidden md:flex" isTerminalOpen={isTerminalOpen} onTerminalToggle={toggleTerminal} />
+            <Sidebar className="hidden md:flex" isTerminalOpen={isTerminalOpen} onTerminalToggle={openRoot} />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileOpen && (
@@ -78,7 +59,7 @@ function DashboardLayoutContent({
                     isMobileOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
                 isTerminalOpen={isTerminalOpen}
-                onTerminalToggle={toggleTerminal}
+                onTerminalToggle={openRoot}
             />
 
             {/* Main Content Area */}
@@ -117,11 +98,6 @@ function DashboardLayoutContent({
                         </main>
                     )}
 
-                    {isTerminalOpen && runtime.isRoot && (
-                        <div className="absolute inset-x-0 bottom-0 z-30">
-                            <TerminalPanel onClose={() => setIsTerminalOpen(false)} />
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - Global multi-tab terminal
+
+- Goal: Use one persistent terminal panel for root and all user shells across the app.
+- Files changed: terminal context, Main, Dashboard layout, Terminal panel, Users route, and work log.
+- Important decisions: terminal provider lives above routes; main sidebar activates the root tab; a user's Terminal action adds a `su -` tab; hiding or navigating does not destroy terminal tabs/sessions after first mount.
+- Validation: TypeScript type-check, targeted Go tests, and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - React Router migration
 
 - Goal: Replace manual pathname routing and full-page nested navigation with React Router.

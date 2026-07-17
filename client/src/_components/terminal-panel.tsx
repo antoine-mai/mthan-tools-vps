@@ -6,59 +6,15 @@ import "xterm/css/xterm.css";
 
 import type { ColorMode } from "_utils/color-mode";
 import { runtime } from "runtime";
-
-type TerminalPanelProps = {
-    onClose: () => void;
-    username?: string;
-    className?: string;
-};
-
-type TerminalTab = {
-    id: number;
-    title: string;
-};
+import { useTerminal } from "_contexts/terminal";
 
 const terminalTitle = `${shortOSName(runtime.osName)} - Root`;
-const initialTab: TerminalTab = { id: 1, title: terminalTitle };
-
-export default function TerminalPanel({ onClose, username, className = "h-[320px] border-t" }: TerminalPanelProps) {
-    const title = username ? `${shortOSName(runtime.osName)} - ${username}` : terminalTitle;
-    const firstTab = { ...initialTab, title };
-    const [tabs, setTabs] = useState<TerminalTab[]>([firstTab]);
-    const [activeTabId, setActiveTabId] = useState(initialTab.id);
+export default function TerminalPanel() {
+    const { activeTabId, tabs, closePanel, closeTab, duplicateActiveTab, setActiveTabId } = useTerminal();
     const colorMode = useResolvedColorMode();
 
-    function addTab() {
-        setTabs((currentTabs) => {
-            const nextId = Math.max(...currentTabs.map((tab) => tab.id), 0) + 1;
-            const nextTab = {
-                id: nextId,
-                title,
-            };
-            setActiveTabId(nextTab.id);
-            return [...currentTabs, nextTab];
-        });
-    }
-
-    function closeTab(tabId: number) {
-        if (tabs.length === 1) {
-            onClose();
-            return;
-        }
-
-        const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
-        const nextTabs = tabs.filter((tab) => tab.id !== tabId);
-        setTabs(nextTabs);
-
-        if (activeTabId === tabId) {
-            const nextActiveTab =
-                nextTabs[Math.max(0, tabIndex - 1)] ?? nextTabs[0];
-            setActiveTabId(nextActiveTab.id);
-        }
-    }
-
     return (
-        <div className={`z-30 flex w-full flex-col border-border bg-background text-foreground ${className}`}>
+        <div className="z-30 flex h-[320px] w-full flex-col border-t border-border bg-background text-foreground">
             <div className="flex h-9 items-center justify-between border-b border-border bg-muted/40 select-none">
                 <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
                     <div className="flex h-9 items-center border-r border-border px-3 text-xs font-semibold text-muted-foreground">
@@ -67,6 +23,7 @@ export default function TerminalPanel({ onClose, username, className = "h-[320px
 
                     {tabs.map((tab) => {
                         const isActive = tab.id === activeTabId;
+                        const title = tab.username ? `${shortOSName(runtime.osName)} - ${tab.username}` : terminalTitle;
 
                         return (
                             <div
@@ -81,9 +38,9 @@ export default function TerminalPanel({ onClose, username, className = "h-[320px
                                     className="min-w-0 flex-1 px-3 text-left"
                                     type="button"
                                     onClick={() => setActiveTabId(tab.id)}
-                                    title={tab.title}
+                                    title={title}
                                 >
-                                    <span className="block truncate">{tab.title}</span>
+                                    <span className="block truncate">{title}</span>
                                 </button>
                                 <button
                                     className="mr-2 rounded p-0.5 text-muted-foreground opacity-70 hover:bg-muted-foreground/15 hover:text-foreground group-hover:opacity-100"
@@ -101,14 +58,14 @@ export default function TerminalPanel({ onClose, username, className = "h-[320px
                         className="flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         type="button"
                         title="New terminal"
-                        onClick={addTab}
+                        onClick={duplicateActiveTab}
                     >
                         <Plus className="h-3.5 w-3.5" />
                     </button>
                 </div>
 
                 <button
-                    onClick={onClose}
+                    onClick={closePanel}
                     className="mr-2 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     title="Close panel"
                     type="button"
@@ -123,7 +80,7 @@ export default function TerminalPanel({ onClose, username, className = "h-[320px
                         key={tab.id}
                         active={tab.id === activeTabId}
                         colorMode={colorMode}
-                        username={username}
+                        username={tab.username}
                     />
                 ))}
             </div>

@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
     Plus,
     RefreshCw,
@@ -22,7 +22,7 @@ import {
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import { useApp } from "_contexts/app";
-import TerminalPanel from "_components/terminal-panel";
+import { useTerminal } from "_contexts/terminal";
 
 interface LinuxUser {
     home: string;
@@ -34,7 +34,7 @@ interface LinuxUser {
 
 export default function UsersRoute() {
     const { settings } = useApp();
-    const navigate = useNavigate();
+    const { addTab: openUserTerminal } = useTerminal();
     const params = useParams<{ username?: string; section?: string }>();
     const autoUsername = (settings.users_auto_username ?? "false") === "true";
     const routeUsername = params.username ?? "";
@@ -292,7 +292,14 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
                                             <UserSubItem username={u.username} section="apps" active={activeSection === "apps"} icon={Boxes} label="Apps" />
-                                            <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
+                                            <button
+                                                type="button"
+                                                onClick={() => openUserTerminal(u.username)}
+                                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground"
+                                            >
+                                                <Terminal className="h-3.5 w-3.5" />
+                                                Terminal
+                                            </button>
                                         </nav>
                                     ) : null}
                                     </div>
@@ -385,17 +392,11 @@ export default function UsersRoute() {
                                         <Link to={`/files?path=${encodeURIComponent(selectedUser.home)}`}>Open File Explorer</Link>
                                     </Button>
                                 </div>
-                            ) : activeSection === "apps" ? (
+                            ) : (
                                 <div className="rounded-md border border-border bg-card p-5">
                                     <h3 className="text-sm font-semibold">User Apps</h3>
                                     <p className="mt-2 text-xs text-muted-foreground">No user-specific apps are configured.</p>
                                 </div>
-                            ) : (
-                                <TerminalPanel
-                                    username={selectedUser.username}
-                                    className="h-[520px] rounded-md border"
-                                    onClose={() => navigate(`/users/${encodeURIComponent(selectedUser.username)}/overview`)}
-                                />
                             )}
                         </div>
                     ) : (
@@ -566,10 +567,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "apps" | "terminal";
+type UserSection = "overview" | "files" | "apps";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "apps" || section === "terminal" ? section : "overview";
+    return section === "files" || section === "apps" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {
