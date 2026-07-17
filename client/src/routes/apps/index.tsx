@@ -11,6 +11,7 @@ import {
     Loader2,
     Pin,
     PinOff,
+    Download,
 } from "lucide-react";
 
 import { useApp } from "_contexts/app";
@@ -34,14 +35,14 @@ interface ServerApp {
 }
 
 export default function AppsRoute() {
-    const { headerApps, setHeaderApps } = useApp();
+    const { headerApps, isRoot, setHeaderApps } = useApp();
     const navigate = useNavigate();
     const { app: requestedApp } = useParams<{ app?: string }>();
     const [apps, setApps] = useState<ServerApp[]>([
         {
             id: "1",
             name: "nginx",
-            displayName: "Nginx Web Server",
+            displayName: "Nginx",
             serviceName: "nginx.service",
             version: "1.24.0",
             port: "80, 443",
@@ -54,7 +55,7 @@ export default function AppsRoute() {
         {
             id: "2",
             name: "mariadb",
-            displayName: "MariaDB Database",
+            displayName: "MariaDB",
             serviceName: "mariadb.service",
             version: "10.11.6",
             port: 3306,
@@ -80,7 +81,7 @@ export default function AppsRoute() {
         {
             id: "4",
             name: "redis",
-            displayName: "Redis Cache",
+            displayName: "Redis",
             serviceName: "redis-server.service",
             version: "7.0.15",
             port: 6379,
@@ -212,6 +213,22 @@ export default function AppsRoute() {
         }, 800);
     };
 
+    const installApp = async () => {
+        if (!selectedApp) return;
+        setActionLoading("install");
+        setStatusError("");
+        try {
+            const response = await fetch(Api.current.apps, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selectedApp.name }) });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to install app");
+            const data = await response.json();
+            setApps((current) => current.map((app) => ({ ...app, ...(data.apps.find((status: ServerApp) => status.name === app.name) ?? {}) })));
+            const status = data.apps.find((app: ServerApp) => app.name === selectedApp.name);
+            if (status) setSelectedApp((current) => current ? { ...current, ...status } : current);
+        } catch (error) {
+            setStatusError(error instanceof Error ? error.message : "Failed to install app");
+        } finally { setActionLoading(null); }
+    };
+
     return (
         <DashboardLayout
             title="System Apps"
@@ -304,6 +321,12 @@ export default function AppsRoute() {
                                 </div>
 
                                 <div className="ml-auto flex shrink-0 items-center gap-2">
+                                    {isRoot && !selectedApp.installed ? (
+                                        <Button size="sm" className="gap-2" disabled={actionLoading !== null} onClick={installApp}>
+                                            {actionLoading === "install" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                                            Install
+                                        </Button>
+                                    ) : null}
                                     {selectedApp.installed && selectedApp.manageable ? (
                                         selectedApp.running ? (
                                         <>

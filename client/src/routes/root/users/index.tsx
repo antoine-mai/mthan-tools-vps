@@ -20,6 +20,8 @@ import {
     ChevronRight,
     CheckCircle2,
     XCircle,
+    GitBranch,
+    Upload,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -71,6 +73,13 @@ export default function UsersRoute() {
     const [systemApps, setSystemApps] = useState<SystemAppStatus[]>([]);
     const [systemAppsError, setSystemAppsError] = useState<string | null>(null);
     const [systemAppsLoading, setSystemAppsLoading] = useState(false);
+    const [addAppOpen, setAddAppOpen] = useState(false);
+    const [addAppMode, setAddAppMode] = useState<"upload" | "git">("upload");
+    const [addAppName, setAddAppName] = useState("");
+    const [repository, setRepository] = useState("");
+    const [appArchive, setAppArchive] = useState<File | null>(null);
+    const [addAppSaving, setAddAppSaving] = useState(false);
+    const [addAppError, setAddAppError] = useState("");
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,6 +206,27 @@ export default function UsersRoute() {
 
         return () => controller.abort();
     }, [activeSection]);
+
+    const submitApp = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!selectedUser) return;
+        setAddAppSaving(true); setAddAppError("");
+        try {
+            let response: Response;
+            const endpoint = `/post/user/apps?username=${encodeURIComponent(selectedUser.username)}`;
+            if (addAppMode === "upload") {
+                if (!appArchive) throw new Error("ZIP file is required");
+                const body = new FormData(); body.append("name", addAppName.trim()); body.append("file", appArchive);
+                response = await fetch(endpoint, { method: "POST", body });
+            } else {
+                response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: addAppName.trim(), repository: repository.trim() }) });
+            }
+            if (!response.ok) throw new Error((await response.text()) || "Failed to add app");
+            setAddAppOpen(false); setAddAppName(""); setRepository(""); setAppArchive(null);
+            setUserApps((current) => [...current, addAppName.trim()].sort());
+        } catch (requestError) { setAddAppError(requestError instanceof Error ? requestError.message : "Failed to add app"); }
+        finally { setAddAppSaving(false); }
+    };
 
     const handleCreateUser = async (e: FormEvent) => {
         e.preventDefault();
@@ -448,9 +478,9 @@ export default function UsersRoute() {
                                 </div>
                             ) : (
                                 <div className="border border-border bg-card">
-                                    <div className="border-b border-border px-4 py-3">
-                                        <h3 className="text-sm font-semibold">User Apps</h3>
-                                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p>
+                                    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                        <div><h3 className="text-sm font-semibold">User Apps</h3><p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p></div>
+                                        <Button size="sm" className="gap-2" onClick={() => setAddAppOpen(true)}><Plus className="h-4 w-4" />Add App</Button>
                                     </div>
                                     {appsLoading ? (
                                         <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -489,6 +519,28 @@ export default function UsersRoute() {
             </div>
 
             {/* Modal */}
+            {addAppOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <form onSubmit={submitApp} className="w-full max-w-md border border-border bg-card shadow-lg">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4"><h3 className="font-semibold">Add App</h3><button type="button" onClick={() => setAddAppOpen(false)}><X className="h-4 w-4" /></button></div>
+                        <div className="space-y-4 p-5">
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button type="button" variant={addAppMode === "upload" ? "default" : "outline"} onClick={() => setAddAppMode("upload")} className="gap-2"><Upload className="h-4 w-4" />Upload ZIP</Button>
+                                <Button type="button" variant={addAppMode === "git" ? "default" : "outline"} onClick={() => setAddAppMode("git")} className="gap-2"><GitBranch className="h-4 w-4" />Git Clone</Button>
+                            </div>
+                            <label className="block space-y-1.5 text-xs font-medium"><span>App Name</span><input required value={addAppName} onChange={(event) => setAddAppName(event.target.value)} placeholder="my-app" className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+                            {addAppMode === "upload" ? (
+                                <label className="block space-y-1.5 text-xs font-medium"><span>ZIP Archive</span><input required type="file" accept=".zip,application/zip" onChange={(event) => setAppArchive(event.target.files?.[0] || null)} className="block w-full text-xs text-muted-foreground file:mr-3 file:border file:border-input file:bg-background file:px-3 file:py-2 file:text-xs" /></label>
+                            ) : (
+                                <label className="block space-y-1.5 text-xs font-medium"><span>Repository URL</span><input required value={repository} onChange={(event) => setRepository(event.target.value)} placeholder="https://github.com/example/app.git" className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+                            )}
+                            {addAppError ? <p className="text-xs text-destructive">{addAppError}</p> : null}
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-border px-5 py-4"><Button type="button" variant="outline" onClick={() => setAddAppOpen(false)}>Cancel</Button><Button type="submit" disabled={addAppSaving}>{addAppSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add App"}</Button></div>
+                    </form>
+                </div>
+            )}
+
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="relative w-full max-w-md overflow-hidden rounded-none border border-border bg-card shadow-lg animate-in zoom-in-95 duration-200">

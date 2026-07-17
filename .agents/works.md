@@ -23,6 +23,22 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - System app installation
+
+- Goal: Install supported apps directly from `/apps` and simplify app display names.
+- Files changed: package installation service/tests, authenticated Apps POST route, Apps UI, and work log.
+- Important decisions: package names and command arguments are allowlisted for apt, dnf/yum, and pacman families; installation status and detected version refresh from the existing Apps API; display names are concise product names.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: third-party repositories such as Docker CE must already be configured when distro-native fallback packages are unavailable.
+
+### 2026-07-17 - Add user app by upload or Git
+
+- Goal: Add apps to a user's `htdocs` folder from a ZIP upload or Git repository.
+- Files changed: user app service and route, route registration, Users Apps UI, and work log.
+- Important decisions: app names are restricted; destinations must not already exist; ZIP traversal and symlinks are rejected; Git clone uses argument-safe execution; created files are owned by the target Linux user.
+- Validation: Go formatting, targeted Go tests, TypeScript type-check, and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - API credential management
 
 - Goal: Implement the APIs page and persistent `apis` SQLite table, including accepted IP restrictions.
