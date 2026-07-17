@@ -43,8 +43,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 }
                 return true;
             }
+            if (response.status !== 401) {
+                // Preserve the local session during transient restarts and gateway failures.
+                return localStatus;
+            }
         } catch {
-            // Treat network/session checks that cannot complete as logged out.
+            // The backend still validates every protected request. A temporary
+            // network failure must not turn into a client-side logout.
+            return localStatus;
         }
 
         if (isLoggedIn) {

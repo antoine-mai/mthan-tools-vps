@@ -23,6 +23,30 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - Per-user terminal section
+
+- Goal: Add a Terminal sub-item for every Linux user.
+- Files changed: terminal WebSocket backend/component, Users route, and work log.
+- Important decisions: route is `/users/{username}/terminal`; root sessions launch `su - <username>` using a separate command argument; login shell starts in the target user's home; non-root sessions and unknown accounts are rejected.
+- Validation: targeted Go tests, TypeScript syntax parser, and `git diff --check`; no frontend production build.
+- Known follow-up: folder-only `/home` entries without a matching system account cannot open a terminal.
+
+### 2026-07-17 - Preserve sessions through update restarts
+
+- Goal: Prevent transient 502/network failures during update from logging the user out.
+- Files changed: user context, Login route, and work log.
+- Important decisions: only HTTP 401 invalidates local login state; network/5xx preserves it while protected APIs remain server-validated; login distinguishes invalid credentials from temporary server failures and never renders proxy HTML.
+- Validation: TypeScript syntax parser and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
+### 2026-07-17 - Suppress transient update gateway errors
+
+- Goal: Do not show harmless 502/503/504 or network errors while the API is restarting.
+- Files changed: update header component and work log.
+- Important decisions: background check errors are suppressed during the update/reconnect workflow; post-reconnect confirmation failures remain visible.
+- Validation: TypeScript syntax parser and `git diff --check`; no frontend production build.
+- Known follow-up: none.
+
 ### 2026-07-17 - Nested user sections
 
 - Goal: Add Overview, Files, and Apps sub-items for every user.

@@ -56,8 +56,15 @@ export default function LoginRoute() {
             });
 
             if (!response.ok) {
-                const errorMsg = await response.text();
-                throw new Error(errorMsg.trim() || "Login failed");
+                if (response.status === 401) {
+                    throw new Error("Invalid username or password");
+                }
+                if ([502, 503, 504].includes(response.status)) {
+                    throw new Error("The server is temporarily unavailable. Please try again shortly");
+                }
+                const contentType = response.headers.get("content-type") ?? "";
+                const errorMsg = contentType.includes("text/plain") ? (await response.text()).trim() : "";
+                throw new Error(errorMsg && errorMsg.length <= 200 ? errorMsg : `Login failed (${response.status})`);
             }
 
             setStatus("success");
@@ -67,7 +74,11 @@ export default function LoginRoute() {
             }, 800);
         } catch (error: any) {
             setStatus("error");
-            setMessage(error.message || "Unable to login");
+            setMessage(
+                error instanceof TypeError
+                    ? "Unable to reach the server. Please try again shortly"
+                    : error.message || "Unable to login",
+            );
         }
     }
 

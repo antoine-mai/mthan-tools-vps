@@ -21,6 +21,7 @@ import {
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import { useApp } from "_contexts/app";
+import TerminalPanel from "_components/terminal-panel";
 
 interface LinuxUser {
     home: string;
@@ -283,6 +284,7 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
                                             <UserSubItem username={u.username} section="apps" active={activeSection === "apps"} icon={Boxes} label="Apps" />
+                                            <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
                                         </nav>
                                     ) : null}
                                     </div>
@@ -375,11 +377,17 @@ export default function UsersRoute() {
                                         <a href={`/files?path=${encodeURIComponent(selectedUser.home)}`}>Open File Explorer</a>
                                     </Button>
                                 </div>
-                            ) : (
+                            ) : activeSection === "apps" ? (
                                 <div className="rounded-md border border-border bg-card p-5">
                                     <h3 className="text-sm font-semibold">User Apps</h3>
                                     <p className="mt-2 text-xs text-muted-foreground">No user-specific apps are configured.</p>
                                 </div>
+                            ) : (
+                                <TerminalPanel
+                                    username={selectedUser.username}
+                                    className="h-[520px] rounded-md border"
+                                    onClose={() => { window.location.href = `/users/${encodeURIComponent(selectedUser.username)}/overview`; }}
+                                />
                             )}
                         </div>
                     ) : (
@@ -550,10 +558,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "apps";
+type UserSection = "overview" | "files" | "apps" | "terminal";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "apps" ? section : "overview";
+    return section === "files" || section === "apps" || section === "terminal" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {

@@ -9,6 +9,8 @@ import { runtime } from "runtime";
 
 type TerminalPanelProps = {
     onClose: () => void;
+    username?: string;
+    className?: string;
 };
 
 type TerminalTab = {
@@ -19,8 +21,10 @@ type TerminalTab = {
 const terminalTitle = `${shortOSName(runtime.osName)} - Root`;
 const initialTab: TerminalTab = { id: 1, title: terminalTitle };
 
-export default function TerminalPanel({ onClose }: TerminalPanelProps) {
-    const [tabs, setTabs] = useState<TerminalTab[]>([initialTab]);
+export default function TerminalPanel({ onClose, username, className = "h-[320px] border-t" }: TerminalPanelProps) {
+    const title = username ? `${shortOSName(runtime.osName)} - ${username}` : terminalTitle;
+    const firstTab = { ...initialTab, title };
+    const [tabs, setTabs] = useState<TerminalTab[]>([firstTab]);
     const [activeTabId, setActiveTabId] = useState(initialTab.id);
     const colorMode = useResolvedColorMode();
 
@@ -29,7 +33,7 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
             const nextId = Math.max(...currentTabs.map((tab) => tab.id), 0) + 1;
             const nextTab = {
                 id: nextId,
-                title: terminalTitle,
+                title,
             };
             setActiveTabId(nextTab.id);
             return [...currentTabs, nextTab];
@@ -54,7 +58,7 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
     }
 
     return (
-        <div className="z-30 flex h-[320px] w-full flex-col border-t border-border bg-background text-foreground">
+        <div className={`z-30 flex w-full flex-col border-border bg-background text-foreground ${className}`}>
             <div className="flex h-9 items-center justify-between border-b border-border bg-muted/40 select-none">
                 <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
                     <div className="flex h-9 items-center border-r border-border px-3 text-xs font-semibold text-muted-foreground">
@@ -119,6 +123,7 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
                         key={tab.id}
                         active={tab.id === activeTabId}
                         colorMode={colorMode}
+                        username={username}
                     />
                 ))}
             </div>
@@ -129,9 +134,11 @@ export default function TerminalPanel({ onClose }: TerminalPanelProps) {
 function TerminalSession({
     active,
     colorMode,
+    username,
 }: {
     active: boolean;
     colorMode: ColorMode;
+    username?: string;
 }) {
     const terminalRef = useRef<HTMLDivElement>(null);
     const termInstance = useRef<Terminal | null>(null);
@@ -156,7 +163,8 @@ function TerminalSession({
         fitAddonRef.current = fitAddon;
 
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/post/terminal`;
+        const userQuery = username ? `?user=${encodeURIComponent(username)}` : "";
+        const wsUrl = `${protocol}//${window.location.host}/post/terminal${userQuery}`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 
 	"github.com/creack/pty"
 	"golang.org/x/net/websocket"
@@ -29,17 +30,27 @@ func Handler(sessions *services.SessionService) http.Handler {
 		}
 
 		session, exists := sessions.Get(cookie.Value)
-		if !exists {
+		if !exists || session.Mode != "root" {
 			_ = ws.Close()
 			return
 		}
 
-		shell := "/bin/bash"
-		if _, err := os.Stat(shell); os.IsNotExist(err) {
-			shell = "/bin/sh"
+		targetUsername := req.URL.Query().Get("user")
+		var cmd *exec.Cmd
+		if targetUsername != "" {
+			target, err := user.Lookup(targetUsername)
+			if err != nil || target.Username != targetUsername {
+				_ = ws.Close()
+				return
+			}
+			cmd = exec.Command("su", "-", targetUsername)
+		} else {
+			shell := "/bin/bash"
+			if _, err := os.Stat(shell); os.IsNotExist(err) {
+				shell = "/bin/sh"
+			}
+			cmd = exec.Command(shell)
 		}
-
-		cmd := exec.Command(shell)
 		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "USER="+session.Username)
 
 		ptmx, err := pty.Start(cmd)

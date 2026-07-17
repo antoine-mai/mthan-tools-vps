@@ -28,6 +28,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     const [updateSuccess, setUpdateSuccess] = useState(false);
     const [reloadCountdown, setReloadCountdown] = useState(0);
     const allowReload = useRef(false);
+    const updateWorkflowActive = useRef(false);
 
     const checkUpdate = useCallback(async () => {
         if (!isRoot) return null;
@@ -36,6 +37,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         try {
             const response = await fetch("/post/update", { cache: "no-store" });
             if (!response.ok) {
+                if (isRestartResponse(response.status)) return null;
                 throw new Error(await responseError(response, "Failed to check for updates"));
             }
             const info: UpdateInfo = await response.json();
@@ -46,7 +48,9 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         } catch (err: unknown) {
             const message =
                 err instanceof Error ? err.message : "Failed to check for updates";
-            setUpdateError(message);
+            if (!updateWorkflowActive.current) {
+                setUpdateError(message);
+            }
             console.error("Failed to check for updates:", err);
         } finally {
             setChecking(false);
@@ -93,6 +97,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     };
 
     const confirmUpdate = async () => {
+        updateWorkflowActive.current = true;
         setUpdating(true);
         setRestarting(false);
         setUpdateError("");
@@ -126,6 +131,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         } catch (err: any) {
             setUpdateError(err.message || "Update failed");
         } finally {
+            updateWorkflowActive.current = false;
             setUpdating(false);
         }
     };
