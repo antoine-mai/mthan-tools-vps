@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import ColorModeSwitch from "_components/color-mode-switch";
 import { AlertTriangle, Boxes, User, Menu, RefreshCw, X } from "lucide-react";
 import { useApp } from "../../_contexts/app";
@@ -155,15 +156,15 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
 
             <div className="flex items-center gap-4">
                 {headerApps.map((app) => (
-                    <a
+                    <Link
                         key={app}
-                        href={`/apps/${encodeURIComponent(app)}`}
+                        to={`/apps/${encodeURIComponent(app)}`}
                         className="hidden h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium capitalize text-muted-foreground hover:bg-muted hover:text-foreground sm:flex"
                         title={`Open ${app}`}
                     >
                         <Boxes className="h-3.5 w-3.5" />
                         {app === "node" ? "Node.js" : app}
-                    </a>
+                    </Link>
                 ))}
                 {isRoot && (
                     <button

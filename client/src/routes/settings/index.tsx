@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Boxes, GripVertical, Plus, Settings, User, X } from "lucide-react";
 
 import { useApp } from "_contexts/app";
@@ -24,7 +25,8 @@ type SettingsSection = "general" | "users" | "apps";
 
 export default function SettingsRoute() {
     const { appName, setAppName, headerApps, setHeaderApps, setDefaultColorMode, settings, setSetting } = useApp();
-    const section = getSettingsSection();
+    const { section: sectionParam } = useParams<{ section?: string }>();
+    const section = settingsSection(sectionParam);
     const [appNameDraft, setAppNameDraft] = useState(appName);
     const [colorMode, setCurrentColorMode] = useState<ColorModePreference>(getColorModePreference);
     const [installedApps, setInstalledApps] = useState<string[]>([]);
@@ -263,8 +265,7 @@ export default function SettingsRoute() {
     );
 }
 
-function getSettingsSection(): SettingsSection {
-    const section = window.location.pathname.split("/")[2];
+function settingsSection(section?: string): SettingsSection {
     return section === "users" || section === "apps" ? section : "general";
 }
 
@@ -275,14 +276,14 @@ function SettingsNavItem({ active, href, icon: Icon, label }: {
     label: string;
 }) {
     return (
-        <a
-            href={href}
+        <Link
+            to={href}
             className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold ${
                 active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
         >
             <Icon className="h-4 w-4" />
             {label}
-        </a>
+        </Link>
     );
 }

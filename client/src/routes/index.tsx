@@ -1,62 +1,37 @@
+import { Route, Routes as RouterRoutes } from "react-router-dom";
+
 import { runtime } from "../runtime";
+import AgentRoute from "./agent";
+import AppsRoute from "./apps";
+import FilesRoute from "./files";
 import LoginRoute from "./login";
 import RootRoutes from "./root";
 import UsersRoute from "./root/users";
-import UserRoutes from "./user";
-import FilesRoute from "./files";
-import VHostsRoute from "./vhosts";
-import AppsRoute from "./apps";
-import AgentRoute from "./agent";
 import SettingsRoute from "./settings";
+import UserRoutes from "./user";
+import VHostsRoute from "./vhosts";
 
-export default function Routes() {
-    if (isRoute("/login")) {
-        return <LoginRoute />;
-    }
-
-    if (isRoute("/files")) {
-        return <FilesRoute />;
-    }
-
-    if (isRoute("/vhosts")) {
-        return <VHostsRoute />;
-    }
-
-    if (isRoute("/apps") || isNestedRoute("/apps")) {
-        return <AppsRoute />;
-    }
-
-    if (isRoute("/agent")) {
-        return <AgentRoute />;
-    }
-
-    if (isRoute("/settings") || isNestedRoute("/settings")) {
-        return <SettingsRoute />;
-    }
-
-    if (runtime.isRoot) {
-        if (isRoute("/users") || isNestedRoute("/users")) {
-            return <UsersRoute />;
-        }
-
-        return <RootRoutes />;
-    }
-
-    return <UserRoutes />;
-}
-
-function isRoute(pathname: string) {
-    return trimTrailingSlash(window.location.pathname) === pathname;
-}
-
-function isNestedRoute(pathname: string) {
-    return trimTrailingSlash(window.location.pathname).startsWith(`${pathname}/`);
-}
-
-function trimTrailingSlash(pathname: string) {
-    if (pathname === "/") {
-        return pathname;
-    }
-
-    return pathname.replace(/\/+$/, "");
+export default function AppRoutes() {
+    return (
+        <RouterRoutes>
+            <Route path="/login" element={<LoginRoute />} />
+            <Route path="/files" element={<FilesRoute />} />
+            <Route path="/vhosts" element={<VHostsRoute />} />
+            <Route path="/apps" element={<AppsRoute />} />
+            <Route path="/apps/:app" element={<AppsRoute />} />
+            <Route path="/agent" element={<AgentRoute />} />
+            <Route path="/settings" element={<SettingsRoute />} />
+            <Route path="/settings/:section" element={<SettingsRoute />} />
+            {runtime.isRoot ? (
+                <>
+                    <Route path="/users" element={<UsersRoute />} />
+                    <Route path="/users/:username" element={<UsersRoute />} />
+                    <Route path="/users/:username/:section" element={<UsersRoute />} />
+                    <Route path="*" element={<RootRoutes />} />
+                </>
+            ) : (
+                <Route path="*" element={<UserRoutes />} />
+            )}
+        </RouterRoutes>
+    );
 }

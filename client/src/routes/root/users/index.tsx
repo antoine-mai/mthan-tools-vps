@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
     Plus,
     RefreshCw,
@@ -33,10 +34,11 @@ interface LinuxUser {
 
 export default function UsersRoute() {
     const { settings } = useApp();
+    const navigate = useNavigate();
+    const params = useParams<{ username?: string; section?: string }>();
     const autoUsername = (settings.users_auto_username ?? "false") === "true";
-    const routeParts = window.location.pathname.split("/").filter(Boolean);
-    const routeUsername = routeParts[0] === "users" ? decodeURIComponent(routeParts[1] || "") : "";
-    const activeSection = userSection(routeParts[2]);
+    const routeUsername = params.username ?? "";
+    const activeSection = userSection(params.section);
     const [users, setUsers] = useState<LinuxUser[]>([]);
     const [selectedUser, setSelectedUser] = useState<LinuxUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -119,6 +121,12 @@ export default function UsersRoute() {
     useEffect(() => {
         fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (!routeUsername) return;
+        const routed = users.find((user) => user.username === routeUsername);
+        if (routed) setSelectedUser(routed);
+    }, [routeUsername, users]);
 
     const handleCreateUser = async (e: FormEvent) => {
         e.preventDefault();
@@ -268,8 +276,8 @@ export default function UsersRoute() {
                                 const isSelected = selectedUser?.username === u.username;
                                 return (
                                     <div key={u.username}>
-                                    <a
-                                        href={`/users/${encodeURIComponent(u.username)}/overview`}
+                                    <Link
+                                        to={`/users/${encodeURIComponent(u.username)}/overview`}
                                         className={`flex items-center gap-2 py-1.5 px-2.5 rounded-none hover:bg-muted/60 transition-colors text-xs ${
                                             isSelected
                                                 ? "bg-primary/10 text-primary font-semibold"
@@ -278,7 +286,7 @@ export default function UsersRoute() {
                                     >
                                         <User className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
                                         <span className="truncate flex-1 min-w-0">{u.username}</span>
-                                    </a>
+                                    </Link>
                                     {isSelected ? (
                                         <nav className="ml-5 border-l border-border py-1 pl-2">
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
@@ -374,7 +382,7 @@ export default function UsersRoute() {
                                     <h3 className="text-sm font-semibold">User Files</h3>
                                     <p className="mt-2 font-mono text-xs text-muted-foreground">{selectedUser.home}</p>
                                     <Button variant="outline" size="sm" asChild className="mt-4">
-                                        <a href={`/files?path=${encodeURIComponent(selectedUser.home)}`}>Open File Explorer</a>
+                                        <Link to={`/files?path=${encodeURIComponent(selectedUser.home)}`}>Open File Explorer</Link>
                                     </Button>
                                 </div>
                             ) : activeSection === "apps" ? (
@@ -386,7 +394,7 @@ export default function UsersRoute() {
                                 <TerminalPanel
                                     username={selectedUser.username}
                                     className="h-[520px] rounded-md border"
-                                    onClose={() => { window.location.href = `/users/${encodeURIComponent(selectedUser.username)}/overview`; }}
+                                    onClose={() => navigate(`/users/${encodeURIComponent(selectedUser.username)}/overview`)}
                                 />
                             )}
                         </div>
@@ -572,14 +580,14 @@ function UserSubItem({ username, section, active, icon: Icon, label }: {
     label: string;
 }) {
     return (
-        <a
-            href={`/users/${encodeURIComponent(username)}/${section}`}
+        <Link
+            to={`/users/${encodeURIComponent(username)}/${section}`}
             className={`flex items-center gap-2 px-2 py-1.5 text-[11px] ${
                 active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
         >
             <Icon className="h-3.5 w-3.5" />
             {label}
-        </a>
+        </Link>
     );
 }

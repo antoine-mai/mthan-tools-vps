@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
     Boxes,
     Cpu,
@@ -34,6 +35,8 @@ interface ServerApp {
 
 export default function AppsRoute() {
     const { headerApps, setHeaderApps } = useApp();
+    const navigate = useNavigate();
+    const { app: requestedApp } = useParams<{ app?: string }>();
     const [apps, setApps] = useState<ServerApp[]>([
         {
             id: "1",
@@ -134,19 +137,15 @@ export default function AppsRoute() {
     const [statusError, setStatusError] = useState("");
 
     useEffect(() => {
-        const selectFromPath = () => {
-            const requestedApp = window.location.pathname.split("/")[2];
-            if (!requestedApp) {
-                setSelectedApp(apps[0]);
-                return;
-            }
-            const match = apps.find((app) => app.name === decodeURIComponent(requestedApp));
-            if (match) setSelectedApp(match);
-        };
+        if (!requestedApp) {
+            setSelectedApp(apps[0]);
+            return;
+        }
+        const match = apps.find((app) => app.name === requestedApp);
+        if (match) setSelectedApp(match);
+    }, [requestedApp]);
 
-        selectFromPath();
-        window.addEventListener("popstate", selectFromPath);
-
+    useEffect(() => {
         const loadStatuses = async () => {
             try {
                 const response = await fetch(Api.current.apps, { cache: "no-store" });
@@ -174,15 +173,11 @@ export default function AppsRoute() {
         };
 
         loadStatuses();
-        return () => window.removeEventListener("popstate", selectFromPath);
     }, []);
 
     const selectApp = (app: ServerApp) => {
         setSelectedApp(app);
-        const path = `/apps/${encodeURIComponent(app.name)}`;
-        if (window.location.pathname !== path) {
-            window.history.pushState({}, "", path);
-        }
+        navigate(`/apps/${encodeURIComponent(app.name)}`);
     };
 
     const handleServiceAction = (id: string, action: "start" | "stop" | "restart") => {

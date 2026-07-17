@@ -23,6 +23,14 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-17 - React Router migration
+
+- Goal: Replace manual pathname routing and full-page nested navigation with React Router.
+- Files changed: package manifests, Main, route table, sidebar/header navigation, Apps, Settings, Users, and work log.
+- Important decisions: use `react-router-dom` v6; nested app/settings/user URLs use params; internal navigation uses Link/useNavigate; Back/Forward is router-managed.
+- Validation: TypeScript type-check and `git diff --check`; no frontend production build.
+- Known follow-up: top-level pages still own their DashboardLayout instances, but nested navigation no longer remounts the document/sidebar.
+
 ### 2026-07-17 - Per-user terminal section
 
 - Goal: Add a Terminal sub-item for every Linux user.

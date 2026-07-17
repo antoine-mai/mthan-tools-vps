@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
     Server,
@@ -22,6 +23,7 @@ type SidebarProps = {
 
 export default function Sidebar({ className = "", isTerminalOpen, onTerminalToggle }: SidebarProps) {
     const { logout } = useUser();
+    const location = useLocation();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
     const topMenuItems = [
@@ -51,12 +53,12 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                 {topMenuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive =
-                        window.location.pathname === item.href ||
-                        (item.href !== "/" && window.location.pathname.startsWith(`${item.href}/`));
+                        location.pathname === item.href ||
+                        (item.href !== "/" && location.pathname.startsWith(`${item.href}/`));
                     return (
-                        <a
+                        <Link
                             key={item.label}
-                            href={item.href}
+                            to={item.href}
                             className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
                                 isActive
                                     ? "bg-primary text-primary-foreground"
@@ -68,17 +70,17 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                             <span className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-150 rounded bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md border border-border whitespace-nowrap z-50">
                                 {item.label}
                             </span>
-                        </a>
+                        </Link>
                     );
                 })}
 
                 {/* Spacer to push Terminal to bottom */}
                 <div className="flex-1" />
 
-                <a
-                    href="/settings/general"
+                <Link
+                    to="/settings/general"
                     className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
-                        window.location.pathname === "/settings" || window.location.pathname.startsWith("/settings/")
+                        location.pathname === "/settings" || location.pathname.startsWith("/settings/")
                             ? "bg-primary text-primary-foreground"
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
@@ -87,7 +89,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                     <span className="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 translate-x-1 whitespace-nowrap rounded border border-border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100">
                         Settings
                     </span>
-                </a>
+                </Link>
 
                 {/* Terminal Menu Item */}
                 {runtime.isRoot && (
