@@ -591,26 +591,24 @@ function ContainerEngineConfiguration({
                 {details.items.map((item) => {
                     const Icon = item.icon;
                     return (
-                        <div key={item.label} className="rounded-md border border-border bg-card p-4">
+                        <div key={item.label} className="relative rounded-md border border-border bg-card p-4">
+                            {canEdit && item.editablePath ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="absolute right-3 top-3 h-7 gap-1.5 px-2 text-xs"
+                                    onClick={() => onEdit({ app: engine, label: item.label, path: item.editablePath! })}
+                                >
+                                    <Pencil className="h-3 w-3" />
+                                    Edit
+                                </Button>
+                            ) : null}
                             <div className="flex items-start gap-3">
                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                                     <Icon className="h-4 w-4" />
                                 </span>
-                                <div className="min-w-0">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <p className="text-xs font-semibold text-foreground">{item.label}</p>
-                                        {canEdit && item.editablePath ? (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
-                                                onClick={() => onEdit({ app: engine, label: item.label, path: item.editablePath! })}
-                                            >
-                                                <Pencil className="h-3 w-3" />
-                                                Edit
-                                            </Button>
-                                        ) : null}
-                                    </div>
+                                <div className={`min-w-0 ${canEdit && item.editablePath ? "pr-16" : ""}`}>
+                                    <p className="text-xs font-semibold text-foreground">{item.label}</p>
                                     <code className="mt-1 block break-all text-xs text-primary">{item.value}</code>
                                     <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>
                                 </div>

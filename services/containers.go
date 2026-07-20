@@ -3,14 +3,18 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"os/user"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+var allowedContainerID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
 type Container struct {
 	ID        string   `json:"id"`
@@ -73,8 +77,7 @@ func (s *ContainerService) ListAll() []Container {
 }
 
 func (s *ContainerService) ListCurrentUser(username string) []Container {
-	current, err := user.Current()
-	if err != nil || current.Username != username {
+	if !isCurrentUser(username) {
 		return []Container{}
 	}
 	output, err := s.runner.Run("podman", "ps", "-a", "--format", "json")
@@ -84,6 +87,80 @@ func (s *ContainerService) ListCurrentUser(username string) []Container {
 	result := parsePodmanContainers(output, username)
 	sortContainers(result)
 	return result
+}
+
+func (s *ContainerService) ActionAll(engine, owner, id, action string) error {
+	args, err := containerActionArgs(id, action)
+	if err != nil {
+		return err
+	}
+	_, err = s.runForOwner(engine, owner, args...)
+	return err
+}
+
+func (s *ContainerService) LogsAll(engine, owner, id string) (string, error) {
+	if !allowedContainerID.MatchString(id) {
+		return "", errors.New("invalid container")
+	}
+	output, err := s.runForOwner(engine, owner, "logs", "--tail", "200", id)
+	return string(output), err
+}
+
+func (s *ContainerService) ActionCurrentUser(username, id, action string) error {
+	if !isCurrentUser(username) {
+		return errors.New("container owner unavailable")
+	}
+	args, err := containerActionArgs(id, action)
+	if err != nil {
+		return err
+	}
+	_, err = s.runner.Run("podman", args...)
+	return err
+}
+
+func (s *ContainerService) LogsCurrentUser(username, id string) (string, error) {
+	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
+		return "", errors.New("invalid container")
+	}
+	output, err := s.runner.Run("podman", "logs", "--tail", "200", id)
+	return string(output), err
+}
+
+func (s *ContainerService) runForOwner(engine, owner string, args ...string) ([]byte, error) {
+	switch engine {
+	case "docker":
+		if owner != "root" && owner != "system" {
+			return nil, errors.New("invalid Docker owner")
+		}
+		return s.runner.Run("docker", args...)
+	case "podman":
+		linuxUser, exists, err := HomeUser(owner)
+		if err != nil || !exists || linuxUser.UID < 0 {
+			return nil, errors.New("invalid Podman owner")
+		}
+		command := []string{
+			"--user", linuxUser.Username, "--", "env", "HOME=" + linuxUser.Home,
+			fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%d", linuxUser.UID), "podman",
+		}
+		return s.runner.Run("runuser", append(command, args...)...)
+	default:
+		return nil, errors.New("invalid container engine")
+	}
+}
+
+func containerActionArgs(id, action string) ([]string, error) {
+	if !allowedContainerID.MatchString(id) {
+		return nil, errors.New("invalid container")
+	}
+	if action != "start" && action != "stop" && action != "restart" {
+		return nil, errors.New("invalid container action")
+	}
+	return []string{action, id}, nil
+}
+
+func isCurrentUser(username string) bool {
+	current, err := user.Current()
+	return err == nil && current.Username == username
 }
 
 func (s *ContainerService) listDocker() []Container {

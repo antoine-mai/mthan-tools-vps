@@ -23,6 +23,13 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-20 - Container controls and logs
+
+- Goal: Operate containers and inspect recent logs from the Containers inventory.
+- Files changed: owner-aware container command service, root/user action and logs routes, Containers controls/modal, and work log.
+- Important decisions: actions are limited to start/stop/restart; IDs and engines are validated; rootless Podman commands execute as the owning Linux user; logs are capped at the latest 200 lines.
+- Validation: Go formatting/tests, TypeScript type-check, production client build, and `git diff --check`.
+
 ### 2026-07-20 - Editable container-engine configuration
 
 - Goal: Make Docker and Podman global configuration paths directly editable from Apps.

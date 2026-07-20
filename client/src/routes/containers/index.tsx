@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Container as ContainerIcon, RefreshCw } from "lucide-react";
+import { Container as ContainerIcon, FileText, Loader2, Play, RefreshCw, RotateCw, Square, X } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
@@ -22,6 +22,11 @@ export default function ContainersRoute() {
     const [containers, setContainers] = useState<ContainerRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [actionLoading, setActionLoading] = useState("");
+    const [logsContainer, setLogsContainer] = useState<ContainerRecord | null>(null);
+    const [logs, setLogs] = useState("");
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [logsError, setLogsError] = useState("");
 
     const loadContainers = useCallback(async () => {
         setLoading(true);
@@ -41,6 +46,43 @@ export default function ContainersRoute() {
     useEffect(() => {
         loadContainers();
     }, [loadContainers]);
+
+    const runAction = async (container: ContainerRecord, action: "start" | "stop" | "restart") => {
+        const key = `${container.engine}:${container.owner}:${container.id}:${action}`;
+        setActionLoading(key);
+        setError("");
+        try {
+            const response = await fetch(`${Api.current.containers}/action`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, engine: container.engine, id: container.id, owner: container.owner }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || `Failed to ${action} container`);
+            await loadContainers();
+        } catch (actionError) {
+            setError(actionError instanceof Error ? actionError.message : `Failed to ${action} container`);
+        } finally {
+            setActionLoading("");
+        }
+    };
+
+    const openLogs = async (container: ContainerRecord) => {
+        setLogsContainer(container);
+        setLogs("");
+        setLogsError("");
+        setLogsLoading(true);
+        try {
+            const query = new URLSearchParams({ engine: container.engine, id: container.id, owner: container.owner });
+            const response = await fetch(`${Api.current.containers}/logs?${query.toString()}`, { cache: "no-store" });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to load container logs");
+            const data: { logs?: string } = await response.json();
+            setLogs(data.logs ?? "");
+        } catch (logsLoadError) {
+            setLogsError(logsLoadError instanceof Error ? logsLoadError.message : "Failed to load container logs");
+        } finally {
+            setLogsLoading(false);
+        }
+    };
 
     return (
         <DashboardLayout
@@ -70,7 +112,7 @@ export default function ContainersRoute() {
             {containers.length > 0 ? (
                 <div className="overflow-hidden rounded-md border border-border bg-card">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[900px] text-left text-xs">
+                        <table className="w-full min-w-[1080px] text-left text-xs">
                             <thead className="border-b border-border bg-muted/40 text-muted-foreground">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Container</th>
@@ -79,6 +121,7 @@ export default function ContainersRoute() {
                                     <th className="px-4 py-3 font-medium">Image</th>
                                     <th className="px-4 py-3 font-medium">State</th>
                                     <th className="px-4 py-3 font-medium">Ports</th>
+                                    <th className="px-4 py-3 text-right font-medium">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -102,10 +145,54 @@ export default function ContainersRoute() {
                                         <td className="px-4 py-3 text-muted-foreground">
                                             {container.ports?.length ? container.ports.join(", ") : "—"}
                                         </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                {container.state.toLowerCase() === "running" ? (
+                                                    <Button size="icon" variant="outline" className="h-8 w-8" title="Stop" aria-label={`Stop ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "stop")}>
+                                                        {actionLoading.endsWith(":stop") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                ) : (
+                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-emerald-600" title="Start" aria-label={`Start ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "start")}>
+                                                        {actionLoading.endsWith(":start") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                )}
+                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
+                                                    {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
+                                                </Button>
+                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
+                                                    <FileText className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            ) : null}
+
+            {logsContainer ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
+                    <div className="flex h-[min(720px,90vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
+                        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+                            <div className="min-w-0">
+                                <h2 className="text-sm font-semibold text-foreground">{logsContainer.name || logsContainer.id} logs</h2>
+                                <p className="mt-1 text-xs text-muted-foreground">Last 200 lines · {logsContainer.engine} · {logsContainer.owner}</p>
+                            </div>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setLogsContainer(null)} aria-label="Close logs">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-auto bg-zinc-950 p-5">
+                            {logsLoading ? (
+                                <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-zinc-400" /></div>
+                            ) : logsError ? (
+                                <p className="whitespace-pre-wrap text-xs text-red-400">{logsError.trim()}</p>
+                            ) : (
+                                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-200">{logs || "No logs available."}</pre>
+                            )}
+                        </div>
                     </div>
                 </div>
             ) : null}
