@@ -32,11 +32,13 @@ func ProvisionUserHome(home string, uid, gid int) error {
 }
 
 type LinuxUser struct {
-	Home     string `json:"home"`
-	Name     string `json:"name"`
-	Shell    string `json:"shell"`
-	UID      int    `json:"uid"`
-	Username string `json:"username"`
+	CPanelEnabled bool   `json:"cpanelEnabled"`
+	HasPassword   bool   `json:"hasPassword"`
+	Home          string `json:"home"`
+	Name          string `json:"name"`
+	Shell         string `json:"shell"`
+	UID           int    `json:"uid"`
+	Username      string `json:"username"`
 }
 
 func UserApps(home string) ([]string, error) {
@@ -72,6 +74,46 @@ func HomeUser(username string) (LinuxUser, bool, error) {
 
 func HomeUsers() ([]LinuxUser, error) {
 	return homeUsersIn("/home", passwdUsersByName())
+}
+
+func HomeUsersWithAccess() ([]LinuxUser, error) {
+	users, err := HomeUsers()
+	if err != nil {
+		return nil, err
+	}
+	return userAccessFromShadow(users, "/etc/shadow")
+}
+
+func userAccessFromShadow(users []LinuxUser, shadowPath string) ([]LinuxUser, error) {
+	file, err := os.Open(shadowPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	hashes := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), ":", 3)
+		if len(parts) >= 2 {
+			hashes[parts[0]] = parts[1]
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	for index := range users {
+		users[index].HasPassword, users[index].CPanelEnabled = passwordAccessState(hashes[users[index].Username])
+	}
+	return users, nil
+}
+
+func passwordAccessState(hash string) (bool, bool) {
+	locked := strings.HasPrefix(hash, "!") || strings.HasPrefix(hash, "*")
+	usableHash := strings.TrimLeft(hash, "!")
+	hasPassword := usableHash != "" && usableHash != "*"
+	return hasPassword, hasPassword && !locked
 }
 
 func homeUsersIn(homeRoot string, passwdUsers map[string]passwdUser) ([]LinuxUser, error) {

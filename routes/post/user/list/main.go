@@ -9,7 +9,7 @@ import (
 
 func Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		users, err := services.HomeUsers()
+		users, err := services.HomeUsersWithAccess()
 		if err != nil {
 			http.Error(w, "linux users could not be loaded", http.StatusInternalServerError)
 			return

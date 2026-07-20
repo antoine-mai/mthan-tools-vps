@@ -138,21 +138,23 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
     };
 
     return (
-        <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
-            <div className="flex min-w-0 items-center gap-4">
-                {onMenuClick && (
-                    <button
-                        onClick={onMenuClick}
-                        className="rounded-md p-1.5 hover:bg-muted md:hidden"
-                        aria-label="Toggle menu"
-                    >
-                        <Menu className="h-5 w-5 text-muted-foreground" />
-                    </button>
-                )}
-                <h1 className="text-sm font-semibold text-foreground md:text-base">
-                    {title}
-                </h1>
-                <div className="flex min-w-0 items-center gap-2">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-card pr-6">
+            <div className="flex h-full min-w-0 items-center">
+                <div className="flex h-full shrink-0 items-center gap-4 border-r border-border px-4 md:w-[280px] md:px-6">
+                    {onMenuClick && (
+                        <button
+                            onClick={onMenuClick}
+                            className="rounded-md p-1.5 hover:bg-muted md:hidden"
+                            aria-label="Toggle menu"
+                        >
+                            <Menu className="h-5 w-5 text-muted-foreground" />
+                        </button>
+                    )}
+                    <h1 className="truncate text-sm font-semibold text-foreground md:text-base">
+                        {title}
+                    </h1>
+                </div>
+                <div className="ml-4 flex min-w-0 items-center gap-2">
                     {headerApps.map((app) => (
                         <Link
                             key={app}

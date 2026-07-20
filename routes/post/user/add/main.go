@@ -40,6 +40,10 @@ func Handler(settings *services.SettingsService) http.Handler {
 			http.Error(w, "password is required", http.StatusBadRequest)
 			return
 		}
+		if strings.ContainsAny(req.Password, ":\r\n") {
+			http.Error(w, "password contains unsupported characters", http.StatusBadRequest)
+			return
+		}
 
 		username := strings.TrimSpace(req.Username)
 		if settings.Get("users_auto_username", "false") == "true" {

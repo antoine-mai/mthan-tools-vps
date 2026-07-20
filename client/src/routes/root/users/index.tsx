@@ -30,6 +30,8 @@ import { useApp } from "_contexts/app";
 import { useTerminal } from "_contexts/terminal";
 
 interface LinuxUser {
+    cpanelEnabled: boolean;
+    hasPassword: boolean;
     home: string;
     name: string;
     shell: string;
@@ -80,6 +82,12 @@ export default function UsersRoute() {
     const [appArchive, setAppArchive] = useState<File | null>(null);
     const [addAppSaving, setAddAppSaving] = useState(false);
     const [addAppError, setAddAppError] = useState("");
+    const [activationOpen, setActivationOpen] = useState(false);
+    const [activationPassword, setActivationPassword] = useState("");
+    const [activationConfirm, setActivationConfirm] = useState("");
+    const [activationShowPassword, setActivationShowPassword] = useState(false);
+    const [activationSaving, setActivationSaving] = useState(false);
+    const [activationError, setActivationError] = useState("");
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -325,6 +333,38 @@ export default function UsersRoute() {
         }
     };
 
+    const activateCPanel = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!selectedUser) return;
+        setActivationError("");
+        if (!activationPassword) {
+            setActivationError("Password is required");
+            return;
+        }
+        if (activationPassword !== activationConfirm) {
+            setActivationError("Passwords do not match");
+            return;
+        }
+        setActivationSaving(true);
+        try {
+            const response = await fetch("/post/user/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: selectedUser.username, password: activationPassword }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to activate cPanel access");
+            setActivationOpen(false);
+            setActivationPassword("");
+            setActivationConfirm("");
+            setActivationShowPassword(false);
+            await fetchUsers(true);
+        } catch (activationRequestError) {
+            setActivationError(activationRequestError instanceof Error ? activationRequestError.message : "Failed to activate cPanel access");
+        } finally {
+            setActivationSaving(false);
+        }
+    };
+
     return (
         <DashboardLayout
             title="Linux users"
@@ -373,21 +413,17 @@ export default function UsersRoute() {
                             </div>
                         ) : (
                             users.map((u) => {
-                                const isSelected = selectedUser?.username === u.username;
+                                const isOpen = selectedUser?.username === u.username;
                                 return (
                                     <div key={u.username}>
                                     <Link
                                         to={`/users/${encodeURIComponent(u.username)}/overview`}
-                                        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-none hover:bg-muted/60 transition-colors text-xs ${
-                                            isSelected
-                                                ? "bg-primary/10 text-primary font-semibold"
-                                                : "text-foreground/90"
-                                        }`}
+                                        className="flex items-center gap-2 rounded-none px-2.5 py-1.5 text-xs text-foreground/90 transition-colors hover:bg-muted/60"
                                     >
-                                        <User className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                                        <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                         <span className="truncate flex-1 min-w-0">{u.username}</span>
                                     </Link>
-                                    {isSelected ? (
+                                    {isOpen ? (
                                         <nav className="ml-5 border-l border-border py-1 pl-2">
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
@@ -414,21 +450,39 @@ export default function UsersRoute() {
                     {selectedUser ? (
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Profile Header */}
-                            <div className="flex items-center gap-3 border-b border-border pb-5">
-                                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
-                                    <h2 className="mr-1 shrink-0 text-2xl font-bold tracking-tight text-foreground">
+                            <div className="flex items-start gap-4 border-b border-border pb-5">
+                                <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+                                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
                                         {selectedUser.username}
                                     </h2>
-                                    <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
-                                    <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
-                                    <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
+                                    <div className="flex max-w-full items-center gap-2 overflow-x-auto">
+                                        <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
+                                        <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
+                                        <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
+                                    </div>
                                 </div>
 
+                                <div className="ml-auto flex shrink-0 items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={`h-7 cursor-default gap-1.5 px-2 text-xs ${selectedUser.cpanelEnabled ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+                                        tabIndex={-1}
+                                    >
+                                        {selectedUser.cpanelEnabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                                        {selectedUser.cpanelEnabled ? "CPanel Enabled" : "CPanel Disabled"}
+                                    </Button>
+                                    {!selectedUser.cpanelEnabled ? (
+                                        <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
+                                            <Key className="h-3.5 w-3.5" />
+                                            Activate
+                                        </Button>
+                                    ) : null}
                                 {selectedUser.uid !== 0 && (
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
+                                        className="h-7 text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
                                         onClick={() => handleDeleteUser(selectedUser.username)}
                                         disabled={isDeleting}
                                     >
@@ -440,6 +494,7 @@ export default function UsersRoute() {
                                         Delete User
                                     </Button>
                                 )}
+                                </div>
                             </div>
 
                             {activeSection === "overview" ? (
@@ -540,6 +595,48 @@ export default function UsersRoute() {
                     </form>
                 </div>
             )}
+
+            {activationOpen && selectedUser ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <form onSubmit={activateCPanel} className="w-full max-w-md border border-border bg-card shadow-lg">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div>
+                                <h3 className="text-sm font-semibold">Activate cPanel access</h3>
+                                <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedUser.username}</p>
+                            </div>
+                            <button type="button" onClick={() => setActivationOpen(false)} disabled={activationSaving} aria-label="Close activation modal">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-4 p-5">
+                            <p className="text-xs leading-5 text-muted-foreground">
+                                Set a Linux account password to allow this user to authenticate with cPanel.
+                            </p>
+                            <label className="block space-y-1.5 text-xs font-medium">
+                                <span>Password</span>
+                                <div className="relative">
+                                    <input type={activationShowPassword ? "text" : "password"} value={activationPassword} onChange={(event) => setActivationPassword(event.target.value)} className="h-9 w-full border border-input bg-background px-3 pr-10 text-sm outline-none focus:border-primary" autoComplete="new-password" required />
+                                    <button type="button" onClick={() => setActivationShowPassword((current) => !current)} className="absolute right-3 top-2.5 text-muted-foreground">
+                                        {activationShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </label>
+                            <label className="block space-y-1.5 text-xs font-medium">
+                                <span>Confirm Password</span>
+                                <input type={activationShowPassword ? "text" : "password"} value={activationConfirm} onChange={(event) => setActivationConfirm(event.target.value)} className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary" autoComplete="new-password" required />
+                            </label>
+                            {activationError ? <p className="text-xs text-destructive">{activationError.trim()}</p> : null}
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+                            <Button type="button" variant="outline" onClick={() => setActivationOpen(false)} disabled={activationSaving}>Cancel</Button>
+                            <Button type="submit" className="gap-2" disabled={activationSaving}>
+                                {activationSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                                Activate
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            ) : null}
 
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
