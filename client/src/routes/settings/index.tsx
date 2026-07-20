@@ -1,25 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Boxes, GripVertical, Plus, Settings, User, X } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 
 import { useApp } from "_contexts/app";
 import DashboardLayout from "_layouts/dashboard";
 import { defaultAppName } from "_utils/app-settings";
 import Api from "_utils/api";
+import SettingsSidebar, { availableApps } from "./sidebar";
 import {
     getColorModePreference,
     type ColorModePreference,
 } from "_utils/color-mode";
-
-const availableApps = [
-    ["nginx", "Nginx"],
-    ["mariadb", "MariaDB"],
-    ["redis", "Redis"],
-    ["docker", "Docker"],
-    ["podman", "Podman"],
-    ["node", "Node.js"],
-    ["php", "PHP"],
-] as const;
 
 type SettingsSection = "general" | "users" | "apps";
 
@@ -91,12 +82,8 @@ export default function SettingsRoute() {
 
     return (
         <DashboardLayout title="Settings" fullWidth>
-            <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[240px_1fr]">
-                <aside className="flex h-full flex-col gap-1 border-r border-border bg-card/60 p-2">
-                    <SettingsNavItem active={section === "general"} href="/settings/general" icon={Settings} label="General Settings" />
-                    <SettingsNavItem active={section === "users"} href="/settings/users" icon={User} label="Users Settings" />
-                    <SettingsNavItem active={section === "apps"} href="/settings/apps" icon={Boxes} label="Apps Settings" />
-                </aside>
+            <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[280px_1fr]">
+                <SettingsSidebar section={section} />
 
                 <main className="overflow-y-auto p-6">
                     {section === "general" ? (
@@ -267,23 +254,4 @@ export default function SettingsRoute() {
 
 function settingsSection(section?: string): SettingsSection {
     return section === "users" || section === "apps" ? section : "general";
-}
-
-function SettingsNavItem({ active, href, icon: Icon, label }: {
-    active: boolean;
-    href: string;
-    icon: typeof Settings;
-    label: string;
-}) {
-    return (
-        <Link
-            to={href}
-            className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold ${
-                active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-        >
-            <Icon className="h-4 w-4" />
-            {label}
-        </Link>
-    );
 }

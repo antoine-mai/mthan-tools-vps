@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -15,6 +17,16 @@ import (
 )
 
 var allowedContainerID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
+var (
+	ErrContainerDockerfileDenied  = errors.New("Dockerfile access denied")
+	ErrContainerDockerfileMissing = errors.New("Dockerfile not found")
+)
+
+type ContainerDockerfile struct {
+	Content string `json:"content"`
+	Path    string `json:"path"`
+}
 
 type Container struct {
 	ID        string   `json:"id"`
@@ -124,6 +136,146 @@ func (s *ContainerService) LogsCurrentUser(username, id string) (string, error) 
 	}
 	output, err := s.runner.Run("podman", "logs", "--tail", "200", id)
 	return string(output), err
+}
+
+func (s *ContainerService) DockerfileAll(engine, owner, id string) (ContainerDockerfile, error) {
+	path, err := s.containerDockerfilePath(engine, owner, id)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return readContainerDockerfile(path)
+}
+
+func (s *ContainerService) WriteDockerfileAll(engine, owner, id, content string) (ContainerDockerfile, error) {
+	path, err := s.containerDockerfilePath(engine, owner, id)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return writeContainerDockerfile(path, content)
+}
+
+func (s *ContainerService) DockerfileCurrentUser(username, id string) (ContainerDockerfile, error) {
+	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
+		return ContainerDockerfile{}, ErrContainerDockerfileDenied
+	}
+	output, err := s.runner.Run("podman", "inspect", id)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	path, err := containerDockerfilePathFromInspect(output, "podman", username)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return readContainerDockerfile(path)
+}
+
+func (s *ContainerService) WriteDockerfileCurrentUser(username, id, content string) (ContainerDockerfile, error) {
+	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
+		return ContainerDockerfile{}, ErrContainerDockerfileDenied
+	}
+	output, err := s.runner.Run("podman", "inspect", id)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	path, err := containerDockerfilePathFromInspect(output, "podman", username)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return writeContainerDockerfile(path, content)
+}
+
+func (s *ContainerService) containerDockerfilePath(engine, owner, id string) (string, error) {
+	if !allowedContainerID.MatchString(id) {
+		return "", ErrContainerDockerfileDenied
+	}
+	output, err := s.runForOwner(engine, owner, "inspect", id)
+	if err != nil {
+		return "", err
+	}
+	return containerDockerfilePathFromInspect(output, engine, owner)
+}
+
+func containerDockerfilePathFromInspect(output []byte, engine, owner string) (string, error) {
+	var inspected []map[string]any
+	if json.Unmarshal(output, &inspected) != nil || len(inspected) == 0 {
+		return "", ErrContainerDockerfileMissing
+	}
+	config, _ := inspected[0]["Config"].(map[string]any)
+	labels, _ := config["Labels"].(map[string]any)
+	path := strings.TrimSpace(fmt.Sprint(labels["mthan.dockerfile"]))
+	if path == "" || path == "<nil>" {
+		workingDirectory := strings.TrimSpace(fmt.Sprint(labels["com.docker.compose.project.working_dir"]))
+		if workingDirectory != "" && workingDirectory != "<nil>" {
+			path = filepath.Join(workingDirectory, "Dockerfile")
+		}
+	}
+	path = filepath.Clean(path)
+	if path == "." || !filepath.IsAbs(path) {
+		return "", ErrContainerDockerfileMissing
+	}
+	if engine == "podman" {
+		linuxUser, exists, lookupErr := HomeUser(owner)
+		if lookupErr != nil || !exists || !pathWithin(path, linuxUser.Home) {
+			return "", ErrContainerDockerfileDenied
+		}
+	}
+	return path, nil
+}
+
+func readContainerDockerfile(path string) (ContainerDockerfile, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return ContainerDockerfile{}, ErrContainerDockerfileMissing
+	}
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxAppConfigSize {
+		return ContainerDockerfile{}, ErrContainerDockerfileDenied
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return ContainerDockerfile{Content: string(content), Path: path}, nil
+}
+
+func writeContainerDockerfile(path, content string) (ContainerDockerfile, error) {
+	if len(content) > maxAppConfigSize || strings.ContainsRune(content, 0) {
+		return ContainerDockerfile{}, ErrContainerDockerfileDenied
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return ContainerDockerfile{}, ErrContainerDockerfileDenied
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".mthan-dockerfile-*")
+	if err != nil {
+		return ContainerDockerfile{}, err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(info.Mode().Perm()); err != nil {
+		temporary.Close()
+		return ContainerDockerfile{}, err
+	}
+	if _, err := temporary.WriteString(content); err != nil {
+		temporary.Close()
+		return ContainerDockerfile{}, err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return ContainerDockerfile{}, err
+	}
+	if err := temporary.Close(); err != nil {
+		return ContainerDockerfile{}, err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return ContainerDockerfile{}, err
+	}
+	return ContainerDockerfile{Content: content, Path: path}, nil
+}
+
+func pathWithin(path, root string) bool {
+	cleanPath := filepath.Clean(path)
+	cleanRoot := filepath.Clean(root)
+	return cleanPath == cleanRoot || strings.HasPrefix(cleanPath, cleanRoot+string(filepath.Separator))
 }
 
 func (s *ContainerService) runForOwner(engine, owner string, args ...string) ([]byte, error) {

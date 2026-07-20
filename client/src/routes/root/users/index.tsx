@@ -510,7 +510,7 @@ export default function UsersRoute() {
                                 ) : (
                                     <div className="divide-y divide-border">
                                         {systemApps.map((app) => (
-                                            <Link key={app.name} to={`/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
+                                            <Link key={app.name} to={`/settings/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
                                                 <Boxes className="h-4 w-4 shrink-0 text-primary" />
                                                 <span className="min-w-0 flex-1 truncate font-medium">{systemAppNames[app.name] || app.name}</span>
                                                 <span className="font-mono text-xs text-muted-foreground">{app.version || app.versions?.join(", ") || "—"}</span>

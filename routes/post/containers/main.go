@@ -2,6 +2,7 @@ package containers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"mthan/vps/services"
@@ -18,6 +19,40 @@ func Handler(sessions *services.SessionService, containers *services.ContainerSe
 		if err := json.NewEncoder(w).Encode(map[string]any{"containers": containers.ListAll()}); err != nil {
 			http.Error(w, "could not read containers", http.StatusInternalServerError)
 		}
+	})
+}
+
+func DockerfileHandler(sessions *services.SessionService, containers *services.ContainerService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !validSession(r, sessions) {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		engine, owner, id := r.URL.Query().Get("engine"), r.URL.Query().Get("owner"), r.URL.Query().Get("id")
+		var result services.ContainerDockerfile
+		var err error
+		if r.Method == http.MethodGet {
+			result, err = containers.DockerfileAll(engine, owner, id)
+		} else {
+			var input struct {
+				Content string `json:"content"`
+			}
+			if json.NewDecoder(r.Body).Decode(&input) != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			result, err = containers.WriteDockerfileAll(engine, owner, id, input.Content)
+		}
+		if err != nil {
+			if errors.Is(err, services.ErrContainerDockerfileMissing) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+			} else {
+				http.Error(w, err.Error(), http.StatusForbidden)
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(result)
 	})
 }
 

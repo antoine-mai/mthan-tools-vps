@@ -23,6 +23,27 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-20 - Route groups limited to API and POST
+
+- Goal: Keep every HTTP handler under the actual `/api` or `/post` route group.
+- Files changed: API/Post settings handlers, shared settings validation service, route imports, removed shared routes/settings handler, and work log.
+- Important decisions: `routes/` now contains only the root registrar plus `api/` and `post/`; setting validation belongs to services rather than a third route namespace.
+- Validation: Go formatting/tests, route-tree scan, and `git diff --check`.
+
+### 2026-07-20 - Apps moved into Settings
+
+- Goal: Make system apps sub-items of Apps Settings with route-backed detail pages.
+- Files changed: shared Settings sidebar/app catalog, Settings and Apps layouts, route table, global sidebar/header links, User Overview links, and work log.
+- Important decisions: the top-level Apps navigation and `/apps/*` routes are removed; app details use `/settings/apps/:appname`; `/settings/apps` remains the installed/header shortcut overview.
+- Validation: TypeScript type-check, production client build, route reference scan, and `git diff --check`.
+
+### 2026-07-20 - Container Dockerfile editor
+
+- Goal: Edit the host Dockerfile associated with a listed Docker or Podman container.
+- Files changed: safe Dockerfile discovery/read/write service, root/user routes, Containers action/modal, and work log.
+- Important decisions: discovery uses `mthan.dockerfile` then Compose working-directory metadata; rootless Podman paths are jailed to the owner's home; only existing regular files up to 2 MiB are editable; saving never rebuilds or recreates a container.
+- Validation: Go formatting/tests, TypeScript type-check, production client build, and `git diff --check`.
+
 ### 2026-07-20 - Per-user cPanel access status
 
 - Goal: Show whether each Linux user can authenticate with cPanel and activate access by setting a password.

@@ -9,7 +9,6 @@ import {
     User,
     Users,
     Globe,
-    Boxes,
     Settings,
     Braces,
     Container,
@@ -34,7 +33,6 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
         { icon: Globe, label: "VHosts", href: "/vhosts" },
         { icon: Container, label: "Containers", href: "/containers" },
         { icon: Folder, label: "Files", href: "/files" },
-        { icon: Boxes, label: "Apps", href: "/apps" },
     ];
 
     const handleLogoutClick = (e: React.MouseEvent<HTMLButtonElement>) => {

@@ -15,6 +15,7 @@ import (
 	postlogin "mthan/vps/routes/post/login"
 	"mthan/vps/routes/post/ping"
 	"mthan/vps/routes/post/session"
+	settingsroute "mthan/vps/routes/post/settings"
 	"mthan/vps/routes/post/terminal"
 	"mthan/vps/routes/post/update"
 	useradd "mthan/vps/routes/post/user/add"
@@ -23,7 +24,6 @@ import (
 	userlist "mthan/vps/routes/post/user/list"
 	userlogin "mthan/vps/routes/post/user/login"
 	userpassword "mthan/vps/routes/post/user/password"
-	settingsroute "mthan/vps/routes/settings"
 	"mthan/vps/services"
 )
 
@@ -56,6 +56,8 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("GET /post/containers", postOnly(deps.Startup, postcontainers.Handler(deps.Sessions, services.NewContainerService())))
 	mux.Handle("POST /post/containers/action", postOnly(deps.Startup, postcontainers.ActionHandler(deps.Sessions, services.NewContainerService())))
 	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, postcontainers.LogsHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
 	mux.Handle("POST /post/apps", postOnly(deps.Startup, postapps.Handler(deps.Sessions)))
 	mux.Handle("GET /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
 	mux.Handle("PUT /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))

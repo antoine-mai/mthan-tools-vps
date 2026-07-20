@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Container as ContainerIcon, FileText, Loader2, Play, RefreshCw, RotateCw, Square, X } from "lucide-react";
+import { Container as ContainerIcon, FileCode2, FileText, Loader2, Play, RefreshCw, RotateCw, Save, Square, X } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
@@ -27,6 +27,12 @@ export default function ContainersRoute() {
     const [logs, setLogs] = useState("");
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState("");
+    const [dockerfileContainer, setDockerfileContainer] = useState<ContainerRecord | null>(null);
+    const [dockerfileContent, setDockerfileContent] = useState("");
+    const [dockerfilePath, setDockerfilePath] = useState("");
+    const [dockerfileLoading, setDockerfileLoading] = useState(false);
+    const [dockerfileSaving, setDockerfileSaving] = useState(false);
+    const [dockerfileError, setDockerfileError] = useState("");
 
     const loadContainers = useCallback(async () => {
         setLoading(true);
@@ -81,6 +87,50 @@ export default function ContainersRoute() {
             setLogsError(logsLoadError instanceof Error ? logsLoadError.message : "Failed to load container logs");
         } finally {
             setLogsLoading(false);
+        }
+    };
+
+    const dockerfileQuery = (container: ContainerRecord) => new URLSearchParams({
+        engine: container.engine,
+        id: container.id,
+        owner: container.owner,
+    });
+
+    const openDockerfile = async (container: ContainerRecord) => {
+        setDockerfileContainer(container);
+        setDockerfileContent("");
+        setDockerfilePath("");
+        setDockerfileError("");
+        setDockerfileLoading(true);
+        try {
+            const response = await fetch(`${Api.current.containers}/dockerfile?${dockerfileQuery(container)}`, { cache: "no-store" });
+            if (!response.ok) throw new Error((await response.text()) || "Dockerfile not found");
+            const data: { content?: string; path?: string } = await response.json();
+            setDockerfileContent(data.content ?? "");
+            setDockerfilePath(data.path ?? "");
+        } catch (dockerfileLoadError) {
+            setDockerfileError(dockerfileLoadError instanceof Error ? dockerfileLoadError.message : "Dockerfile not found");
+        } finally {
+            setDockerfileLoading(false);
+        }
+    };
+
+    const saveDockerfile = async () => {
+        if (!dockerfileContainer) return;
+        setDockerfileSaving(true);
+        setDockerfileError("");
+        try {
+            const response = await fetch(`${Api.current.containers}/dockerfile?${dockerfileQuery(dockerfileContainer)}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: dockerfileContent }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to save Dockerfile");
+            setDockerfileContainer(null);
+        } catch (dockerfileSaveError) {
+            setDockerfileError(dockerfileSaveError instanceof Error ? dockerfileSaveError.message : "Failed to save Dockerfile");
+        } finally {
+            setDockerfileSaving(false);
         }
     };
 
@@ -163,6 +213,9 @@ export default function ContainersRoute() {
                                                 <Button size="icon" variant="outline" className="h-8 w-8" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
                                                     <FileText className="h-3.5 w-3.5" />
                                                 </Button>
+                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Edit Dockerfile" aria-label={`Edit Dockerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
+                                                    <FileCode2 className="h-3.5 w-3.5" />
+                                                </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -193,6 +246,45 @@ export default function ContainersRoute() {
                             ) : (
                                 <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-200">{logs || "No logs available."}</pre>
                             )}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {dockerfileContainer ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
+                    <div className="flex h-[min(760px,90vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+                            <div className="min-w-0">
+                                <h2 className="text-sm font-semibold text-foreground">Edit Dockerfile · {dockerfileContainer.name || dockerfileContainer.id}</h2>
+                                <code className="mt-1 block break-all text-xs text-muted-foreground">{dockerfilePath || "Dockerfile path unavailable"}</code>
+                            </div>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDockerfileContainer(null)} disabled={dockerfileSaving} aria-label="Close Dockerfile editor">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        {dockerfileError ? (
+                            <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-3 text-xs text-destructive">
+                                {dockerfileError.trim()}
+                                {!dockerfilePath ? <span className="mt-1 block text-muted-foreground">Add the label mthan.dockerfile=/absolute/path/Dockerfile when creating the container, or use Docker Compose from a directory containing Dockerfile.</span> : null}
+                            </div>
+                        ) : null}
+                        <div className="min-h-0 flex-1 bg-background">
+                            {dockerfileLoading ? (
+                                <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                            ) : (
+                                <textarea value={dockerfileContent} onChange={(event) => setDockerfileContent(event.target.value)} disabled={!dockerfilePath} spellCheck={false} className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50" aria-label="Dockerfile content" />
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                            <p className="text-xs text-muted-foreground">Saving does not rebuild the image or recreate the container.</p>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setDockerfileContainer(null)} disabled={dockerfileSaving}>Cancel</Button>
+                                <Button size="sm" className="gap-2" onClick={saveDockerfile} disabled={!dockerfilePath || dockerfileLoading || dockerfileSaving}>
+                                    {dockerfileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    Save
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -2,6 +2,7 @@ package containers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"mthan/vps/services"
@@ -15,6 +16,40 @@ func UserHandler(sessions *services.SessionService, containers *services.Contain
 			return
 		}
 		writeJSON(w, map[string]any{"containers": containers.ListCurrentUser(session.Username)})
+	})
+}
+
+func UserDockerfileHandler(sessions *services.SessionService, containers *services.ContainerService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := requestSession(r, sessions)
+		if !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		id := r.URL.Query().Get("id")
+		var result services.ContainerDockerfile
+		var err error
+		if r.Method == http.MethodGet {
+			result, err = containers.DockerfileCurrentUser(session.Username, id)
+		} else {
+			var input struct {
+				Content string `json:"content"`
+			}
+			if json.NewDecoder(r.Body).Decode(&input) != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			result, err = containers.WriteDockerfileCurrentUser(session.Username, id, input.Content)
+		}
+		if err != nil {
+			if errors.Is(err, services.ErrContainerDockerfileMissing) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+			} else {
+				http.Error(w, err.Error(), http.StatusForbidden)
+			}
+			return
+		}
+		writeJSON(w, result)
 	})
 }
 

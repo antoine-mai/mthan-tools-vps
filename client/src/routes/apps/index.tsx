@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
     Boxes,
-    Cpu,
     RefreshCw,
     Play,
     Square,
@@ -26,6 +25,7 @@ import { useApp } from "_contexts/app";
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import Api from "_utils/api";
+import SettingsSidebar from "../settings/sidebar";
 
 interface ServerApp {
     id: string;
@@ -50,7 +50,6 @@ type ConfigEditorTarget = {
 
 export default function AppsRoute() {
     const { headerApps, isRoot, setHeaderApps } = useApp();
-    const navigate = useNavigate();
     const { app: requestedApp } = useParams<{ app?: string }>();
     const [apps, setApps] = useState<ServerApp[]>([
         {
@@ -142,7 +141,6 @@ export default function AppsRoute() {
 
     const [selectedApp, setSelectedApp] = useState<ServerApp | null>(apps[0]);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
-    const [statusLoading, setStatusLoading] = useState(true);
     const [statusError, setStatusError] = useState("");
     const [configEditor, setConfigEditor] = useState<ConfigEditorTarget | null>(null);
 
@@ -177,18 +175,11 @@ export default function AppsRoute() {
                 setStatusError("");
             } catch (error) {
                 setStatusError(error instanceof Error ? error.message : "Failed to load app status");
-            } finally {
-                setStatusLoading(false);
             }
         };
 
         loadStatuses();
     }, []);
-
-    const selectApp = (app: ServerApp) => {
-        setSelectedApp(app);
-        navigate(`/apps/${encodeURIComponent(app.name)}`);
-    };
 
     const handleServiceAction = (id: string, action: "start" | "stop" | "restart") => {
         setActionLoading(action);
@@ -240,58 +231,17 @@ export default function AppsRoute() {
 
     return (
         <DashboardLayout
-            title="System Apps"
-            description="Monitor, configure, and control core system software services and runtimes."
+            title="Settings"
             fullWidth={true}
         >
             <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[280px_1fr]">
-                {/* Left Sidebar - Apps List */}
-                <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
-                    <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
-                        <span className="text-xs font-semibold text-muted-foreground">
-                            System Apps
-                        </span>
-                        <Boxes className="h-4 w-4 text-muted-foreground" />
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
-                        {statusError ? (
-                            <p className="px-2 py-2 text-xs text-destructive">{statusError}</p>
-                        ) : null}
-                        {apps.map((app) => {
-                            const isSelected = selectedApp?.id === app.id;
-                            return (
-                                <div
-                                    key={app.id}
-                                    className={`flex items-center gap-2.5 py-2 px-2.5 rounded-md cursor-pointer hover:bg-muted/60 transition-colors text-xs ${
-                                        isSelected
-                                            ? "bg-primary/10 text-primary font-semibold"
-                                            : "text-foreground/90"
-                                    }`}
-                                    onClick={() => selectApp(app)}
-                                >
-                                    <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                                    <span className="truncate flex-1 min-w-0">{app.displayName}</span>
-                                    <span
-                                        className={`h-2.5 w-2.5 shrink-0 rounded-full border ${
-                                            statusLoading
-                                                ? "animate-pulse border-muted-foreground/30 bg-muted"
-                                                : app.installed
-                                                  ? "border-emerald-500/30 bg-emerald-500"
-                                                  : "border-muted-foreground/30 bg-transparent"
-                                        }`}
-                                        title={statusLoading ? "Checking installation" : app.installed ? "Installed" : "Not installed"}
-                                    />
-                                </div>
-                            );
-                        })}
-                    </div>
-                </aside>
-
-                {/* Right Panel - App Detail View */}
+                <SettingsSidebar section="apps" app={selectedApp?.name} />
                 <main className="bg-background flex flex-col h-full overflow-hidden">
                     {selectedApp ? (
                         <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                            {statusError ? (
+                                <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{statusError}</p>
+                            ) : null}
                             {/* Compact app header */}
                             <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
                                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">

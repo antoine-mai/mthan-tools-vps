@@ -19,13 +19,12 @@ export default function AppRoutes() {
             <Route path="/login" element={<LoginRoute />} />
             <Route path="/files" element={<FilesRoute />} />
             <Route path="/vhosts" element={<VHostsRoute />} />
-            <Route path="/apps" element={<AppsRoute />} />
-            <Route path="/apps/:app" element={<AppsRoute />} />
             <Route path="/containers" element={<ContainersRoute />} />
             <Route path="/apis" element={<APIsRoute />} />
             <Route path="/agent" element={<AgentRoute />} />
             <Route path="/settings" element={<SettingsRoute />} />
             <Route path="/settings/:section" element={<SettingsRoute />} />
+            <Route path="/settings/apps/:app" element={<AppsRoute />} />
             {runtime.isRoot ? (
                 <>
                     <Route path="/users" element={<UsersRoute />} />
