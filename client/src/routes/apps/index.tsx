@@ -17,6 +17,9 @@ import {
     Network,
     Settings2,
     TerminalSquare,
+    Pencil,
+    Save,
+    X,
 } from "lucide-react";
 
 import { useApp } from "_contexts/app";
@@ -38,6 +41,12 @@ interface ServerApp {
     manageable: boolean;
     versions?: string[];
 }
+
+type ConfigEditorTarget = {
+    app: string;
+    label: string;
+    path: string;
+};
 
 export default function AppsRoute() {
     const { headerApps, isRoot, setHeaderApps } = useApp();
@@ -135,6 +144,7 @@ export default function AppsRoute() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [statusLoading, setStatusLoading] = useState(true);
     const [statusError, setStatusError] = useState("");
+    const [configEditor, setConfigEditor] = useState<ConfigEditorTarget | null>(null);
 
     useEffect(() => {
         if (!requestedApp) {
@@ -422,7 +432,11 @@ export default function AppsRoute() {
                             ) : null}
 
                             {selectedApp.name === "docker" || selectedApp.name === "podman" ? (
-                                <ContainerEngineConfiguration app={selectedApp} />
+                                <ContainerEngineConfiguration
+                                    app={selectedApp}
+                                    canEdit={isRoot}
+                                    onEdit={setConfigEditor}
+                                />
                             ) : null}
                         </div>
                     ) : (
@@ -434,6 +448,9 @@ export default function AppsRoute() {
                     )}
                 </main>
             </div>
+            {configEditor ? (
+                <AppConfigEditorModal target={configEditor} onClose={() => setConfigEditor(null)} />
+            ) : null}
         </DashboardLayout>
     );
 }
@@ -445,6 +462,7 @@ type ConfigurationItem = {
     value: string;
     icon: typeof Settings2;
     description: string;
+    editablePath?: string;
 };
 
 const containerEngineDetails: Record<
@@ -463,6 +481,7 @@ const containerEngineDetails: Record<
                 value: "/etc/docker/daemon.json",
                 icon: FileCode2,
                 description: "System-wide daemon options such as log drivers, registry mirrors, and address pools.",
+                editablePath: "/etc/docker/daemon.json",
             },
             {
                 label: "Engine data",
@@ -492,37 +511,41 @@ const containerEngineDetails: Record<
         ],
     },
     podman: {
-        summary: "Podman runs rootless inside each Linux user account. Containers, images, storage, and sockets are isolated from other panel users.",
+        summary: "These system-wide defaults apply to Podman installations. Individual rootless users can override them in ~/.config/containers/.",
         items: [
             {
-                label: "User configuration",
-                value: "~/.config/containers/containers.conf",
+                label: "Container configuration",
+                value: "/etc/containers/containers.conf",
                 icon: FileCode2,
-                description: "Per-user runtime, networking, capabilities, and container behavior. Manage this from that user's account.",
+                description: "Global runtime, networking, capabilities, and container behavior defaults.",
+                editablePath: "/etc/containers/containers.conf",
             },
             {
-                label: "User registries",
-                value: "~/.config/containers/registries.conf",
+                label: "Registry configuration",
+                value: "/etc/containers/registries.conf",
                 icon: Network,
-                description: "Per-user registry search order, aliases, mirrors, and registry security settings.",
+                description: "Global registry search order, aliases, mirrors, and registry security settings.",
+                editablePath: "/etc/containers/registries.conf",
             },
             {
-                label: "User storage configuration",
-                value: "~/.config/containers/storage.conf",
+                label: "Storage configuration",
+                value: "/etc/containers/storage.conf",
                 icon: HardDrive,
-                description: "Storage driver and graph root overrides owned by the selected Linux user.",
+                description: "Global storage-driver defaults inherited by rootless users unless overridden.",
+                editablePath: "/etc/containers/storage.conf",
             },
             {
-                label: "User container data",
-                value: "~/.local/share/containers/storage",
-                icon: HardDrive,
-                description: "Private images, writable layers, volumes, and metadata for this user only.",
+                label: "Container policy",
+                value: "/etc/containers/policy.json",
+                icon: Settings2,
+                description: "Global image-signature verification and trust policy.",
+                editablePath: "/etc/containers/policy.json",
             },
             {
-                label: "User API socket",
+                label: "Rootless API socket",
                 value: "$XDG_RUNTIME_DIR/podman/podman.sock",
                 icon: Network,
-                description: "Optional Docker-compatible socket scoped to the user's runtime directory; never shared globally.",
+                description: "Per-user Docker-compatible socket. It remains isolated and is not editable as a file.",
             },
             {
                 label: "UID and GID mappings",
@@ -541,7 +564,15 @@ const containerEngineDetails: Record<
     },
 };
 
-function ContainerEngineConfiguration({ app }: { app: ServerApp }) {
+function ContainerEngineConfiguration({
+    app,
+    canEdit,
+    onEdit,
+}: {
+    app: ServerApp;
+    canEdit: boolean;
+    onEdit: (target: ConfigEditorTarget) => void;
+}) {
     const engine = app.name as ContainerEngineName;
     const details = containerEngineDetails[engine];
 
@@ -566,7 +597,20 @@ function ContainerEngineConfiguration({ app }: { app: ServerApp }) {
                                     <Icon className="h-4 w-4" />
                                 </span>
                                 <div className="min-w-0">
-                                    <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                        {canEdit && item.editablePath ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+                                                onClick={() => onEdit({ app: engine, label: item.label, path: item.editablePath! })}
+                                            >
+                                                <Pencil className="h-3 w-3" />
+                                                Edit
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                     <code className="mt-1 block break-all text-xs text-primary">{item.value}</code>
                                     <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>
                                 </div>
@@ -591,5 +635,115 @@ function ContainerEngineConfiguration({ app }: { app: ServerApp }) {
                 </div>
             </div>
         </section>
+    );
+}
+
+function AppConfigEditorModal({ target, onClose }: { target: ConfigEditorTarget; onClose: () => void }) {
+    const [content, setContent] = useState("");
+    const [exists, setExists] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let active = true;
+        const load = async () => {
+            try {
+                const query = new URLSearchParams({ app: target.app, path: target.path });
+                const response = await fetch(`/post/apps/config?${query.toString()}`, { cache: "no-store" });
+                if (!response.ok) throw new Error((await response.text()) || "Failed to load configuration");
+                const data: { content: string; exists: boolean } = await response.json();
+                if (active) {
+                    setContent(data.content ?? "");
+                    setExists(data.exists);
+                }
+            } catch (loadError) {
+                if (active) setError(loadError instanceof Error ? loadError.message : "Failed to load configuration");
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+        load();
+        return () => { active = false; };
+    }, [target]);
+
+    useEffect(() => {
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape" && !saving) onClose();
+        };
+        window.addEventListener("keydown", closeOnEscape);
+        return () => window.removeEventListener("keydown", closeOnEscape);
+    }, [onClose, saving]);
+
+    const save = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const query = new URLSearchParams({ app: target.app, path: target.path });
+            const response = await fetch(`/post/apps/config?${query.toString()}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to save configuration");
+            setExists(true);
+            onClose();
+        } catch (saveError) {
+            setError(saveError instanceof Error ? saveError.message : "Failed to save configuration");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
+            <div className="flex h-[min(720px,90vh)] w-full max-w-4xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
+                <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-semibold text-foreground">Edit {target.label}</h2>
+                        <code className="mt-1 block break-all text-xs text-muted-foreground">{target.path}</code>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={onClose} disabled={saving} aria-label="Close editor">
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                {!exists && !loading ? (
+                    <div className="border-b border-amber-500/20 bg-amber-500/10 px-5 py-2 text-xs text-amber-700 dark:text-amber-300">
+                        This file does not exist yet. Saving will create it.
+                    </div>
+                ) : null}
+                {error ? (
+                    <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-2 text-xs text-destructive">{error.trim()}</div>
+                ) : null}
+
+                <div className="min-h-0 flex-1 bg-background">
+                    {loading ? (
+                        <div className="flex h-full items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <textarea
+                            value={content}
+                            onChange={(event) => setContent(event.target.value)}
+                            spellCheck={false}
+                            className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 text-foreground outline-none"
+                            aria-label={`${target.label} content`}
+                        />
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                    <p className="text-xs text-muted-foreground">Saving does not restart the container engine.</p>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+                        <Button size="sm" className="gap-2" onClick={save} disabled={loading || saving || Boolean(error && !content)}>
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

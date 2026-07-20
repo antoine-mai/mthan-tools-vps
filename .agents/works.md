@@ -23,6 +23,13 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-20 - Editable container-engine configuration
+
+- Goal: Make Docker and Podman global configuration paths directly editable from Apps.
+- Files changed: allowlisted atomic config file service/tests, root-only GET/PUT route, Apps configuration cards/modal, and work log.
+- Important decisions: only explicit Docker/Podman system paths are accepted; JSON is validated; symlinks/non-regular targets and files over 2 MiB are rejected; saving never restarts an engine automatically.
+- Validation: Go formatting/tests, TypeScript type-check, production client build, and `git diff --check`.
+
 ### 2026-07-20 - Consistent user list route
 
 - Goal: Keep root Linux-user actions under one `/post/user/*` namespace.

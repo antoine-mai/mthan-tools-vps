@@ -9,6 +9,7 @@ import (
 
 	postapis "mthan/vps/routes/post/apis"
 	postapps "mthan/vps/routes/post/apps"
+	appconfig "mthan/vps/routes/post/apps/config"
 	postcontainers "mthan/vps/routes/post/containers"
 	postfiles "mthan/vps/routes/post/files"
 	postlogin "mthan/vps/routes/post/login"
@@ -52,6 +53,8 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("GET /post/apps", postOnly(deps.Startup, postapps.Handler(deps.Sessions)))
 	mux.Handle("GET /post/containers", postOnly(deps.Startup, postcontainers.Handler(deps.Sessions, services.NewContainerService())))
 	mux.Handle("POST /post/apps", postOnly(deps.Startup, postapps.Handler(deps.Sessions)))
+	mux.Handle("GET /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
+	mux.Handle("PUT /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
 	mux.Handle("GET /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
 	mux.Handle("POST /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
 	mux.Handle("PATCH /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
@@ -113,7 +116,7 @@ func sameDomainOrLocalhostOnly(next http.Handler) http.Handler {
 			w.Header().Add("Vary", "Origin")
 		}
 
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		next.ServeHTTP(w, r)
