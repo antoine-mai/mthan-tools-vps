@@ -12,6 +12,11 @@ import {
     Pin,
     PinOff,
     Download,
+    FileCode2,
+    HardDrive,
+    Network,
+    Settings2,
+    TerminalSquare,
 } from "lucide-react";
 
 import { useApp } from "_contexts/app";
@@ -25,7 +30,7 @@ interface ServerApp {
     displayName: string;
     serviceName: string;
     version: string;
-    port: string | number;
+    port?: string | number;
     description: string;
     running: boolean;
     uptime: string;
@@ -71,7 +76,6 @@ export default function AppsRoute() {
             displayName: "Node.js",
             serviceName: "—",
             version: "22",
-            port: "—",
             description: "System-wide Node.js 22 runtime.",
             running: false,
             uptime: "—",
@@ -84,7 +88,6 @@ export default function AppsRoute() {
             displayName: "PHP",
             serviceName: "php-fpm.service",
             version: "Multiple",
-            port: "Unix sockets",
             description: "PHP FastCGI Process Manager for processing dynamic web scripts.",
             running: true,
             uptime: "5 hours, 12 minutes",
@@ -110,7 +113,6 @@ export default function AppsRoute() {
             displayName: "Docker",
             serviceName: "docker.service",
             version: "System",
-            port: "—",
             description: "Container engine and runtime.",
             running: false,
             uptime: "Stopped",
@@ -123,7 +125,6 @@ export default function AppsRoute() {
             displayName: "Podman",
             serviceName: "podman.service",
             version: "System",
-            port: "—",
             description: "Daemonless container engine.",
             running: false,
             uptime: "Stopped",
@@ -314,9 +315,11 @@ export default function AppsRoute() {
                                         <span>
                                             Service <code className="text-foreground">{selectedApp.serviceName}</code>
                                         </span>
-                                        <span>
-                                            Port <code className="text-foreground">{selectedApp.port}</code>
-                                        </span>
+                                        {selectedApp.port !== undefined ? (
+                                            <span>
+                                                Port <code className="text-foreground">{selectedApp.port}</code>
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -417,6 +420,10 @@ export default function AppsRoute() {
                                     </div>
                                 </section>
                             ) : null}
+
+                            {selectedApp.name === "docker" || selectedApp.name === "podman" ? (
+                                <ContainerEngineConfiguration app={selectedApp} />
+                            ) : null}
                         </div>
                     ) : (
                         /* Empty state */
@@ -428,5 +435,161 @@ export default function AppsRoute() {
                 </main>
             </div>
         </DashboardLayout>
+    );
+}
+
+type ContainerEngineName = "docker" | "podman";
+
+type ConfigurationItem = {
+    label: string;
+    value: string;
+    icon: typeof Settings2;
+    description: string;
+};
+
+const containerEngineDetails: Record<
+    ContainerEngineName,
+    {
+        summary: string;
+        items: ConfigurationItem[];
+        commands: Array<{ label: string; command: string }>;
+    }
+> = {
+    docker: {
+        summary: "Docker uses a system daemon to manage containers, images, networks, and volumes.",
+        items: [
+            {
+                label: "Daemon configuration",
+                value: "/etc/docker/daemon.json",
+                icon: FileCode2,
+                description: "System-wide daemon options such as log drivers, registry mirrors, and address pools.",
+            },
+            {
+                label: "Engine data",
+                value: "/var/lib/docker",
+                icon: HardDrive,
+                description: "Default storage location for images, writable layers, volumes, and engine metadata.",
+            },
+            {
+                label: "API socket",
+                value: "/var/run/docker.sock",
+                icon: Network,
+                description: "Local Unix socket used by the Docker CLI and API clients.",
+            },
+            {
+                label: "Client configuration",
+                value: "~/.docker/config.json",
+                icon: Settings2,
+                description: "Per-user CLI preferences, credential helpers, and registry authentication settings.",
+            },
+        ],
+        commands: [
+            { label: "Engine information", command: "docker info" },
+            { label: "Running containers", command: "docker ps" },
+            { label: "All containers", command: "docker ps -a" },
+            { label: "Disk usage", command: "docker system df" },
+            { label: "Compose projects", command: "docker compose ls" },
+        ],
+    },
+    podman: {
+        summary: "Podman is daemonless and supports both system-wide and rootless container workflows.",
+        items: [
+            {
+                label: "Container configuration",
+                value: "/etc/containers/containers.conf",
+                icon: FileCode2,
+                description: "System defaults for the runtime, networking, capabilities, and container behavior.",
+            },
+            {
+                label: "Registry configuration",
+                value: "/etc/containers/registries.conf",
+                icon: Network,
+                description: "Registry search order, aliases, mirrors, and insecure registry settings.",
+            },
+            {
+                label: "Storage configuration",
+                value: "/etc/containers/storage.conf",
+                icon: HardDrive,
+                description: "Storage driver and system-wide container storage locations.",
+            },
+            {
+                label: "Rootless configuration",
+                value: "~/.config/containers/",
+                icon: Settings2,
+                description: "Per-user overrides for containers, registries, storage, and policy settings.",
+            },
+            {
+                label: "Root API socket",
+                value: "/run/podman/podman.sock",
+                icon: Network,
+                description: "Optional Docker-compatible API socket activated through podman.socket.",
+            },
+            {
+                label: "Root storage",
+                value: "/var/lib/containers/storage",
+                icon: HardDrive,
+                description: "Default image, layer, volume, and container storage for rootful Podman.",
+            },
+        ],
+        commands: [
+            { label: "Engine information", command: "podman info" },
+            { label: "Running containers", command: "podman ps" },
+            { label: "All containers", command: "podman ps -a" },
+            { label: "Disk usage", command: "podman system df" },
+            { label: "System connections", command: "podman system connection list" },
+        ],
+    },
+};
+
+function ContainerEngineConfiguration({ app }: { app: ServerApp }) {
+    const engine = app.name as ContainerEngineName;
+    const details = containerEngineDetails[engine];
+
+    return (
+        <section className="space-y-4">
+            <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                    {app.displayName} configuration
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {details.summary}
+                </p>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+                {details.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                        <div key={item.label} className="rounded-md border border-border bg-card p-4">
+                            <div className="flex items-start gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                    <Icon className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                    <code className="mt-1 block break-all text-xs text-primary">{item.value}</code>
+                                    <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="rounded-md border border-border bg-card">
+                <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                    <TerminalSquare className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="text-xs font-semibold text-foreground">Management commands</h4>
+                </div>
+                <div className="divide-y divide-border">
+                    {details.commands.map((item) => (
+                        <div key={item.command} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <span className="text-xs text-muted-foreground">{item.label}</span>
+                            <code className="break-all rounded bg-muted px-2 py-1 text-xs text-foreground">{item.command}</code>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
     );
 }

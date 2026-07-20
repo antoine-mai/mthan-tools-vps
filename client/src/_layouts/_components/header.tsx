@@ -139,7 +139,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
 
     return (
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
                 {onMenuClick && (
                     <button
                         onClick={onMenuClick}
@@ -152,20 +152,22 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                 <h1 className="text-sm font-semibold text-foreground md:text-base">
                     {title}
                 </h1>
+                <div className="flex min-w-0 items-center gap-2">
+                    {headerApps.map((app) => (
+                        <Link
+                            key={app}
+                            to={`/apps/${encodeURIComponent(app)}`}
+                            className="hidden h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium capitalize text-muted-foreground hover:bg-muted hover:text-foreground sm:flex"
+                            title={`Open ${app}`}
+                        >
+                            <Boxes className="h-3.5 w-3.5" />
+                            {app === "node" ? "Node.js" : app}
+                        </Link>
+                    ))}
+                </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                {headerApps.map((app) => (
-                    <Link
-                        key={app}
-                        to={`/apps/${encodeURIComponent(app)}`}
-                        className="hidden h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium capitalize text-muted-foreground hover:bg-muted hover:text-foreground sm:flex"
-                        title={`Open ${app}`}
-                    >
-                        <Boxes className="h-3.5 w-3.5" />
-                        {app === "node" ? "Node.js" : app}
-                    </Link>
-                ))}
+            <div className="flex shrink-0 items-center gap-4">
                 {isRoot && (
                     <button
                         onClick={handleUpdate}

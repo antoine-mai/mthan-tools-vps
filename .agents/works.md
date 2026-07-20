@@ -23,6 +23,13 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-20 - Container engine configuration and header layout
+
+- Goal: Place pinned app shortcuts on the left, improve App Details fields, and add Docker/Podman configuration pages.
+- Files changed: header layout, Apps details, and work log.
+- Important decisions: shortcuts now follow the app title; App Details omits Port for apps without a fixed network port; Docker and Podman show engine-specific configuration paths and management commands without presenting them as editable settings.
+- Validation: TypeScript type-check and `git diff --check`.
+
 ### 2026-07-17 - Restore system Node.js 22
 
 - Goal: Restore Node.js as a system app and make Node.js 22 the default installation target.
