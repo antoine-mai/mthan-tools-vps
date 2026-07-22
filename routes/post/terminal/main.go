@@ -96,6 +96,8 @@ func Handler(sessions *services.SessionService) http.Handler {
 						Cols: wsMsg.Cols,
 						Rows: wsMsg.Rows,
 					})
+				case "ping":
+					// Application heartbeat keeps idle WebSockets alive through proxies.
 				}
 			} else {
 				_, _ = ptmx.Write([]byte(msg))

@@ -430,3 +430,17 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 - Added a right-click context menu to every file and directory in the Files sidebar.
 - Supports Open, directory refresh, and copying the absolute path, with viewport-aware positioning and automatic dismissal.
+# Files editor color-mode support
+
+- Replaced the FileEditor hard-coded slate dark palette with semantic theme colors.
+- Empty, loading, error, binary, editor, line-number, tab, and status states now follow light and dark mode.
+# Files context-menu mutations
+
+- Added Rename and Delete for file-system items, plus New File and New Folder for directories.
+- Added authenticated POST/PATCH/DELETE handlers for both root and standard-user Files routes.
+- Standard-user mutations remain jailed to the resolved home path; root/home explorer nodes cannot be renamed or deleted.
+# Resilient user terminals
+
+- Added a 20-second application heartbeat so idle terminal WebSockets remain active through proxies and NAT gateways.
+- Terminal tabs now detect disconnects, display connection status, and automatically reconnect to a fresh shell.
+- The terminal session effect now correctly follows its target username.

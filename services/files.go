@@ -23,6 +23,115 @@ type DirectoryList struct {
 }
 
 var ErrAccessDenied = errors.New("access denied")
+var ErrInvalidFileOperation = errors.New("invalid file operation")
+
+func CreateFileItem(parentPath, name, homeDir string, isRoot, directory bool) error {
+	parentPath, err := allowedFilePath(parentPath, homeDir, isRoot)
+	if err != nil {
+		return err
+	}
+	if !isRoot {
+		if err := ensureResolvedInHome(parentPath, homeDir); err != nil {
+			return err
+		}
+	}
+	if !validFileName(name) {
+		return ErrInvalidFileOperation
+	}
+	target := filepath.Join(parentPath, name)
+	if _, err := allowedFilePath(target, homeDir, isRoot); err != nil {
+		return err
+	}
+	if directory {
+		return os.Mkdir(target, 0755)
+	}
+	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func RenameFileItem(path, name, homeDir string, isRoot bool) (string, error) {
+	path, err := mutableFilePath(path, homeDir, isRoot)
+	if err != nil {
+		return "", err
+	}
+	if !validFileName(name) {
+		return "", ErrInvalidFileOperation
+	}
+	target := filepath.Join(filepath.Dir(path), name)
+	if _, err := allowedFilePath(target, homeDir, isRoot); err != nil {
+		return "", err
+	}
+	if _, err := os.Lstat(target); err == nil {
+		return "", os.ErrExist
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err := os.Rename(path, target); err != nil {
+		return "", err
+	}
+	return target, nil
+}
+
+func DeleteFileItem(path, homeDir string, isRoot bool) error {
+	path, err := mutableFilePath(path, homeDir, isRoot)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(path)
+}
+
+func validFileName(name string) bool {
+	name = strings.TrimSpace(name)
+	return name != "" && name != "." && name != ".." && filepath.Base(name) == name && !strings.ContainsRune(name, 0)
+}
+
+func allowedFilePath(path, homeDir string, isRoot bool) (string, error) {
+	path = filepath.Clean(path)
+	if !filepath.IsAbs(path) {
+		return "", ErrAccessDenied
+	}
+	if !isRoot {
+		home := filepath.Clean(homeDir)
+		if path != home && !strings.HasPrefix(path, home+string(filepath.Separator)) {
+			return "", ErrAccessDenied
+		}
+	}
+	return path, nil
+}
+
+func mutableFilePath(path, homeDir string, isRoot bool) (string, error) {
+	path, err := allowedFilePath(path, homeDir, isRoot)
+	if err != nil {
+		return "", err
+	}
+	if path == "/" || (!isRoot && path == filepath.Clean(homeDir)) {
+		return "", ErrAccessDenied
+	}
+	if !isRoot {
+		if err := ensureResolvedInHome(path, homeDir); err != nil {
+			return "", err
+		}
+	}
+	return path, nil
+}
+
+func ensureResolvedInHome(path, homeDir string) error {
+	home, err := filepath.EvalSymlinks(filepath.Clean(homeDir))
+	if err != nil {
+		return err
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return err
+	}
+	if resolved != home && !strings.HasPrefix(resolved, home+string(filepath.Separator)) {
+		return ErrAccessDenied
+	}
+	return nil
+}
 
 func ListDirectory(requestedPath string, homeDir string, isRoot bool) (DirectoryList, error) {
 	// Clean and resolve path

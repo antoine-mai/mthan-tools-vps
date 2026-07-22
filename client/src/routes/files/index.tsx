@@ -9,6 +9,10 @@ import {
     RefreshCw,
     Clipboard,
     MousePointer2,
+    FilePlus2,
+    FolderPlus,
+    Pencil,
+    Trash2,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -166,7 +170,7 @@ export default function FilesRoute() {
         event.preventDefault();
         event.stopPropagation();
         const menuWidth = 190;
-        const menuHeight = item.isDir ? 126 : 86;
+        const menuHeight = item.isDir ? 242 : 148;
         setCopiedPath(false);
         setContextMenu({
             item,
@@ -185,6 +189,54 @@ export default function FilesRoute() {
             setError("Could not copy the path to the clipboard.");
             setContextMenu(null);
         }
+    };
+
+    const parentPath = (path: string) => path === "/" ? "/" : path.slice(0, path.lastIndexOf("/")) || "/";
+
+    const mutateItem = async (method: "POST" | "PATCH" | "DELETE", payload: { path: string; name?: string; kind?: string }) => {
+        setError(null);
+        const response = await fetch(apiEndpoint, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error((await response.text()) || "File operation failed");
+    };
+
+    const createItem = async (kind: "file" | "folder") => {
+        if (!contextMenu) return;
+        const name = window.prompt(kind === "file" ? "New file name" : "New folder name");
+        if (!name) return;
+        const folder = contextMenu.item.path;
+        setContextMenu(null);
+        try { await mutateItem("POST", { path: folder, name, kind }); await refreshFolder(folder); }
+        catch (reason) { setError(reason instanceof Error ? reason.message : `Could not create ${kind}`); }
+    };
+
+    const renameItem = async () => {
+        if (!contextMenu) return;
+        const item = contextMenu.item;
+        const name = window.prompt("Rename item", item.name);
+        if (!name || name === item.name) return;
+        setContextMenu(null);
+        try {
+            await mutateItem("PATCH", { path: item.path, name });
+            if (selectedFile?.path === item.path) setSelectedFile(null);
+            await refreshFolder(parentPath(item.path));
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not rename item"); }
+    };
+
+    const deleteItem = async () => {
+        if (!contextMenu) return;
+        const item = contextMenu.item;
+        if (!window.confirm(`Delete ${item.name}${item.isDir ? " and everything inside it" : ""}? This cannot be undone.`)) return;
+        setContextMenu(null);
+        try {
+            await mutateItem("DELETE", { path: item.path });
+            if (selectedFile?.path === item.path || selectedFile?.path.startsWith(item.path + "/")) setSelectedFile(null);
+            setExpanded((prev) => { const next = { ...prev }; delete next[item.path]; return next; });
+            await refreshFolder(parentPath(item.path));
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete item"); }
     };
 
     return (
@@ -260,14 +312,28 @@ export default function FilesRoute() {
                         <MousePointer2 className="h-3.5 w-3.5 text-muted-foreground" />Open
                     </button>
                     {contextMenu.item.isDir ? (
+                        <>
+                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void createItem("file")} role="menuitem">
+                            <FilePlus2 className="h-3.5 w-3.5 text-muted-foreground" />New file
+                        </button>
+                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void createItem("folder")} role="menuitem">
+                            <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />New folder
+                        </button>
                         <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void refreshFolder(contextMenu.item.path); setContextMenu(null); }} role="menuitem">
                             <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />Refresh folder
                         </button>
+                        </>
                     ) : null}
                     <div className="my-1 border-t border-border" />
+                    {contextMenu.item.path !== homePath ? <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void renameItem()} role="menuitem">
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />Rename
+                    </button> : null}
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void copyPath()} role="menuitem">
                         <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />{copiedPath ? "Copied" : "Copy path"}
                     </button>
+                    {contextMenu.item.path !== homePath ? <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => void deleteItem()} role="menuitem">
+                        <Trash2 className="h-3.5 w-3.5" />Delete
+                    </button> : null}
                 </div>
             ) : null}
         </DashboardLayout>

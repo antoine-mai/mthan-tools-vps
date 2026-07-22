@@ -119,25 +119,42 @@ function TerminalSession({
         termInstance.current = term;
         fitAddonRef.current = fitAddon;
 
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const userQuery = username ? `?user=${encodeURIComponent(username)}` : "";
-        const wsUrl = `${protocol}//${window.location.host}/post/terminal${userQuery}`;
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
+        let disposed = false;
+        let reconnectTimer: number | undefined;
+        let heartbeatTimer: number | undefined;
 
-        ws.onopen = () => {
-            resizeTerminal();
+        const connect = (reconnecting = false) => {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const userQuery = username ? `?user=${encodeURIComponent(username)}` : "";
+            const wsUrl = `${protocol}//${window.location.host}/post/terminal${userQuery}`;
+            const ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                if (disposed) return;
+                if (reconnecting) term.write("\r\n\x1b[32mTerminal reconnected. A new shell session was started.\x1b[0m\r\n");
+                resizeTerminal();
+                window.clearInterval(heartbeatTimer);
+                heartbeatTimer = window.setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+                }, 20000);
+            };
+
+            ws.onmessage = (event) => term.write(event.data);
+            ws.onerror = () => ws.close();
+            ws.onclose = () => {
+                window.clearInterval(heartbeatTimer);
+                if (disposed || wsRef.current !== ws) return;
+                term.write("\r\n\x1b[33mConnection lost. Reconnecting…\x1b[0m\r\n");
+                reconnectTimer = window.setTimeout(() => connect(true), 1500);
+            };
         };
 
-        ws.onmessage = (event) => {
-            term.write(event.data);
-        };
-
-        ws.onerror = () => undefined;
-        ws.onclose = () => undefined;
+        connect();
 
         const dataDisposable = term.onData((data) => {
-            if (ws.readyState === WebSocket.OPEN) {
+            const ws = wsRef.current;
+            if (ws?.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: "input", data }));
             }
         });
@@ -150,7 +167,8 @@ function TerminalSession({
         function resizeTerminal() {
             try {
                 fitAddon.fit();
-                if (ws.readyState === WebSocket.OPEN) {
+                const ws = wsRef.current;
+                if (ws?.readyState === WebSocket.OPEN) {
                     ws.send(
                         JSON.stringify({
                             type: "resize",
@@ -165,13 +183,16 @@ function TerminalSession({
         }
 
         return () => {
+            disposed = true;
             window.clearTimeout(initialFit);
+            window.clearTimeout(reconnectTimer);
+            window.clearInterval(heartbeatTimer);
             window.removeEventListener("resize", handleResize);
             dataDisposable.dispose();
-            ws.close();
+            wsRef.current?.close();
             term.dispose();
         };
-    }, []);
+    }, [username]);
 
     useEffect(() => {
         const term = termInstance.current;

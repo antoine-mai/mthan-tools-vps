@@ -27,6 +27,10 @@ func Handler(sessions *services.SessionService) http.Handler {
 
 		// Root mode exposes the full filesystem and starts the explorer at /.
 		homeDir := "/"
+		if r.Method != http.MethodGet {
+			handleMutation(w, r, homeDir, true)
+			return
+		}
 
 		if isContent {
 			content, err := services.GetFileContent(requestedPath, homeDir, true)
@@ -54,6 +58,43 @@ func Handler(sessions *services.SessionService) http.Handler {
 
 		writeJSON(w, http.StatusOK, list)
 	})
+}
+
+func handleMutation(w http.ResponseWriter, r *http.Request, homeDir string, isRoot bool) {
+	var input struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+		Kind string `json:"kind"`
+	}
+	if json.NewDecoder(r.Body).Decode(&input) != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	var resultPath string
+	var err error
+	switch r.Method {
+	case http.MethodPost:
+		err = services.CreateFileItem(input.Path, input.Name, homeDir, isRoot, input.Kind == "folder")
+	case http.MethodPatch:
+		resultPath, err = services.RenameFileItem(input.Path, input.Name, homeDir, isRoot)
+	case http.MethodDelete:
+		err = services.DeleteFileItem(input.Path, homeDir, isRoot)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, services.ErrAccessDenied) {
+			status = http.StatusForbidden
+		}
+		if errors.Is(err, services.ErrInvalidFileOperation) {
+			status = http.StatusBadRequest
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": resultPath})
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, payload any) {

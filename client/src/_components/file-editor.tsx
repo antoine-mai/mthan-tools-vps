@@ -42,14 +42,14 @@ export default function FileEditor({
     if (!fileName && !filePath) {
         return (
             /* VSCode Empty Welcome Screen */
-            <div className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-slate-950 text-slate-500">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-background text-muted-foreground">
                 <div className="flex flex-col items-center max-w-md text-center gap-6">
-                    <div className="h-16 w-16 items-center justify-center rounded-xl bg-slate-900 border border-slate-800 flex text-slate-400">
+                    <div className="h-16 w-16 items-center justify-center rounded-xl bg-muted border border-border flex text-muted-foreground">
                         <FolderOpen className="h-8 w-8" />
                     </div>
                     <div className="space-y-1.5">
-                        <h3 className="text-slate-300 font-semibold text-sm">{placeholderTitle}</h3>
-                        <p className="text-xs text-slate-600 max-w-xs leading-relaxed">
+                        <h3 className="text-foreground font-semibold text-sm">{placeholderTitle}</h3>
+                        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
                             {placeholderDescription}
                         </p>
                     </div>
@@ -59,23 +59,23 @@ export default function FileEditor({
     }
 
     return (
-        <div className="flex-grow flex flex-col h-full overflow-hidden text-slate-200 bg-slate-950">
+        <div className="flex-grow flex flex-col h-full overflow-hidden text-foreground bg-background">
             {/* Editor Tab Bar */}
-            <div className="flex h-10 items-center border-b border-slate-800 bg-slate-900/60 select-none shrink-0">
-                <div className="flex h-full items-center gap-2 px-3 bg-slate-950 border-r border-slate-800 text-xs font-medium text-slate-200 relative">
-                    <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <div className="flex h-10 items-center border-b border-border bg-muted/40 select-none shrink-0">
+                <div className="flex h-full items-center gap-2 px-3 bg-background border-r border-border text-xs font-medium text-foreground relative">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span>{fileName}</span>
                     {onClose && (
                         <button
                             onClick={onClose}
-                            className="ml-2 p-0.5 rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                            className="ml-2 p-0.5 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                         >
                             <X className="h-3 w-3" />
                         </button>
                     )}
                 </div>
                 <div className="flex-1" />
-                <div className="px-4 text-[10px] text-slate-500 font-mono">
+                <div className="px-4 text-[10px] text-muted-foreground font-mono">
                     {formatBytes(fileSize)}
                 </div>
             </div>
@@ -83,26 +83,26 @@ export default function FileEditor({
             {/* Editor Content Area */}
             <div className="flex-1 overflow-hidden relative">
                 {isLoading ? (
-                    <div className="flex h-full items-center justify-center bg-slate-950">
-                        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+                    <div className="flex h-full items-center justify-center bg-background">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
                 ) : error ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-red-400 p-6 text-center select-none bg-slate-950">
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-destructive p-6 text-center select-none bg-background">
                         <AlertCircle className="h-8 w-8 shrink-0" />
                         <p className="text-sm font-semibold">{error}</p>
                     </div>
                 ) : isBinary ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-500 p-8 select-none bg-slate-950">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 select-none bg-background">
                         <AlertCircle className="h-10 w-10 mb-3 text-amber-600 animate-pulse" />
-                        <p className="text-sm font-semibold text-slate-300">Binary file not displayed</p>
+                        <p className="text-sm font-semibold text-foreground">Binary file not displayed</p>
                         <p className="text-xs mt-1 max-w-sm text-center leading-relaxed">
                             This file is not displayed in the text editor because it is either binary, has an unsupported text encoding, or is too large.
                         </p>
                     </div>
                 ) : (
-                    <div className="flex font-mono text-xs md:text-sm leading-6 overflow-auto h-full bg-slate-950 text-slate-300">
+                    <div className="flex font-mono text-xs md:text-sm leading-6 overflow-auto h-full bg-background text-foreground">
                         {/* Line numbers */}
-                        <div className="text-right pr-4 pl-3 select-none text-slate-600 border-r border-slate-800 bg-slate-900/20 sticky left-0 min-w-[3.5rem] py-4 shrink-0">
+                        <div className="text-right pr-4 pl-3 select-none text-muted-foreground border-r border-border bg-muted/30 sticky left-0 min-w-[3.5rem] py-4 shrink-0">
                             {content.split("\n").map((_, idx) => (
                                 <div key={idx} className="h-6">{idx + 1}</div>
                             ))}
@@ -116,7 +116,7 @@ export default function FileEditor({
             </div>
 
             {/* Editor Status Bar */}
-            <div className="border-t border-slate-900 bg-slate-900 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-500 font-mono select-none shrink-0">
+            <div className="border-t border-border bg-muted/50 px-4 py-1.5 flex items-center justify-between text-[10px] text-muted-foreground font-mono select-none shrink-0">
                 <span className="truncate max-w-md" title={filePath}>
                     Path: {filePath}
                 </span>
