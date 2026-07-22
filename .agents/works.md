@@ -421,3 +421,12 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 - Goal: Move the published installer to `public/install.sh` and all distribution artifacts from `bin`/`dist` into `public/dist`.
 - Changed: build scripts, Makefile, development watcher exclusions, updater URLs, static-client fallbacks, README, and project rules now use the public layout.
 - Validation: `bash -n` passed for build, control build, deploy, and installer scripts; `git diff --check` passed. Full builds were not run.
+# VHost edit and delete actions
+
+- Added root-only Edit and Delete actions to the Caddy VHosts table.
+- Edit opens a Caddyfile modal and reloads Caddy after saving.
+- Delete removes the matching top-level site block, reloads Caddy, and restores the previous file if reload fails.
+# Files explorer item context menu
+
+- Added a right-click context menu to every file and directory in the Files sidebar.
+- Supports Open, directory refresh, and copying the absolute path, with viewport-aware positioning and automatic dismissal.

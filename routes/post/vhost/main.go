@@ -27,10 +27,33 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 			writeJSON(w, vhosts.Status())
 		case "/list":
 			writeJSON(w, map[string]any{"vhosts": vhosts.Summaries()})
+		case "/reload":
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			if err := vhosts.Reload(); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			hostname := strings.TrimPrefix(path, "/")
 			if hostname == "" || strings.Contains(hostname, "/") {
 				http.Error(w, "vhost not found", http.StatusNotFound)
+				return
+			}
+			if r.Method == http.MethodDelete {
+				err := vhosts.Delete(hostname)
+				if errors.Is(err, services.ErrVHostNotFound) {
+					http.Error(w, "vhost not found", http.StatusNotFound)
+					return
+				}
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			host, err := vhosts.Get(hostname)

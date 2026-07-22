@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, Globe, Loader2, RefreshCw, Search, ShieldCheck, ShieldOff } from "lucide-react";
+import { ExternalLink, Globe, Loader2, Pencil, RefreshCw, Save, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
@@ -18,6 +18,8 @@ export default function VHostsRoute() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [editing, setEditing] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<string | null>(null);
     const endpoint = runtime.isRoot ? "/post/vhost/list" : "/api/vhost/list";
 
     const loadVHosts = useCallback(async () => {
@@ -44,6 +46,21 @@ export default function VHostsRoute() {
         if (!value) return vhosts;
         return vhosts.filter((vhost) => vhost.hostname.toLowerCase().includes(value) || vhost.aliases.some((alias) => alias.toLowerCase().includes(value)));
     }, [query, vhosts]);
+
+    const deleteVHost = async (hostname: string) => {
+        if (!window.confirm(`Delete ${hostname} from the Caddyfile? This cannot be undone.`)) return;
+        setDeleting(hostname);
+        setError("");
+        try {
+            const response = await fetch(`/post/vhost/${encodeURIComponent(hostname)}`, { method: "DELETE" });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to delete virtual host");
+            await loadVHosts();
+        } catch (deleteError) {
+            setError(deleteError instanceof Error ? deleteError.message : "Failed to delete virtual host");
+        } finally {
+            setDeleting(null);
+        }
+    };
 
     return (
         <DashboardLayout
@@ -83,7 +100,7 @@ export default function VHostsRoute() {
                                         <th className="px-4 py-3 font-medium">Aliases</th>
                                         <th className="px-4 py-3 font-medium">Listen</th>
                                         <th className="px-4 py-3 font-medium">TLS</th>
-                                        <th className="px-4 py-3 text-right font-medium">Open</th>
+                                        <th className="px-4 py-3 text-right font-medium">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
@@ -99,9 +116,17 @@ export default function VHostsRoute() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right">
+                                                <span className="inline-flex items-center gap-1.5">
+                                                {runtime.isRoot ? <>
+                                                    <Button size="sm" variant="outline" className="h-8 gap-1.5 px-2 text-xs" onClick={() => setEditing(vhost.hostname)}><Pencil className="h-3.5 w-3.5" />Edit</Button>
+                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteVHost(vhost.hostname)} disabled={deleting === vhost.hostname} aria-label={`Delete ${vhost.hostname}`} title={`Delete ${vhost.hostname}`}>
+                                                        {deleting === vhost.hostname ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                </> : null}
                                                 <a href={`${vhost.tls ? "https" : "http"}://${vhost.hostname}`} target="_blank" rel="noreferrer" className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Open ${vhost.hostname}`} title={`Open ${vhost.hostname}`}>
                                                     <ExternalLink className="h-3.5 w-3.5" />
                                                 </a>
+                                                </span>
                                             </td>
                                         </tr>
                                     ))}
@@ -111,6 +136,45 @@ export default function VHostsRoute() {
                     </div>
                 )}
             </div>
+            {editing ? <CaddyEditor hostname={editing} onClose={() => setEditing(null)} onSaved={loadVHosts} /> : null}
         </DashboardLayout>
     );
+}
+
+function CaddyEditor({ hostname, onClose, onSaved }: { hostname: string; onClose: () => void; onSaved: () => Promise<void> }) {
+    const [content, setContent] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const query = new URLSearchParams({ app: "caddy", path: "/etc/caddy/Caddyfile" });
+        fetch(`/post/apps/config?${query}`, { cache: "no-store" })
+            .then(async (response) => { if (!response.ok) throw new Error(await response.text()); return response.json(); })
+            .then((data: { content: string }) => setContent(data.content ?? ""))
+            .catch((reason) => setError(reason instanceof Error ? reason.message : "Failed to load Caddyfile"))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const save = async () => {
+        setSaving(true); setError("");
+        try {
+            const query = new URLSearchParams({ app: "caddy", path: "/etc/caddy/Caddyfile" });
+            const response = await fetch(`/post/apps/config?${query}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to save Caddyfile");
+            const reload = await fetch("/post/vhost/reload", { method: "POST" });
+            if (!reload.ok) throw new Error((await reload.text()) || "Caddyfile was saved, but Caddy could not be reloaded");
+            await onSaved(); onClose();
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Failed to save Caddyfile"); }
+        finally { setSaving(false); }
+    };
+
+    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
+        <div className="flex h-[min(720px,90vh)] w-full max-w-4xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
+            <div className="flex items-start justify-between border-b border-border px-5 py-4"><div><h2 className="text-sm font-semibold">Edit {hostname}</h2><code className="text-xs text-muted-foreground">/etc/caddy/Caddyfile</code></div><Button size="icon" variant="ghost" onClick={onClose} disabled={saving}><X className="h-4 w-4" /></Button></div>
+            {error ? <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-2 text-xs text-destructive">{error.trim()}</div> : null}
+            <div className="min-h-0 flex-1 bg-background">{loading ? <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div> : <textarea value={content} onChange={(event) => setContent(event.target.value)} spellCheck={false} className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 outline-none" />}</div>
+            <div className="flex justify-end gap-2 border-t border-border px-5 py-3"><Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button><Button size="sm" className="gap-2" onClick={save} disabled={loading || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save & reload</Button></div>
+        </div>
+    </div>;
 }

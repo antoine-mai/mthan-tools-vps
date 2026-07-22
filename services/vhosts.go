@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -13,6 +14,7 @@ import (
 )
 
 var ErrVHostNotFound = errors.New("vhost not found")
+var ErrVHostUpdateFailed = errors.New("caddy configuration update failed")
 
 type PublicPort struct {
 	Port      int    `json:"port"`
@@ -108,6 +110,105 @@ func (s *VHostService) Get(hostname string) (VHost, error) {
 		}
 	}
 	return VHost{}, ErrVHostNotFound
+}
+
+func (s *VHostService) Delete(hostname string) error {
+	hostname = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(hostname), "."))
+	path := "/etc/caddy/Caddyfile"
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	updated, found := removeCaddySiteBlock(string(content), hostname)
+	if !found {
+		return ErrVHostNotFound
+	}
+	configs := NewAppConfigService()
+	if _, err = configs.Write("caddy", path, updated); err != nil {
+		return err
+	}
+	if _, err = s.runner.Run("caddy", "reload", "--config", path); err != nil {
+		_, _ = configs.Write("caddy", path, string(content))
+		_, _ = s.runner.Run("caddy", "reload", "--config", path)
+		return ErrVHostUpdateFailed
+	}
+	return nil
+}
+
+func (s *VHostService) Reload() error {
+	if _, err := s.runner.Run("caddy", "reload", "--config", "/etc/caddy/Caddyfile"); err != nil {
+		return ErrVHostUpdateFailed
+	}
+	return nil
+}
+
+func removeCaddySiteBlock(content, hostname string) (string, bool) {
+	depth, start := 0, -1
+	var quote byte
+	escaped, comment := false, false
+	for i := 0; i < len(content); i++ {
+		char := content[i]
+		if comment {
+			if char == '\n' {
+				comment = false
+			}
+			continue
+		}
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quote != 0 {
+			if char == '\\' {
+				escaped = true
+			} else if char == quote {
+				quote = 0
+			}
+			continue
+		}
+		if char == '#' {
+			comment = true
+			continue
+		}
+		if char == '"' || char == '\'' {
+			quote = char
+			continue
+		}
+		switch char {
+		case '{':
+			if depth == 0 {
+				start = strings.LastIndex(content[:i], "\n") + 1
+			}
+			depth++
+		case '}':
+			if depth == 0 {
+				continue
+			}
+			depth--
+			if depth == 0 && start >= 0 {
+				brace := strings.Index(content[start:i], "{")
+				if brace < 0 {
+					continue
+				}
+				label := strings.TrimSpace(content[start : start+brace])
+				for _, address := range strings.Split(label, ",") {
+					candidate := strings.TrimSpace(address)
+					candidate = strings.TrimPrefix(candidate, "http://")
+					candidate = strings.TrimPrefix(candidate, "https://")
+					candidate = strings.Split(candidate, ":")[0]
+					if strings.EqualFold(strings.TrimSuffix(candidate, "."), hostname) {
+						end := i + 1
+						for end < len(content) && (content[end] == '\n' || content[end] == '\r') {
+							end++
+						}
+						return content[:start] + content[end:], true
+					}
+				}
+				start = -1
+			}
+		}
+	}
+	return content, false
 }
 
 func (s *VHostService) publicPorts() []PublicPort {

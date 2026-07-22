@@ -1,24 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     Folder,
-    File,
     ChevronRight,
     ChevronDown,
     FileText,
-    Image,
-    Music,
-    Video,
-    Archive,
-    Home,
     Loader2,
     AlertCircle,
     RefreshCw,
-    X,
-    FolderOpen,
+    Clipboard,
+    MousePointer2,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
-import { Button } from "_layouts/_components/ui/button";
 import FileEditor from "../../_components/file-editor";
 import { runtime } from "../../runtime";
 
@@ -34,6 +27,12 @@ interface DirectoryList {
     currentPath: string;
     parentPath: string;
     items: FileItem[];
+}
+
+interface ExplorerContextMenu {
+    item: FileItem;
+    x: number;
+    y: number;
 }
 
 const apiEndpoint = runtime.isRoot ? "/post/files" : "/api/files";
@@ -54,6 +53,8 @@ export default function FilesRoute() {
     const [fileSize, setFileSize] = useState<number>(0);
     const [isContentLoading, setIsContentLoading] = useState(false);
     const [contentError, setContentError] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<ExplorerContextMenu | null>(null);
+    const [copiedPath, setCopiedPath] = useState(false);
 
     // Initialize root / home directory
     const initExplorer = async () => {
@@ -112,6 +113,12 @@ export default function FilesRoute() {
         }
     };
 
+    const refreshFolder = useCallback(async (path: string) => {
+        const items = await fetchFolderContents(path);
+        setExpanded((prev) => ({ ...prev, [path]: items }));
+        setOpenPaths((prev) => ({ ...prev, [path]: true }));
+    }, []);
+
     const handleSelectNode = async (item: FileItem) => {
         if (item.isDir) {
             await handleToggleExpand(item.path);
@@ -142,12 +149,42 @@ export default function FilesRoute() {
         initExplorer();
     }, []);
 
-    const formatBytes = (bytes: number) => {
-        if (bytes === 0) return "0 Bytes";
-        const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    useEffect(() => {
+        if (!contextMenu) return;
+        const close = () => setContextMenu(null);
+        window.addEventListener("pointerdown", close);
+        window.addEventListener("blur", close);
+        window.addEventListener("resize", close);
+        return () => {
+            window.removeEventListener("pointerdown", close);
+            window.removeEventListener("blur", close);
+            window.removeEventListener("resize", close);
+        };
+    }, [contextMenu]);
+
+    const openContextMenu = (event: React.MouseEvent, item: FileItem) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menuWidth = 190;
+        const menuHeight = item.isDir ? 126 : 86;
+        setCopiedPath(false);
+        setContextMenu({
+            item,
+            x: Math.min(event.clientX, window.innerWidth - menuWidth - 8),
+            y: Math.min(event.clientY, window.innerHeight - menuHeight - 8),
+        });
+    };
+
+    const copyPath = async () => {
+        if (!contextMenu) return;
+        try {
+            await navigator.clipboard.writeText(contextMenu.item.path);
+            setCopiedPath(true);
+            window.setTimeout(() => setContextMenu(null), 450);
+        } catch {
+            setError("Could not copy the path to the clipboard.");
+            setContextMenu(null);
+        }
     };
 
     return (
@@ -194,6 +231,7 @@ export default function FilesRoute() {
                                 expanded={expanded}
                                 openPaths={openPaths}
                                 onToggle={handleToggleExpand}
+                                onContextMenu={openContextMenu}
                             />
                         ) : null}
                     </div>
@@ -211,6 +249,27 @@ export default function FilesRoute() {
                     onClose={() => setSelectedFile(null)}
                 />
             </div>
+            {contextMenu ? (
+                <div
+                    className="fixed z-[70] w-[190px] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    role="menu"
+                >
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void handleSelectNode(contextMenu.item); setContextMenu(null); }} role="menuitem">
+                        <MousePointer2 className="h-3.5 w-3.5 text-muted-foreground" />Open
+                    </button>
+                    {contextMenu.item.isDir ? (
+                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void refreshFolder(contextMenu.item.path); setContextMenu(null); }} role="menuitem">
+                            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />Refresh folder
+                        </button>
+                    ) : null}
+                    <div className="my-1 border-t border-border" />
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void copyPath()} role="menuitem">
+                        <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />{copiedPath ? "Copied" : "Copy path"}
+                    </button>
+                </div>
+            ) : null}
         </DashboardLayout>
     );
 }
@@ -226,6 +285,7 @@ interface DirectoryTreeNodeProps {
     expanded: Record<string, FileItem[]>;
     openPaths: Record<string, boolean>;
     onToggle: (path: string) => Promise<void>;
+    onContextMenu: (event: React.MouseEvent, item: FileItem) => void;
 }
 
 function DirectoryTreeNode({
@@ -238,6 +298,7 @@ function DirectoryTreeNode({
     expanded,
     openPaths,
     onToggle,
+    onContextMenu,
 }: DirectoryTreeNodeProps) {
     const isExpanded = openPaths[path] || false;
     const isSelected = selectedPath === path;
@@ -262,6 +323,7 @@ function DirectoryTreeNode({
                 }`}
                 style={{ paddingLeft: `${depth * 10 + 8}px` }}
                 onClick={handleClick}
+                onContextMenu={(event) => onContextMenu(event, { name, isDir, path, size: 0, modTime: "" })}
             >
                 {isDir ? (
                     <button
@@ -300,6 +362,7 @@ function DirectoryTreeNode({
                             expanded={expanded}
                             openPaths={openPaths}
                             onToggle={onToggle}
+                            onContextMenu={onContextMenu}
                         />
                     ))}
                 </div>

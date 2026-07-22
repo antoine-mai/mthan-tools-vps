@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,25 @@ func TestParseCaddyVHosts(t *testing.T) {
 	}
 	if !reflect.DeepEqual(hosts[0].Upstreams, []string{"127.0.0.1:8080"}) {
 		t.Fatalf("unexpected upstreams: %#v", hosts[0].Upstreams)
+	}
+}
+
+func TestRemoveCaddySiteBlock(t *testing.T) {
+	input := "example.com, www.example.com {\n\treverse_proxy localhost:3000\n}\n\nother.test {\n\troot * /srv/example.com\n}\n"
+	got, found := removeCaddySiteBlock(input, "www.example.com")
+	if !found {
+		t.Fatal("expected site block to be found")
+	}
+	if strings.Contains(got, "reverse_proxy") || !strings.Contains(got, "other.test") {
+		t.Fatalf("unexpected Caddyfile after deletion: %q", got)
+	}
+}
+
+func TestRemoveCaddySiteBlockDoesNotMatchDirective(t *testing.T) {
+	input := "other.test {\n\treverse_proxy example.com:3000\n}\n"
+	got, found := removeCaddySiteBlock(input, "example.com")
+	if found || got != input {
+		t.Fatal("directive value must not be treated as a site address")
 	}
 }
 
