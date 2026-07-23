@@ -23,6 +23,13 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-23 - Distinct user and root login screens
+
+- Goal: Make `/login` visibly user-focused and `/root/login` a separate privileged login that asks only for the root password.
+- Files changed: split login layouts/form behavior, server-enforced root username, and work log.
+- Important decisions: `/post/login` always authenticates the fixed `root` account regardless of request payload; the root screen uses a dedicated warning-oriented visual treatment while the user screen retains username/password login.
+- Validation: Go formatting/full tests, TypeScript production build, application/control binary build, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
 ### 2026-07-23 - Separate user and root portals
 
 - Goal: Serve regular-user access at `/` and reserve `/root` for the fixed root account.

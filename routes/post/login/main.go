@@ -21,6 +21,7 @@ func Handler(auth *services.AuthService, sessions *services.SessionService) http
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
+		credentials.Username = "root"
 
 		user, err := auth.AuthenticateLinuxUser(credentials)
 		if err != nil {

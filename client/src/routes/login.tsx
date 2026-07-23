@@ -4,6 +4,7 @@ import {
     Loader2,
     LockKeyhole,
     Server,
+    ShieldAlert,
     ShieldCheck,
     User,
 } from "lucide-react";
@@ -50,7 +51,7 @@ export default function LoginRoute() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    username: formData.get("username"),
+                    ...(runtime.isRoot ? {} : { username: formData.get("username") }),
                     password: formData.get("password"),
                 }),
             });
@@ -84,13 +85,44 @@ export default function LoginRoute() {
 
     return (
         <DefaultLayout>
-            <main className="relative flex min-h-screen items-center justify-center bg-background px-6 py-8 text-foreground">
-                <div className="absolute right-6 top-6">
-                    <ColorModeSwitch />
-                </div>
+            {runtime.isRoot ? (
+                <RootLoginLayout
+                    handleInputChange={handleInputChange}
+                    handleSubmit={handleSubmit}
+                    isLoading={isLoading}
+                    message={message}
+                    status={status}
+                />
+            ) : (
+                <UserLoginLayout
+                    handleInputChange={handleInputChange}
+                    handleSubmit={handleSubmit}
+                    isLoading={isLoading}
+                    message={message}
+                    status={status}
+                />
+            )}
+        </DefaultLayout>
+    );
+}
 
-                <section className="grid w-full max-w-4xl overflow-hidden rounded-md border border-border bg-card shadow-sm md:grid-cols-[0.9fr_1.1fr]">
-                    <aside className="flex min-h-64 flex-col justify-between border-b border-border bg-muted/40 p-6 md:border-b-0 md:border-r">
+type LoginLayoutProps = {
+    handleInputChange: () => void;
+    handleSubmit: (event: FormEvent<HTMLFormElement>) => void;
+    isLoading: boolean;
+    message: string;
+    status: LoginStatus;
+};
+
+function UserLoginLayout(props: LoginLayoutProps) {
+    return (
+        <main className="relative flex min-h-screen items-center justify-center bg-background px-6 py-8 text-foreground">
+            <div className="absolute right-6 top-6">
+                <ColorModeSwitch />
+            </div>
+
+            <section className="grid w-full max-w-4xl overflow-hidden rounded-md border border-border bg-card shadow-sm md:grid-cols-[0.9fr_1.1fr]">
+                <aside className="flex min-h-64 flex-col justify-between border-b border-border bg-muted/40 p-6 md:border-b-0 md:border-r">
                         <div className="space-y-6">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background">
@@ -104,7 +136,7 @@ export default function LoginRoute() {
                                         MThan VPS
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {runtime.mode} access
+                                        User access
                                     </p>
                                 </div>
                             </div>
@@ -115,9 +147,7 @@ export default function LoginRoute() {
                                         className="h-3.5 w-3.5 text-muted-foreground"
                                         aria-hidden="true"
                                     />
-                                    {runtime.isRoot
-                                        ? "Root session"
-                                        : "User session"}
+                                    User session
                                 </div>
                                 <div className="space-y-2">
                                     <h1 className="text-3xl font-semibold tracking-tight">
@@ -131,25 +161,83 @@ export default function LoginRoute() {
                         </div>
 
                         <p className="mt-8 text-xs text-muted-foreground">
-                            {runtime.username
-                                ? `Runtime user: ${runtime.username}`
-                                : "Runtime user unavailable"}
+                            Your shell and files remain isolated to your Linux account.
                         </p>
-                    </aside>
+                </aside>
 
-                    <div className="p-6 sm:p-8">
+                <div className="p-6 sm:p-8">
                         <div className="mb-6 space-y-1">
                             <h2 className="text-xl font-semibold tracking-tight">
                                 Login
                             </h2>
                             <p className="text-sm text-muted-foreground">
-                                {runtime.isRoot
-                                    ? "Use root credentials."
-                                    : "Use your account credentials."}
+                                Use your Linux account credentials.
                             </p>
                         </div>
 
-                        <form className="space-y-5" onSubmit={handleSubmit}>
+                        <LoginForm {...props} showUsername />
+                </div>
+            </section>
+        </main>
+    );
+}
+
+function RootLoginLayout(props: LoginLayoutProps) {
+    return (
+        <main className="relative flex min-h-screen items-center justify-center bg-zinc-950 px-6 py-10 text-zinc-100">
+            <div className="absolute right-6 top-6">
+                <ColorModeSwitch />
+            </div>
+
+            <section className="w-full max-w-md overflow-hidden rounded-lg border border-red-500/30 bg-zinc-900 shadow-2xl shadow-red-950/30">
+                <div className="border-b border-red-500/20 bg-red-950/30 px-7 py-6">
+                    <div className="mb-5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500/15 text-red-400">
+                                <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <div>
+                                <p className="font-semibold">MThan VPS</p>
+                                <p className="text-xs text-red-300/70">Privileged access</p>
+                            </div>
+                        </div>
+                        <span className="rounded border border-red-500/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-300">
+                            Root
+                        </span>
+                    </div>
+                    <h1 className="text-2xl font-semibold">Root console</h1>
+                    <p className="mt-2 text-sm leading-6 text-zinc-400">
+                        This area has unrestricted control of the server. Authorized administrators only.
+                    </p>
+                </div>
+
+                <div className="px-7 py-7">
+                    <div className="mb-5">
+                        <p className="text-sm font-medium text-zinc-200">Authenticate as root</p>
+                        <p className="mt-1 text-xs text-zinc-500">Enter the root account password to continue.</p>
+                    </div>
+                    <LoginForm {...props} showUsername={false} root />
+                    <a className="mt-6 block text-center text-xs text-zinc-500 hover:text-zinc-300" href="/login">
+                        Return to user login
+                    </a>
+                </div>
+            </section>
+        </main>
+    );
+}
+
+function LoginForm({
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    message,
+    root = false,
+    showUsername,
+    status,
+}: LoginLayoutProps & { root?: boolean; showUsername: boolean }) {
+    return (
+        <form className="space-y-5" onSubmit={handleSubmit}>
+            {showUsername && (
                             <label className="block space-y-2">
                                 <span className="text-sm font-medium">
                                     Username
@@ -169,6 +257,7 @@ export default function LoginRoute() {
                                     />
                                 </span>
                             </label>
+            )}
 
                             <label className="block space-y-2">
                                 <span className="text-sm font-medium">
@@ -180,7 +269,11 @@ export default function LoginRoute() {
                                         aria-hidden="true"
                                     />
                                     <input
-                                        className="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring"
+                                        className={`h-11 w-full rounded-md border pl-9 pr-3 text-sm outline-none transition-colors ${
+                                            root
+                                                ? "border-zinc-700 bg-zinc-950 text-zinc-100 placeholder:text-zinc-600 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                                : "border-input bg-background placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring"
+                                        }`}
                                         name="password"
                                         type="password"
                                         autoComplete="current-password"
@@ -197,6 +290,8 @@ export default function LoginRoute() {
                                         ? "bg-emerald-600 hover:bg-emerald-600 text-white disabled:opacity-100"
                                         : status === "error"
                                         ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                        : root
+                                        ? "bg-red-600 text-white hover:bg-red-500"
                                         : ""
                                 }`}
                                 disabled={isLoading || status === "success"}
@@ -212,16 +307,12 @@ export default function LoginRoute() {
                                     <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 )}
                                 
-                                {status === "idle" && "Sign in"}
+                                {status === "idle" && (root ? "Unlock root console" : "Sign in")}
                                 {status === "loading" && "Signing in..."}
                                 {status === "success" && "Login successful. Redirecting..."}
                                 {status === "error" && `${message || "Login failed"} - Try again`}
                             </Button>
-                        </form>
-                    </div>
-                </section>
-            </main>
-        </DefaultLayout>
+        </form>
     );
 }
 
