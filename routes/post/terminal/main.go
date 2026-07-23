@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -20,7 +21,7 @@ type wsMessage struct {
 	Data string `json:"data"`
 }
 
-func Handler(sessions *services.SessionService) http.Handler {
+func Handler(sessions *services.SessionService, startup services.StartupConfig, rootAccess bool) http.Handler {
 	return websocket.Handler(func(ws *websocket.Conn) {
 		req := ws.Request()
 		cookie, err := req.Cookie(services.SessionCookieName)
@@ -30,26 +31,47 @@ func Handler(sessions *services.SessionService) http.Handler {
 		}
 
 		session, exists := sessions.Get(cookie.Value)
-		if !exists || session.Mode != "root" {
+		if !exists {
 			_ = ws.Close()
 			return
 		}
 
-		targetUsername := req.URL.Query().Get("user")
 		var cmd *exec.Cmd
-		if targetUsername != "" {
-			target, err := user.Lookup(targetUsername)
-			if err != nil || target.Username != targetUsername {
+		if rootAccess {
+			if session.Mode != "root" || session.UID != 0 {
 				_ = ws.Close()
 				return
 			}
-			cmd = exec.Command("su", "-", targetUsername)
-		} else {
-			shell := "/bin/bash"
-			if _, err := os.Stat(shell); os.IsNotExist(err) {
-				shell = "/bin/sh"
+			targetUsername := req.URL.Query().Get("user")
+			if targetUsername != "" {
+				target, err := user.Lookup(targetUsername)
+				if err != nil || target.Username != targetUsername {
+					_ = ws.Close()
+					return
+				}
+				cmd = exec.Command("su", "-", targetUsername)
+			} else {
+				cmd = loginShell()
 			}
-			cmd = exec.Command(shell)
+		} else {
+			if session.Mode != "user" || session.UID == 0 || req.URL.Query().Get("user") != "" {
+				_ = ws.Close()
+				return
+			}
+			if startup.IsRoot {
+				target, err := user.Lookup(session.Username)
+				if err != nil || target.Username != session.Username || target.Uid != fmt.Sprint(session.UID) {
+					_ = ws.Close()
+					return
+				}
+				cmd = exec.Command("su", "-", session.Username)
+			} else {
+				if startup.UID != session.UID || startup.Username != session.Username {
+					_ = ws.Close()
+					return
+				}
+				cmd = loginShell()
+			}
 		}
 		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "USER="+session.Username)
 
@@ -104,4 +126,12 @@ func Handler(sessions *services.SessionService) http.Handler {
 			}
 		}
 	})
+}
+
+func loginShell() *exec.Cmd {
+	shell := "/bin/bash"
+	if _, err := os.Stat(shell); os.IsNotExist(err) {
+		shell = "/bin/sh"
+	}
+	return exec.Command(shell)
 }

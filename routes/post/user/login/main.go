@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"mthan/vps/services"
 )
@@ -22,14 +21,13 @@ func Handler(auth *services.AuthService) http.Handler {
 			return
 		}
 
-		if !strings.HasPrefix(credentials.Username, "user-") {
-			http.Error(w, "invalid credentials", http.StatusUnauthorized)
-			return
-		}
-
 		user, err := auth.AuthenticateLinuxUser(credentials)
 		if err != nil {
 			writeAuthError(w, err)
+			return
+		}
+		if user.UID == 0 {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
 

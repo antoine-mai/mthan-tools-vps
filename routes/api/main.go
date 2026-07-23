@@ -13,6 +13,7 @@ import (
 	apifiles "mthan/vps/routes/api/files"
 	settingsroute "mthan/vps/routes/api/settings"
 	vhostroute "mthan/vps/routes/api/vhost"
+	"mthan/vps/routes/post/terminal"
 	"mthan/vps/services"
 )
 
@@ -22,6 +23,7 @@ type Dependencies struct {
 	Sessions    *services.SessionService
 	System      *services.SystemService
 	Settings    *services.SettingsService
+	Startup     services.StartupConfig
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
@@ -115,6 +117,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("PUT /api/containers/dockerfile", public(containersroute.UserDockerfileHandler(deps.Sessions, services.NewContainerService())))
 	mux.Handle("GET /api/vhost", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
 	mux.Handle("GET /api/vhost/", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
+	mux.Handle("GET /api/terminal", public(terminal.Handler(deps.Sessions, deps.Startup, false)))
 
 	mux.Handle("GET /healthz", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, deps.Health.Status())

@@ -1,6 +1,7 @@
 export type RuntimeMode = "root" | "user";
 
 export type ClientRuntime = {
+  basePath: string;
   env: string;
   isRoot: boolean;
   mode: RuntimeMode;
@@ -17,6 +18,7 @@ declare global {
 }
 
 export const runtime: ClientRuntime = window.__VPS_RUNTIME__ ?? {
+  basePath: "",
   env: "development",
   isRoot: false,
   mode: "user",

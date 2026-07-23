@@ -27,6 +27,10 @@ func Handler(auth *services.AuthService, sessions *services.SessionService) http
 			writeAuthError(w, err)
 			return
 		}
+		if user.UID != 0 {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
 
 		session, err := sessions.Create(user, "root")
 		if err != nil {

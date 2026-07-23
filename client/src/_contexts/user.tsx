@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from "react";
 
 import Api from "_utils/api";
+import { runtime } from "../runtime";
 
 type UserContextType = {
     isLoggedIn: boolean;
@@ -13,21 +14,21 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
     const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-        return localStorage.getItem("is_logged_in") === "true";
+        return localStorage.getItem(loginStorageKey()) === "true";
     });
 
     useEffect(() => {
-        localStorage.setItem("is_logged_in", isLoggedIn.toString());
+        localStorage.setItem(loginStorageKey(), isLoggedIn.toString());
     }, [isLoggedIn]);
 
     const logout = () => {
         setIsLoggedIn(false);
-        localStorage.removeItem("is_logged_in");
-        window.location.href = "/login";
+        localStorage.removeItem(loginStorageKey());
+        window.location.href = `${runtime.basePath}/login`;
     };
 
     const checkSession = useCallback(async (): Promise<boolean> => {
-        const localStatus = localStorage.getItem("is_logged_in") === "true";
+        const localStatus = localStorage.getItem(loginStorageKey()) === "true";
         if (!localStatus) {
             if (isLoggedIn) {
                 setIsLoggedIn(false);
@@ -56,7 +57,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (isLoggedIn) {
             setIsLoggedIn(false);
         }
-        localStorage.removeItem("is_logged_in");
+        localStorage.removeItem(loginStorageKey());
         return false;
     }, [isLoggedIn]);
 
@@ -69,6 +70,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
             {children}
         </UserContext.Provider>
     );
+}
+
+function loginStorageKey() {
+    return runtime.isRoot ? "is_root_logged_in" : "is_user_logged_in";
 }
 
 export function useUser() {

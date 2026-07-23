@@ -5,6 +5,7 @@ import Sidebar from "./_components/sidebar";
 import Header from "./_components/header";
 import { useApp } from "../_contexts/app";
 import { useTerminal } from "../_contexts/terminal";
+import { runtime } from "../runtime";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -30,7 +31,7 @@ function DashboardLayoutContent({
 
     useEffect(() => {
         if (!isLoggedIn) {
-            window.location.href = "/login";
+            window.location.href = `${runtime.basePath}/login`;
         }
     }, [isLoggedIn]);
 

@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { runtime } from "../runtime";
 
 export type TerminalTab = { id: number; username?: string };
 
@@ -57,7 +56,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (runtime.isRoot && event.ctrlKey && event.key === "`") {
+            if (event.ctrlKey && event.key === "`") {
                 event.preventDefault();
                 setIsOpen((current) => !current);
             }

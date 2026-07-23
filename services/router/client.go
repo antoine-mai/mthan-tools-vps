@@ -16,6 +16,7 @@ import (
 )
 
 type ClientRuntime struct {
+	BasePath string `json:"basePath"`
 	Env      string `json:"env"`
 	IsRoot   bool   `json:"isRoot"`
 	Mode     string `json:"mode"`
@@ -25,7 +26,7 @@ type ClientRuntime struct {
 	Username string `json:"username"`
 }
 
-func Register(mux *http.ServeMux, startup services.StartupConfig, clientFS embed.FS) {
+func Register(mux *http.ServeMux, startup services.StartupConfig, sessions *services.SessionService, clientFS embed.FS) {
 	runtime := newClientRuntime(startup)
 	subFS, err := fs.Sub(clientFS, "client/build")
 	if err != nil {
@@ -45,11 +46,11 @@ func Register(mux *http.ServeMux, startup services.StartupConfig, clientFS embed
 	}
 
 	if startup.IsRoot {
-		registerRootRoutes(mux, runtime, subFS)
+		registerRootRoutes(mux, runtime, sessions, subFS)
 		return
 	}
 
-	registerUserRoutes(mux, runtime, subFS)
+	registerUserRoutes(mux, runtime, sessions, subFS)
 }
 
 func PostBaseURL(startup services.StartupConfig) string {
@@ -72,8 +73,20 @@ func newClientRuntime(startup services.StartupConfig) ClientRuntime {
 	}
 }
 
-func clientHandler(runtime ClientRuntime, embeddedFS fs.FS, clientDirs ...string) http.Handler {
+func clientHandler(runtime ClientRuntime, sessions *services.SessionService, embeddedFS fs.FS, clientDirs ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestRuntime := runtime
+		if !runtime.IsRoot {
+			requestRuntime.UID = -1
+			requestRuntime.Username = ""
+			if cookie, err := r.Cookie(services.SessionCookieName); err == nil {
+				if session, ok := sessions.Get(cookie.Value); ok && session.Mode == "user" {
+					requestRuntime.UID = session.UID
+					requestRuntime.Username = session.Username
+				}
+			}
+		}
+
 		// 1. Try local filesystem directories first (development)
 		for _, clientDir := range clientDirs {
 			if _, err := os.Stat(clientDir); err == nil {
@@ -81,7 +94,7 @@ func clientHandler(runtime ClientRuntime, embeddedFS fs.FS, clientDirs ...string
 				requestedPath, ok := clientPath(clientDir, r.URL.Path)
 				if ok && fileExists(requestedPath) {
 					if isIndexFile(requestedPath) {
-						serveClientIndex(w, requestedPath, runtime)
+						serveClientIndex(w, requestedPath, requestRuntime)
 						return
 					}
 
@@ -97,7 +110,7 @@ func clientHandler(runtime ClientRuntime, embeddedFS fs.FS, clientDirs ...string
 
 			if fileExistsInFS(embeddedFS, cleanPath) {
 				if cleanPath == "" || cleanPath == "index.html" {
-					serveEmbeddedIndex(w, embeddedFS, runtime)
+					serveEmbeddedIndex(w, embeddedFS, requestRuntime)
 					return
 				}
 
@@ -107,7 +120,7 @@ func clientHandler(runtime ClientRuntime, embeddedFS fs.FS, clientDirs ...string
 
 			// Fallback to index.html for SPA routing
 			if fileExistsInFS(embeddedFS, "index.html") {
-				serveEmbeddedIndex(w, embeddedFS, runtime)
+				serveEmbeddedIndex(w, embeddedFS, requestRuntime)
 				return
 			}
 		}
@@ -116,7 +129,7 @@ func clientHandler(runtime ClientRuntime, embeddedFS fs.FS, clientDirs ...string
 		for _, clientDir := range clientDirs {
 			indexPath := filepath.Join(clientDir, "index.html")
 			if fileExists(indexPath) {
-				serveClientIndex(w, indexPath, runtime)
+				serveClientIndex(w, indexPath, requestRuntime)
 				return
 			}
 		}

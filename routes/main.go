@@ -28,6 +28,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		Sessions:    deps.Sessions,
 		System:      deps.System,
 		Settings:    deps.Settings,
+		Startup:     deps.Startup,
 	})
 
 	post.Register(mux, post.Dependencies{
@@ -39,5 +40,5 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		Settings: deps.Settings,
 	})
 
-	router.Register(mux, deps.Startup, deps.ClientFS)
+	router.Register(mux, deps.Startup, deps.Sessions, deps.ClientFS)
 }

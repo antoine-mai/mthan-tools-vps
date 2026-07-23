@@ -8,7 +8,7 @@ import type { ColorMode } from "_utils/color-mode";
 import { runtime } from "runtime";
 import { useTerminal } from "_contexts/terminal";
 
-const terminalTitle = `${shortOSName(runtime.osName)} - Root`;
+const terminalTitle = `${shortOSName(runtime.osName)} - ${runtime.isRoot ? "Root" : runtime.username || "User"}`;
 export default function TerminalPanel() {
     const { activeTabId, tabs, closePanel, closeTab, duplicateActiveTab, setActiveTabId } = useTerminal();
     const colorMode = useResolvedColorMode();
@@ -125,8 +125,9 @@ function TerminalSession({
 
         const connect = (reconnecting = false) => {
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const userQuery = username ? `?user=${encodeURIComponent(username)}` : "";
-            const wsUrl = `${protocol}//${window.location.host}/post/terminal${userQuery}`;
+            const userQuery = runtime.isRoot && username ? `?user=${encodeURIComponent(username)}` : "";
+            const endpoint = runtime.isRoot ? "/post/terminal" : "/api/terminal";
+            const wsUrl = `${protocol}//${window.location.host}${endpoint}${userQuery}`;
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 

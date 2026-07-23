@@ -23,6 +23,20 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-23 - Separate user and root portals
+
+- Goal: Serve regular-user access at `/` and reserve `/root` for the fixed root account.
+- Files changed: dual client runtimes and React basename, mode-specific login state/redirects, user terminal endpoint, session-owned shell selection, global POST root-session enforcement, user login rules, and work log.
+- Important decisions: `/root` uses only UID 0 sessions; `/` accepts any authenticated non-root Linux account; user terminals ignore client-selected usernames and run as the session owner; all privileged `/post/*` routes require a root session except the explicit login/health handshakes.
+- Validation: Go formatting, full Go test suite, TypeScript production build, application/control binary build, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
+### 2026-07-23 - Prevent regular-user root sessions
+
+- Goal: Prevent a regular Linux account authenticated through the root login endpoint from receiving root terminal and control-panel access.
+- Files changed: root login UID enforcement, session mode/UID invariants, terminal defense-in-depth check, session regression tests, and work log.
+- Important decisions: root sessions require UID 0 and user sessions reject UID 0; previously persisted inconsistent sessions are invalidated when accessed.
+- Validation: Go formatting, full Go test suite, and `git diff --check`.
+
 ### 2026-07-20 - Caddy-only VHosts inventory
 
 - Goal: Make the VHosts sidebar destination list the public hosts configured in Caddy.

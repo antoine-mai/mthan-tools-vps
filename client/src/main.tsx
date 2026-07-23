@@ -4,10 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { TerminalProvider, useTerminal } from "./_contexts/terminal";
 import TerminalPanel from "./_components/terminal-panel";
+import { runtime } from "./runtime";
 
 export default function Main() {
     return (
-        <BrowserRouter>
+        <BrowserRouter basename={runtime.basePath || undefined}>
             <AppProvider>
                 <TerminalProvider>
                     <Routes />

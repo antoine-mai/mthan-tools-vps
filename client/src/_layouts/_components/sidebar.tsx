@@ -107,7 +107,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                 </Link>
 
                 {/* Terminal Menu Item */}
-                {runtime.isRoot && (
+                {(
                     <a
                         href="#terminal"
                         onClick={(e) => {

@@ -38,44 +38,44 @@ type Dependencies struct {
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
-	mux.Handle("OPTIONS /post/", postOnly(deps.Startup, http.HandlerFunc(noContent)))
-	mux.Handle("POST /post/login", postOnly(deps.Startup, postlogin.Handler(deps.Auth, deps.Sessions)))
-	mux.Handle("POST /post/user/login", postOnly(deps.Startup, userlogin.Handler(deps.Auth)))
-	mux.Handle("POST /post/user/add", postOnly(deps.Startup, useradd.Handler(deps.Settings)))
-	mux.Handle("GET /post/user/apps", postOnly(deps.Startup, userapps.Handler()))
-	mux.Handle("POST /post/user/apps", postOnly(deps.Startup, userapps.Handler()))
-	mux.Handle("POST /post/user/delete", postOnly(deps.Startup, userdelete.Handler()))
-	mux.Handle("GET /post/session", postOnly(deps.Startup, session.Handler(deps.Sessions)))
-	mux.Handle("GET /post/system", postOnly(deps.Startup, authenticatedSystemHandler(deps.Sessions, deps.System)))
-	mux.Handle("GET /post/update", postOnly(deps.Startup, update.CheckHandler(deps.Update)))
-	mux.Handle("POST /post/update", postOnly(deps.Startup, update.SelfUpdateHandler(deps.Update)))
-	mux.Handle("POST /post/ping", postOnly(deps.Startup, ping.Handler()))
-	mux.Handle("GET /post/user/list", postOnly(deps.Startup, userlist.Handler()))
-	mux.Handle("POST /post/user/password", postOnly(deps.Startup, userpassword.Handler()))
-	mux.Handle("GET /post/files", postOnly(deps.Startup, postfiles.Handler(deps.Sessions)))
-	mux.Handle("POST /post/files", postOnly(deps.Startup, postfiles.Handler(deps.Sessions)))
-	mux.Handle("PATCH /post/files", postOnly(deps.Startup, postfiles.Handler(deps.Sessions)))
-	mux.Handle("DELETE /post/files", postOnly(deps.Startup, postfiles.Handler(deps.Sessions)))
-	mux.Handle("GET /post/apps", postOnly(deps.Startup, postapps.Handler(deps.Sessions)))
-	mux.Handle("GET /post/containers", postOnly(deps.Startup, postcontainers.Handler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("POST /post/containers/action", postOnly(deps.Startup, postcontainers.ActionHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, postcontainers.LogsHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("POST /post/apps", postOnly(deps.Startup, postapps.Handler(deps.Sessions)))
-	mux.Handle("GET /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
-	mux.Handle("PUT /post/apps/config", postOnly(deps.Startup, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
-	mux.Handle("GET /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("POST /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("PATCH /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("DELETE /post/apis", postOnly(deps.Startup, postapis.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("GET /post/settings", postOnly(deps.Startup, settingsroute.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("PUT /post/settings", postOnly(deps.Startup, settingsroute.Handler(deps.Sessions, deps.Settings)))
-	mux.Handle("GET /post/vhost", postOnly(deps.Startup, postvhost.Handler(deps.Sessions, services.NewVHostService())))
-	mux.Handle("GET /post/vhost/", postOnly(deps.Startup, postvhost.Handler(deps.Sessions, services.NewVHostService())))
-	mux.Handle("DELETE /post/vhost/", postOnly(deps.Startup, postvhost.Handler(deps.Sessions, services.NewVHostService())))
-	mux.Handle("POST /post/vhost/reload", postOnly(deps.Startup, postvhost.Handler(deps.Sessions, services.NewVHostService())))
-	mux.Handle("GET /post/terminal", postOnly(deps.Startup, terminal.Handler(deps.Sessions)))
+	mux.Handle("OPTIONS /post/", postOnly(deps.Startup, deps.Sessions, http.HandlerFunc(noContent)))
+	mux.Handle("POST /post/login", postOnly(deps.Startup, deps.Sessions, postlogin.Handler(deps.Auth, deps.Sessions)))
+	mux.Handle("POST /post/user/login", postOnly(deps.Startup, deps.Sessions, userlogin.Handler(deps.Auth)))
+	mux.Handle("POST /post/user/add", postOnly(deps.Startup, deps.Sessions, useradd.Handler(deps.Settings)))
+	mux.Handle("GET /post/user/apps", postOnly(deps.Startup, deps.Sessions, userapps.Handler()))
+	mux.Handle("POST /post/user/apps", postOnly(deps.Startup, deps.Sessions, userapps.Handler()))
+	mux.Handle("POST /post/user/delete", postOnly(deps.Startup, deps.Sessions, userdelete.Handler()))
+	mux.Handle("GET /post/session", postOnly(deps.Startup, deps.Sessions, session.Handler(deps.Sessions)))
+	mux.Handle("GET /post/system", postOnly(deps.Startup, deps.Sessions, authenticatedSystemHandler(deps.Sessions, deps.System)))
+	mux.Handle("GET /post/update", postOnly(deps.Startup, deps.Sessions, update.CheckHandler(deps.Update)))
+	mux.Handle("POST /post/update", postOnly(deps.Startup, deps.Sessions, update.SelfUpdateHandler(deps.Update)))
+	mux.Handle("POST /post/ping", postOnly(deps.Startup, deps.Sessions, ping.Handler()))
+	mux.Handle("GET /post/user/list", postOnly(deps.Startup, deps.Sessions, userlist.Handler()))
+	mux.Handle("POST /post/user/password", postOnly(deps.Startup, deps.Sessions, userpassword.Handler()))
+	mux.Handle("GET /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
+	mux.Handle("POST /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
+	mux.Handle("PATCH /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
+	mux.Handle("DELETE /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
+	mux.Handle("GET /post/apps", postOnly(deps.Startup, deps.Sessions, postapps.Handler(deps.Sessions)))
+	mux.Handle("GET /post/containers", postOnly(deps.Startup, deps.Sessions, postcontainers.Handler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("POST /post/containers/action", postOnly(deps.Startup, deps.Sessions, postcontainers.ActionHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, deps.Sessions, postcontainers.LogsHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("POST /post/apps", postOnly(deps.Startup, deps.Sessions, postapps.Handler(deps.Sessions)))
+	mux.Handle("GET /post/apps/config", postOnly(deps.Startup, deps.Sessions, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
+	mux.Handle("PUT /post/apps/config", postOnly(deps.Startup, deps.Sessions, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
+	mux.Handle("GET /post/apis", postOnly(deps.Startup, deps.Sessions, postapis.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("POST /post/apis", postOnly(deps.Startup, deps.Sessions, postapis.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("PATCH /post/apis", postOnly(deps.Startup, deps.Sessions, postapis.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("DELETE /post/apis", postOnly(deps.Startup, deps.Sessions, postapis.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("GET /post/settings", postOnly(deps.Startup, deps.Sessions, settingsroute.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("PUT /post/settings", postOnly(deps.Startup, deps.Sessions, settingsroute.Handler(deps.Sessions, deps.Settings)))
+	mux.Handle("GET /post/vhost", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
+	mux.Handle("GET /post/vhost/", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
+	mux.Handle("DELETE /post/vhost/", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
+	mux.Handle("POST /post/vhost/reload", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
+	mux.Handle("GET /post/terminal", postOnly(deps.Startup, deps.Sessions, terminal.Handler(deps.Sessions, deps.Startup, true)))
 }
 
 func authenticatedSystemHandler(sessions *services.SessionService, system *services.SystemService) http.Handler {
@@ -101,8 +101,33 @@ func authenticatedSystemHandler(sessions *services.SessionService, system *servi
 	})
 }
 
-func postOnly(startup services.StartupConfig, next http.Handler) http.Handler {
-	return sameDomainOrLocalhostOnly(rootOnly(startup, next))
+func postOnly(startup services.StartupConfig, sessions *services.SessionService, next http.Handler) http.Handler {
+	return sameDomainOrLocalhostOnly(rootOnly(startup, rootSessionOnly(sessions, next)))
+}
+
+func rootSessionOnly(sessions *services.SessionService, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		case r.URL.Path == "/post/login", r.URL.Path == "/post/user/login", r.URL.Path == "/post/ping":
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		cookie, err := r.Cookie(services.SessionCookieName)
+		if err != nil {
+			http.Error(w, "root session required", http.StatusUnauthorized)
+			return
+		}
+		session, ok := sessions.Get(cookie.Value)
+		if !ok || session.Mode != "root" || session.UID != 0 {
+			http.Error(w, "root session required", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func rootOnly(startup services.StartupConfig, next http.Handler) http.Handler {

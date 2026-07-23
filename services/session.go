@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,6 +12,8 @@ import (
 )
 
 const SessionCookieName = "vps_session"
+
+var ErrInvalidSessionMode = errors.New("invalid session mode")
 
 type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
@@ -38,6 +41,13 @@ func NewSessionService() *SessionService {
 }
 
 func (s *SessionService) Create(user AuthenticatedUser, mode string) (Session, error) {
+	if mode != "root" && mode != "user" {
+		return Session{}, ErrInvalidSessionMode
+	}
+	if (mode == "root") != (user.UID == 0) {
+		return Session{}, ErrInvalidSessionMode
+	}
+
 	token, err := sessionToken()
 	if err != nil {
 		return Session{}, err
@@ -67,6 +77,11 @@ func (s *SessionService) Get(token string) (Session, bool) {
 	defer s.mu.Unlock()
 	session, exists := s.sessions[token]
 	if !exists {
+		return Session{}, false
+	}
+	if (session.Mode != "root" && session.Mode != "user") || (session.Mode == "root") != (session.UID == 0) {
+		delete(s.sessions, token)
+		_ = s.saveLocked()
 		return Session{}, false
 	}
 	if time.Now().After(session.ExpiresAt) {
