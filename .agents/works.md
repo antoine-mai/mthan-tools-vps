@@ -23,6 +23,13 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-24 - Browser-scoped root login
+
+- Goal: Require the root password again after the browser session ends.
+- Files changed: non-persistent root cookie, root-only sessionStorage login state, root settings bootstrap check, and work log.
+- Important decisions: root login no longer sets cookie Max-Age; root UI state is tab/browser-session scoped while regular-user login persistence remains unchanged.
+- Validation: full Go test suite, TypeScript production build, application/control binary build, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
 ### 2026-07-24 - Root-only global settings and credentials
 
 - Goal: Audit root/user navigation and prevent regular users from accessing global Settings or API credential management.

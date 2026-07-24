@@ -24,7 +24,7 @@ export default function LoginRoute() {
 
     useEffect(() => {
         document.title = "Login | MThan VPS";
-        const isLoggedIn = localStorage.getItem(loginStorageKey()) === "true";
+        const isLoggedIn = loginStorage().getItem(loginStorageKey()) === "true";
         if (isLoggedIn) {
             window.location.href = appPath("/");
         }
@@ -69,7 +69,7 @@ export default function LoginRoute() {
             }
 
             setStatus("success");
-            localStorage.setItem(loginStorageKey(), "true");
+            loginStorage().setItem(loginStorageKey(), "true");
             setTimeout(() => {
                 window.location.href = appPath("/");
             }, 800);
@@ -318,6 +318,10 @@ function LoginForm({
 
 function loginStorageKey() {
     return runtime.isRoot ? "is_root_logged_in" : "is_user_logged_in";
+}
+
+function loginStorage(): Storage {
+    return runtime.isRoot ? window.sessionStorage : window.localStorage;
 }
 
 function appPath(path: string) {

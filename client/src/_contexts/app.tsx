@@ -35,7 +35,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        if (!runtime.isRoot || window.localStorage.getItem("is_root_logged_in") !== "true") return;
+        if (!runtime.isRoot || window.sessionStorage.getItem("is_root_logged_in") !== "true") return;
         void fetch(Api.root.settings)
             .then((response) => response.ok ? response.json() : null)
             .then((data) => {

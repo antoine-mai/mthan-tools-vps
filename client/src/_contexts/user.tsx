@@ -14,21 +14,21 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
     const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-        return localStorage.getItem(loginStorageKey()) === "true";
+        return loginStorage().getItem(loginStorageKey()) === "true";
     });
 
     useEffect(() => {
-        localStorage.setItem(loginStorageKey(), isLoggedIn.toString());
+        loginStorage().setItem(loginStorageKey(), isLoggedIn.toString());
     }, [isLoggedIn]);
 
     const logout = () => {
         setIsLoggedIn(false);
-        localStorage.removeItem(loginStorageKey());
+        loginStorage().removeItem(loginStorageKey());
         window.location.href = `${runtime.basePath}/login`;
     };
 
     const checkSession = useCallback(async (): Promise<boolean> => {
-        const localStatus = localStorage.getItem(loginStorageKey()) === "true";
+        const localStatus = loginStorage().getItem(loginStorageKey()) === "true";
         if (!localStatus) {
             if (isLoggedIn) {
                 setIsLoggedIn(false);
@@ -57,7 +57,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (isLoggedIn) {
             setIsLoggedIn(false);
         }
-        localStorage.removeItem(loginStorageKey());
+        loginStorage().removeItem(loginStorageKey());
         return false;
     }, [isLoggedIn]);
 
@@ -74,6 +74,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 function loginStorageKey() {
     return runtime.isRoot ? "is_root_logged_in" : "is_user_logged_in";
+}
+
+function loginStorage(): Storage {
+    return runtime.isRoot ? window.sessionStorage : window.localStorage;
 }
 
 export function useUser() {
