@@ -155,7 +155,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                     </h1>
                 </div>
                 <div className="ml-4 flex min-w-0 items-center gap-2">
-                    {headerApps.map((app) => (
+                    {isRoot && headerApps.map((app) => (
                         <Link
                             key={app}
                             to={`/settings/apps/${encodeURIComponent(app)}`}

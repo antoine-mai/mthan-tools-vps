@@ -23,6 +23,27 @@ This file is for handoff between agents. Keep entries concise, factual, and newe
 
 ## Work Entries
 
+### 2026-07-24 - Root-only global settings and credentials
+
+- Goal: Audit root/user navigation and prevent regular users from accessing global Settings or API credential management.
+- Files changed: root-only React routes/sidebar/header shortcuts, root-only settings context behavior, removed user settings API registration/handler, API route map, and work log.
+- Important decisions: Users, Settings, Apps Settings, and API Credentials exist only in `/root`; `/api/settings` was removed because it exposed the shared global SettingsService to any valid user session; regular users retain Dashboard, scoped Files/Containers/Terminal, and read-only VHosts.
+- Validation: full Go test suite, TypeScript production build, application/control binary build, `/api/settings` route scan, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
+### 2026-07-24 - Root-only Users navigation
+
+- Goal: Keep Linux user management visible only in the root portal.
+- Files changed: role-aware sidebar navigation and work log.
+- Important decisions: `/root` renders the Users item; the regular-user portal omits it, while backend `/post/user/*` authorization remains the enforcement boundary.
+- Validation: TypeScript production build, application/control binary build, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
+### 2026-07-24 - Root user-management context menu
+
+- Goal: Add a right-click action menu to each Linux user in the root Users list.
+- Files changed: user-list context-menu state, positioning/dismissal behavior, navigation and existing user actions, and work log.
+- Important decisions: the menu reuses Overview, Files, Apps, Terminal, cPanel activation, and guarded deletion flows; deletion stays unavailable for UID 0; clicking outside, resizing, losing focus, or pressing Escape closes the menu.
+- Validation: TypeScript production build, application/control binary build, and `git diff --check`; frontend build has only pre-existing lint warnings.
+
 ### 2026-07-23 - Distinct user and root login screens
 
 - Goal: Make `/login` visibly user-focused and `/root/login` a separate privileged login that asks only for the root password.

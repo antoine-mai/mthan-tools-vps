@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
     Plus,
     RefreshCw,
@@ -46,6 +46,12 @@ interface SystemAppStatus {
     versions?: string[];
 }
 
+interface UserContextMenu {
+    user: LinuxUser;
+    x: number;
+    y: number;
+}
+
 const systemAppNames: Record<string, string> = {
     caddy: "Caddy",
     nginx: "Nginx",
@@ -60,6 +66,7 @@ const systemAppNames: Record<string, string> = {
 export default function UsersRoute() {
     const { settings } = useApp();
     const { addTab: openUserTerminal } = useTerminal();
+    const navigate = useNavigate();
     const params = useParams<{ username?: string; section?: string }>();
     const autoUsername = (settings.users_auto_username ?? "false") === "true";
     const routeUsername = params.username ?? "";
@@ -89,6 +96,7 @@ export default function UsersRoute() {
     const [activationShowPassword, setActivationShowPassword] = useState(false);
     const [activationSaving, setActivationSaving] = useState(false);
     const [activationError, setActivationError] = useState("");
+    const [contextMenu, setContextMenu] = useState<UserContextMenu | null>(null);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,6 +133,65 @@ export default function UsersRoute() {
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isModalOpen]);
+
+    useEffect(() => {
+        if (!contextMenu) return;
+        const close = () => setContextMenu(null);
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") close();
+        };
+        window.addEventListener("pointerdown", close);
+        window.addEventListener("blur", close);
+        window.addEventListener("resize", close);
+        window.addEventListener("keydown", closeOnEscape);
+        return () => {
+            window.removeEventListener("pointerdown", close);
+            window.removeEventListener("blur", close);
+            window.removeEventListener("resize", close);
+            window.removeEventListener("keydown", closeOnEscape);
+        };
+    }, [contextMenu]);
+
+    const openContextMenu = (event: React.MouseEvent, user: LinuxUser) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menuWidth = 210;
+        const menuHeight = user.uid === 0 ? 190 : user.cpanelEnabled ? 226 : 258;
+        setSelectedUser(user);
+        setContextMenu({
+            user,
+            x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+            y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+        });
+    };
+
+    const navigateFromContextMenu = (section: UserSection) => {
+        if (!contextMenu) return;
+        const username = contextMenu.user.username;
+        setContextMenu(null);
+        navigate(`/users/${encodeURIComponent(username)}/${section}`);
+    };
+
+    const openTerminalFromContextMenu = () => {
+        if (!contextMenu) return;
+        openUserTerminal(contextMenu.user.username);
+        setContextMenu(null);
+    };
+
+    const activateFromContextMenu = () => {
+        if (!contextMenu) return;
+        setSelectedUser(contextMenu.user);
+        setActivationError("");
+        setActivationOpen(true);
+        setContextMenu(null);
+    };
+
+    const deleteFromContextMenu = () => {
+        if (!contextMenu) return;
+        const username = contextMenu.user.username;
+        setContextMenu(null);
+        void handleDeleteUser(username);
+    };
 
     const fetchUsers = async (showRefresh = false) => {
         if (showRefresh) setIsRefreshing(true);
@@ -416,7 +483,7 @@ export default function UsersRoute() {
                             users.map((u) => {
                                 const isOpen = selectedUser?.username === u.username;
                                 return (
-                                    <div key={u.username}>
+                                    <div key={u.username} onContextMenu={(event) => openContextMenu(event, u)}>
                                     <Link
                                         to={`/users/${encodeURIComponent(u.username)}/overview`}
                                         className="flex items-center gap-2 rounded-none px-2.5 py-1.5 text-xs text-foreground/90 transition-colors hover:bg-muted/60"
@@ -573,6 +640,51 @@ export default function UsersRoute() {
                     )}
                 </main>
             </div>
+
+            {contextMenu ? (
+                <div
+                    className="fixed z-[70] w-[210px] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    role="menu"
+                    aria-label={`Actions for ${contextMenu.user.username}`}
+                >
+                    <div className="border-b border-border px-2 py-1.5">
+                        <p className="truncate text-xs font-semibold">{contextMenu.user.username}</p>
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                            UID {contextMenu.user.uid} · {contextMenu.user.home}
+                        </p>
+                    </div>
+                    <button className="mt-1 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("overview")} role="menuitem">
+                        <LayoutDashboard className="h-3.5 w-3.5 text-muted-foreground" />Overview
+                    </button>
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("files")} role="menuitem">
+                        <Folder className="h-3.5 w-3.5 text-muted-foreground" />Files
+                    </button>
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("apps")} role="menuitem">
+                        <Boxes className="h-3.5 w-3.5 text-muted-foreground" />Apps
+                    </button>
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={openTerminalFromContextMenu} role="menuitem">
+                        <Terminal className="h-3.5 w-3.5 text-muted-foreground" />Open terminal
+                    </button>
+                    {!contextMenu.user.cpanelEnabled ? (
+                        <>
+                            <div className="my-1 border-t border-border" />
+                            <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={activateFromContextMenu} role="menuitem">
+                                <Key className="h-3.5 w-3.5 text-muted-foreground" />Activate cPanel
+                            </button>
+                        </>
+                    ) : null}
+                    {contextMenu.user.uid !== 0 ? (
+                        <>
+                            <div className="my-1 border-t border-border" />
+                            <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10" onClick={deleteFromContextMenu} role="menuitem">
+                                <Trash2 className="h-3.5 w-3.5" />Delete user
+                            </button>
+                        </>
+                    ) : null}
+                </div>
+            ) : null}
 
             {/* Modal */}
             {addAppOpen && (

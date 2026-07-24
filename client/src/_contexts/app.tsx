@@ -25,8 +25,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [settings, setSettings] = useState<Record<string, string>>({});
 
     const saveSetting = (key: string, value: string) => {
+        if (!runtime.isRoot) return;
         setSettings((current) => ({ ...current, [key]: value }));
-        void fetch(Api.current.settings, {
+        void fetch(Api.root.settings, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ key, value }),
@@ -34,8 +35,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        if (window.localStorage.getItem("is_logged_in") !== "true") return;
-        void fetch(Api.current.settings)
+        if (!runtime.isRoot || window.localStorage.getItem("is_root_logged_in") !== "true") return;
+        void fetch(Api.root.settings)
             .then((response) => response.ok ? response.json() : null)
             .then((data) => {
                 const settings = data?.settings as Record<string, string> | undefined;

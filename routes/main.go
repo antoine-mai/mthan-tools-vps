@@ -27,7 +27,6 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		PostBaseURL: router.PostBaseURL(deps.Startup),
 		Sessions:    deps.Sessions,
 		System:      deps.System,
-		Settings:    deps.Settings,
 		Startup:     deps.Startup,
 	})
 
