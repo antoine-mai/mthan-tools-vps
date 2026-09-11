@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,6 +17,88 @@ import (
 
 var ErrVHostNotFound = errors.New("vhost not found")
 var ErrVHostUpdateFailed = errors.New("caddy configuration update failed")
+
+const (
+	CaddyUsersDir  = "/etc/caddy/Caddyfile.d/mthan-users"
+	CaddyfilePath  = "/etc/caddy/Caddyfile"
+	CaddyImportDir = "import /etc/caddy/Caddyfile.d/mthan-users/*"
+)
+
+func UserCaddyfilePath(username string) string {
+	return filepath.Join(CaddyUsersDir, username+".caddy")
+}
+
+func CreateUserCaddyfile(username string) error {
+	if err := EnsureCaddyMThanUsers(); err != nil {
+		return err
+	}
+	path := UserCaddyfilePath(username)
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	content := fmt.Sprintf("# Virtual hosts for user: %s\n", username)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return err
+	}
+	_ = exec.Command("caddy", "reload", "--config", CaddyfilePath).Run()
+	return nil
+}
+
+func DeleteUserCaddyfile(username string) error {
+	path := UserCaddyfilePath(username)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	_ = exec.Command("caddy", "reload", "--config", CaddyfilePath).Run()
+	return nil
+}
+
+func EnsureCaddyMThanUsers() error {
+	if os.Geteuid() != 0 {
+		return nil
+	}
+
+	if _, err := exec.LookPath("caddy"); err != nil {
+		if _, statErr := os.Stat("/etc/caddy"); statErr != nil {
+			return nil
+		}
+	}
+
+	if err := os.MkdirAll(CaddyUsersDir, 0755); err != nil {
+		return err
+	}
+
+	content, err := os.ReadFile(CaddyfilePath)
+	if os.IsNotExist(err) {
+		_ = os.MkdirAll("/etc/caddy", 0755)
+		return os.WriteFile(CaddyfilePath, []byte(CaddyImportDir+"\n"), 0644)
+	}
+	if err != nil {
+		return err
+	}
+
+	text := string(content)
+	if !strings.Contains(text, CaddyImportDir) {
+		updated := strings.TrimRight(text, "\r\n") + "\n\n" + CaddyImportDir + "\n"
+		if err := os.WriteFile(CaddyfilePath, []byte(updated), 0644); err != nil {
+			return err
+		}
+		_ = exec.Command("caddy", "reload", "--config", CaddyfilePath).Run()
+	}
+
+	if users, uErr := HomeUsers(); uErr == nil {
+		for _, u := range users {
+			if u.Username != "" && u.Username != "root" {
+				userPath := UserCaddyfilePath(u.Username)
+				if _, statErr := os.Stat(userPath); os.IsNotExist(statErr) {
+					_ = os.WriteFile(userPath, []byte(fmt.Sprintf("# Virtual hosts for user: %s\n", u.Username)), 0644)
+				}
+			}
+		}
+	}
+
+	return nil
+}
 
 type PublicPort struct {
 	Port      int    `json:"port"`
@@ -65,6 +149,7 @@ type VHostService struct {
 }
 
 func NewVHostService() *VHostService {
+	_ = EnsureCaddyMThanUsers()
 	return &VHostService{runner: timedCommandRunner{}}
 }
 
@@ -76,6 +161,7 @@ func (s *VHostService) Status() VHostStatus {
 }
 
 func (s *VHostService) List() []VHost {
+	_ = EnsureCaddyMThanUsers()
 	var all []VHost
 	if output, err := s.runner.Run("caddy", "adapt", "--config", "/etc/caddy/Caddyfile"); err == nil {
 		all = append(all, parseCaddyVHosts(output, "/etc/caddy/Caddyfile")...)
@@ -103,6 +189,7 @@ func (s *VHostService) Summaries() []VHostSummary {
 }
 
 func (s *VHostService) Get(hostname string) (VHost, error) {
+	_ = EnsureCaddyMThanUsers()
 	hostname = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(hostname), "."))
 	for _, host := range s.List() {
 		if strings.EqualFold(host.Hostname, hostname) || containsFold(host.Aliases, hostname) {
@@ -113,29 +200,56 @@ func (s *VHostService) Get(hostname string) (VHost, error) {
 }
 
 func (s *VHostService) Delete(hostname string) error {
+	_ = EnsureCaddyMThanUsers()
 	hostname = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(hostname), "."))
 	path := "/etc/caddy/Caddyfile"
 	content, err := os.ReadFile(path)
-	if err != nil {
-		return err
+	if err == nil {
+		if updated, found := removeCaddySiteBlock(string(content), hostname); found {
+			configs := NewAppConfigService()
+			if _, writeErr := configs.Write("caddy", path, updated); writeErr != nil {
+				return writeErr
+			}
+			if _, reloadErr := s.runner.Run("caddy", "reload", "--config", path); reloadErr != nil {
+				_, _ = configs.Write("caddy", path, string(content))
+				_, _ = s.runner.Run("caddy", "reload", "--config", path)
+				return ErrVHostUpdateFailed
+			}
+			return nil
+		}
 	}
-	updated, found := removeCaddySiteBlock(string(content), hostname)
-	if !found {
-		return ErrVHostNotFound
+
+	entries, readErr := os.ReadDir(CaddyUsersDir)
+	if readErr == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			userConfPath := filepath.Join(CaddyUsersDir, entry.Name())
+			fileContent, readErr := os.ReadFile(userConfPath)
+			if readErr != nil {
+				continue
+			}
+			if updated, found := removeCaddySiteBlock(string(fileContent), hostname); found {
+				if strings.TrimSpace(updated) == "" {
+					_ = os.Remove(userConfPath)
+				} else {
+					_ = os.WriteFile(userConfPath, []byte(updated), 0644)
+				}
+				if _, reloadErr := s.runner.Run("caddy", "reload", "--config", path); reloadErr != nil {
+					_ = os.WriteFile(userConfPath, fileContent, 0644)
+					return ErrVHostUpdateFailed
+				}
+				return nil
+			}
+		}
 	}
-	configs := NewAppConfigService()
-	if _, err = configs.Write("caddy", path, updated); err != nil {
-		return err
-	}
-	if _, err = s.runner.Run("caddy", "reload", "--config", path); err != nil {
-		_, _ = configs.Write("caddy", path, string(content))
-		_, _ = s.runner.Run("caddy", "reload", "--config", path)
-		return ErrVHostUpdateFailed
-	}
-	return nil
+
+	return ErrVHostNotFound
 }
 
 func (s *VHostService) Reload() error {
+	_ = EnsureCaddyMThanUsers()
 	if _, err := s.runner.Run("caddy", "reload", "--config", "/etc/caddy/Caddyfile"); err != nil {
 		return ErrVHostUpdateFailed
 	}

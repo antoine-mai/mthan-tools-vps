@@ -96,6 +96,8 @@ func Handler(settings *services.SettingsService) http.Handler {
 			return
 		}
 
+		_ = services.CreateUserCaddyfile(username)
+
 		writeJSON(w, http.StatusOK, response{
 			Status:   "ok",
 			Username: username,

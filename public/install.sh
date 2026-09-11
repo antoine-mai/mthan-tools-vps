@@ -151,6 +151,29 @@ install_caddy() {
   fi
 
   systemctl enable --now caddy
+  configure_caddy_users_dir
+}
+
+configure_caddy_users_dir() {
+  local caddy_conf_dir="/etc/caddy/Caddyfile.d/mthan-users"
+  local caddyfile="/etc/caddy/Caddyfile"
+  local import_line="import /etc/caddy/Caddyfile.d/mthan-users/*"
+
+  echo "Configuring Caddy mthan-users directory: ${caddy_conf_dir}"
+  mkdir -p "${caddy_conf_dir}"
+
+  if [[ ! -f "${caddyfile}" ]]; then
+    mkdir -p "/etc/caddy"
+    echo "${import_line}" > "${caddyfile}"
+  else
+    if ! grep -qF "${import_line}" "${caddyfile}"; then
+      echo -e "\n${import_line}" >> "${caddyfile}"
+    fi
+  fi
+
+  if command -v caddy >/dev/null 2>&1; then
+    caddy reload --config "${caddyfile}" 2>/dev/null || systemctl reload caddy 2>/dev/null || true
+  fi
 }
 
 download_binary() {

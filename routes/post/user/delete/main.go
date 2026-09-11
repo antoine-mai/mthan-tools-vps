@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+
+	"mthan/vps/services"
 )
 
 type request struct {
@@ -41,6 +43,8 @@ func Handler() http.Handler {
 			http.Error(w, "failed to delete user: "+string(output), http.StatusInternalServerError)
 			return
 		}
+
+		_ = services.DeleteUserCaddyfile(username)
 
 		writeJSON(w, http.StatusOK, response{
 			Status: "ok",

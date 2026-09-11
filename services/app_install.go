@@ -58,6 +58,9 @@ func InstallApp(name string) error {
 		cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 		output, err := cmd.CombinedOutput()
 		if err == nil {
+			if name == "caddy" {
+				_ = EnsureCaddyMThanUsers()
+			}
 			return nil
 		}
 		lastOutput = output
