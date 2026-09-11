@@ -18,7 +18,13 @@ type ContainerRecord = {
     ports: string[];
 };
 
-export default function ContainersRoute() {
+export default function ContainersRoute({
+    embedded = false,
+    ownerFilter,
+}: {
+    embedded?: boolean;
+    ownerFilter?: string;
+} = {}) {
     const [containers, setContainers] = useState<ContainerRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -134,33 +140,42 @@ export default function ContainersRoute() {
         }
     };
 
-    return (
-        <DashboardLayout
-            title="Containers"
-            description="View system and isolated rootless Podman containers."
-            wide
-            actions={
-                <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    Refresh
-                </Button>
-            }
-        >
+    const displayedContainers = ownerFilter
+        ? containers.filter((c) => c.owner === ownerFilter)
+        : containers;
+
+    const content = (
+        <div className="space-y-4">
+            {embedded ? (
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-semibold text-foreground">Containers</h3>
+                        <p className="text-xs text-muted-foreground">Podman containers owned by {ownerFilter || "this user"}.</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+                </div>
+            ) : null}
+
             {error ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {error}
                 </div>
             ) : null}
 
-            {!error && !loading && containers.length === 0 ? (
+            {!error && !loading && displayedContainers.length === 0 ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border text-center">
                     <ContainerIcon className="mb-3 h-9 w-9 text-muted-foreground/40" />
                     <p className="text-sm font-medium text-foreground">No containers found</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Podman is available from user terminals.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {ownerFilter ? `No Podman containers found for user "${ownerFilter}".` : "Podman is available from user terminals."}
+                    </p>
                 </div>
             ) : null}
 
-            {containers.length > 0 ? (
+            {displayedContainers.length > 0 ? (
                 <div className="overflow-hidden rounded-md border border-border bg-card">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[1080px] text-left text-xs">
@@ -176,7 +191,7 @@ export default function ContainersRoute() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {containers.map((container) => (
+                                {displayedContainers.map((container) => (
                                     <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30">
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-foreground">{container.name || container.id.slice(0, 12)}</p>
@@ -289,6 +304,26 @@ export default function ContainersRoute() {
                     </div>
                 </div>
             ) : null}
+        </div>
+    );
+
+    if (embedded) {
+        return content;
+    }
+
+    return (
+        <DashboardLayout
+            title="Containers"
+            description="View system and isolated rootless Podman containers."
+            wide
+            actions={
+                <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    Refresh
+                </Button>
+            }
+        >
+            {content}
         </DashboardLayout>
     );
 }
