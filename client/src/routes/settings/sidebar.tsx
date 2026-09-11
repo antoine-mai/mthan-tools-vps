@@ -4,12 +4,8 @@ import { Boxes, Cpu, Settings, User } from "lucide-react";
 export const availableApps = [
     ["caddy", "Caddy"],
     ["nginx", "Nginx"],
-    ["mariadb", "MariaDB"],
-    ["redis", "Redis"],
     ["docker", "Docker"],
     ["podman", "Podman"],
-    ["node", "Node.js"],
-    ["php", "PHP"],
 ] as const;
 
 type SettingsSection = "general" | "users" | "apps";

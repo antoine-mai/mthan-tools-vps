@@ -73,61 +73,12 @@ export default function AppsRoute() {
             version: "1.24.0",
             description: "High-performance HTTP server, reverse proxy, and load balancer.",
             running: true,
-            uptime: "2 days, 14 hours",
+            uptime: "—",
             installed: false,
             manageable: true,
         },
         {
             id: "2",
-            name: "mariadb",
-            displayName: "MariaDB",
-            serviceName: "mariadb.service",
-            version: "10.11.6",
-            port: 3306,
-            description: "Robust, open-source relational database management system.",
-            running: true,
-            uptime: "2 days, 14 hours",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "7",
-            name: "node",
-            displayName: "Node.js",
-            version: "22",
-            description: "System-wide Node.js 22 runtime.",
-            running: false,
-            uptime: "—",
-            installed: false,
-            manageable: false,
-        },
-        {
-            id: "3",
-            name: "php",
-            displayName: "PHP",
-            serviceName: "php-fpm.service",
-            version: "Multiple",
-            description: "PHP FastCGI Process Manager for processing dynamic web scripts.",
-            running: true,
-            uptime: "5 hours, 12 minutes",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "4",
-            name: "redis",
-            displayName: "Redis",
-            serviceName: "redis-server.service",
-            version: "7.0.15",
-            port: 6379,
-            description: "In-memory data structure store used as a database, cache, and message broker.",
-            running: false,
-            uptime: "Stopped",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "5",
             name: "docker",
             displayName: "Docker",
             serviceName: "docker.service",
@@ -139,7 +90,7 @@ export default function AppsRoute() {
             manageable: true,
         },
         {
-            id: "6",
+            id: "3",
             name: "podman",
             displayName: "Podman",
             version: "System",
@@ -369,29 +320,6 @@ export default function AppsRoute() {
                                     </Button>
                                 </div>
                             </div>
-
-                            {selectedApp.name === "php" ? (
-                                <section className="space-y-3">
-                                    <h3 className="text-sm font-semibold text-foreground">PHP configuration</h3>
-                                    <div className="rounded-md border border-border bg-card p-4">
-                                        <p className="text-xs font-medium text-muted-foreground">Installed versions</p>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {selectedApp.versions?.length ? (
-                                                selectedApp.versions.map((version) => (
-                                                    <span
-                                                        key={version}
-                                                        className="rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs text-foreground"
-                                                    >
-                                                        PHP {version}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">No supported PHP version detected.</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </section>
-                            ) : null}
 
                             {selectedApp.name === "docker" || selectedApp.name === "podman" ? (
                                 <ContainerEngineConfiguration

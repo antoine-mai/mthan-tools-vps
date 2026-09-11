@@ -1,12 +1,11 @@
 package services
 
 import (
-	"slices"
 	"testing"
 )
 
-func TestKnownAppsIncludeContainersNodeAndPHP(t *testing.T) {
-	want := []string{"caddy", "docker", "podman", "node", "php"}
+func TestKnownAppsIncludeWebServersAndContainers(t *testing.T) {
+	want := []string{"caddy", "nginx", "docker", "podman"}
 	found := make(map[string]appDefinition, len(knownApps))
 	for _, app := range knownApps {
 		found[app.name] = app
@@ -23,32 +22,6 @@ func TestPodmanIsNotManagedAsRootService(t *testing.T) {
 	for _, app := range knownApps {
 		if app.name == "podman" && len(app.services) != 0 {
 			t.Fatalf("Podman services = %v, want none for per-user rootless isolation", app.services)
-		}
-	}
-}
-
-func TestPHPServicesCoverSupportedLinuxFamilies(t *testing.T) {
-	services := phpServices("8.2")
-	for _, service := range []string{
-		"php8.2-fpm.service",    // Debian and Ubuntu
-		"php82-php-fpm.service", // RHEL-family with Remi packages
-		"php-fpm.service",       // Arch and RHEL-family default packages
-	} {
-		if !slices.Contains(services, service) {
-			t.Errorf("phpServices does not contain %q", service)
-		}
-	}
-}
-
-func TestPHPBinariesCoverVersionedAndRemiLayouts(t *testing.T) {
-	binaries := phpBinaries("8.2")
-	for _, binary := range []string{
-		"php8.2",
-		"/usr/sbin/php-fpm8.2",
-		"/opt/remi/php82/root/usr/sbin/php-fpm",
-	} {
-		if !slices.Contains(binaries, binary) {
-			t.Errorf("phpBinaries does not contain %q", binary)
 		}
 	}
 }

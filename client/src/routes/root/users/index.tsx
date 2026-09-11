@@ -58,12 +58,8 @@ interface UserContextMenu {
 const systemAppNames: Record<string, string> = {
     caddy: "Caddy",
     nginx: "Nginx",
-    mariadb: "MariaDB",
-    php: "PHP",
-    redis: "Redis",
     docker: "Docker",
     podman: "Podman",
-    node: "Node.js",
 };
 
 export default function UsersRoute() {

@@ -75,23 +75,23 @@ function DashboardLayoutContent({
                             {children}
                         </main>
                     ) : (
-                        <main className="flex-1 overflow-y-auto px-6 py-8">
+                        <main className="flex-1 overflow-y-auto px-6 py-4">
                             <div className={`mx-auto w-full ${wide ? "max-w-none" : "max-w-5xl"}`}>
                                 {/* Page Header */}
-                                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="max-w-2xl space-y-2">
-                                        <h2 className="text-3xl font-semibold tracking-tight">
+                                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-bold tracking-tight text-foreground">
                                             {title}
                                         </h2>
                                         {description ? (
-                                            <p className="text-sm leading-6 text-muted-foreground">
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
                                                 {description}
                                             </p>
                                         ) : null}
                                     </div>
 
                                     {actions ? (
-                                        <div className="flex flex-wrap gap-3">{actions}</div>
+                                        <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
                                     ) : null}
                                 </div>
 
