@@ -517,83 +517,58 @@ export default function UsersRoute() {
                 {/* Right Panel - User Details Dashboard */}
                 <main className="bg-background flex flex-col h-full overflow-hidden">
                     {selectedUser ? (
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            {/* Profile Header */}
-                            <div className="flex items-start gap-4 border-b border-border pb-5">
-                                <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-                                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                                        {selectedUser.username}
-                                    </h2>
-                                    <div className="flex max-w-full items-center gap-2 overflow-x-auto">
-                                        <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
-                                        <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
-                                        <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
+                        activeSection === "files" ? (
+                            <div className="flex flex-col h-full overflow-hidden">
+                                {/* Profile Header Bar */}
+                                <div className="flex items-center justify-between border-b border-border px-6 py-3 shrink-0 bg-card/30">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <h2 className="text-lg font-bold tracking-tight text-foreground truncate">
+                                            {selectedUser.username}
+                                        </h2>
+                                        <div className="flex max-w-full items-center gap-2 overflow-x-auto">
+                                            <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
+                                            <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
+                                            <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="ml-auto flex shrink-0 items-center gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className={`h-7 cursor-default gap-1.5 px-2 text-xs ${selectedUser.cpanelEnabled ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
-                                        tabIndex={-1}
-                                    >
-                                        {selectedUser.cpanelEnabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                                        {selectedUser.cpanelEnabled ? "CPanel Enabled" : "CPanel Disabled"}
-                                    </Button>
-                                    {!selectedUser.cpanelEnabled ? (
-                                        <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
-                                            <Key className="h-3.5 w-3.5" />
-                                            Activate
+                                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className={`h-7 cursor-default gap-1.5 px-2 text-xs ${selectedUser.cpanelEnabled ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+                                            tabIndex={-1}
+                                        >
+                                            {selectedUser.cpanelEnabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                                            {selectedUser.cpanelEnabled ? "CPanel Enabled" : "CPanel Disabled"}
                                         </Button>
-                                    ) : null}
-                                {selectedUser.uid !== 0 && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
-                                        onClick={() => handleDeleteUser(selectedUser.username)}
-                                        disabled={isDeleting}
-                                    >
-                                        {isDeleting ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        ) : (
-                                            <Trash2 className="h-3.5 w-3.5" />
+                                        {!selectedUser.cpanelEnabled ? (
+                                            <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
+                                                <Key className="h-3.5 w-3.5" />
+                                                Activate
+                                            </Button>
+                                        ) : null}
+                                        {selectedUser.uid !== 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
+                                                onClick={() => handleDeleteUser(selectedUser.username)}
+                                                disabled={isDeleting}
+                                            >
+                                                {isDeleting ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                )}
+                                                Delete User
+                                            </Button>
                                         )}
-                                        Delete User
-                                    </Button>
-                                )}
-                                </div>
-                            </div>
-
-                            {activeSection === "overview" ? (
-                            <div className="border border-border bg-card">
-                                <div className="border-b border-border px-4 py-3">
-                                    <h3 className="text-sm font-semibold">System Apps</h3>
-                                    <p className="mt-1 text-xs text-muted-foreground">Installation status and detected versions from the system Apps route.</p>
-                                </div>
-                                {systemAppsLoading ? (
-                                    <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-                                ) : systemAppsError ? (
-                                    <p className="p-4 text-xs text-destructive">{systemAppsError}</p>
-                                ) : (
-                                    <div className="divide-y divide-border">
-                                        {systemApps.map((app) => (
-                                            <Link key={app.name} to={`/settings/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
-                                                <Boxes className="h-4 w-4 shrink-0 text-primary" />
-                                                <span className="min-w-0 flex-1 truncate font-medium">{systemAppNames[app.name] || app.name}</span>
-                                                <span className="font-mono text-xs text-muted-foreground">{app.version || app.versions?.join(", ") || "—"}</span>
-                                                <span className={`inline-flex w-28 items-center gap-1.5 text-xs ${app.installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                                                    {app.installed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                                                    {app.installed ? "Installed" : "Not installed"}
-                                                </span>
-                                            </Link>
-                                        ))}
                                     </div>
-                                )}
-                            </div>
-                            ) : activeSection === "files" ? (
-                                <div className="h-[calc(100vh-190px)] min-h-[480px] w-full overflow-hidden rounded-none border border-border bg-card">
+                                </div>
+
+                                {/* File Explorer filling 100% remaining space without page scrollbar */}
+                                <div className="flex-1 min-h-0 w-full overflow-hidden">
                                     <FilesRoute
                                         key={selectedUser.username}
                                         initialPath={selectedUser.home}
@@ -601,38 +576,116 @@ export default function UsersRoute() {
                                         embedded={true}
                                     />
                                 </div>
-                            ) : (
-                                <div className="border border-border bg-card">
-                                    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-                                        <div><h3 className="text-sm font-semibold">User Apps</h3><p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p></div>
-                                        <Button size="sm" className="gap-2" onClick={() => setAddAppOpen(true)}><Plus className="h-4 w-4" />Add App</Button>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {/* Profile Header */}
+                                <div className="flex items-start gap-4 border-b border-border pb-5">
+                                    <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+                                        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                                            {selectedUser.username}
+                                        </h2>
+                                        <div className="flex max-w-full items-center gap-2 overflow-x-auto">
+                                            <UserInfoBox icon={Shield} label="UID" value={String(selectedUser.uid)} />
+                                            <UserInfoBox icon={Home} label="Home" value={selectedUser.home} />
+                                            <UserInfoBox icon={Terminal} label="Shell" value={selectedUser.shell || "/bin/bash"} />
+                                        </div>
                                     </div>
-                                    {appsLoading ? (
+
+                                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className={`h-7 cursor-default gap-1.5 px-2 text-xs ${selectedUser.cpanelEnabled ? "border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+                                            tabIndex={-1}
+                                        >
+                                            {selectedUser.cpanelEnabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                                            {selectedUser.cpanelEnabled ? "CPanel Enabled" : "CPanel Disabled"}
+                                        </Button>
+                                        {!selectedUser.cpanelEnabled ? (
+                                            <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
+                                                <Key className="h-3.5 w-3.5" />
+                                                Activate
+                                            </Button>
+                                        ) : null}
+                                        {selectedUser.uid !== 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
+                                                onClick={() => handleDeleteUser(selectedUser.username)}
+                                                disabled={isDeleting}
+                                            >
+                                                {isDeleting ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                )}
+                                                Delete User
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {activeSection === "overview" ? (
+                                <div className="border border-border bg-card">
+                                    <div className="border-b border-border px-4 py-3">
+                                        <h3 className="text-sm font-semibold">System Apps</h3>
+                                        <p className="mt-1 text-xs text-muted-foreground">Installation status and detected versions from the system Apps route.</p>
+                                    </div>
+                                    {systemAppsLoading ? (
                                         <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-                                    ) : appsError ? (
-                                        <p className="p-4 text-xs text-destructive">{appsError}</p>
-                                    ) : userApps.length === 0 ? (
-                                        <p className="p-4 text-xs text-muted-foreground">No apps found.</p>
+                                    ) : systemAppsError ? (
+                                        <p className="p-4 text-xs text-destructive">{systemAppsError}</p>
                                     ) : (
                                         <div className="divide-y divide-border">
-                                            {userApps.map((app) => (
-                                                <details key={app} className="group">
-                                                    <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
-                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-                                                        <Boxes className="h-4 w-4 shrink-0 text-primary" />
-                                                        <span className="min-w-0 flex-1 truncate font-medium" title={app}>{app}</span>
-                                                    </summary>
-                                                    <div className="border-t border-border bg-muted/20 px-10 py-5">
-                                                        <p className="text-xs font-medium text-foreground">Coming soon</p>
-                                                        <p className="mt-1 text-xs text-muted-foreground">App details and configuration will be available here.</p>
-                                                    </div>
-                                                </details>
+                                            {systemApps.map((app) => (
+                                                <Link key={app.name} to={`/settings/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
+                                                    <Boxes className="h-4 w-4 shrink-0 text-primary" />
+                                                    <span className="min-w-0 flex-1 truncate font-medium">{systemAppNames[app.name] || app.name}</span>
+                                                    <span className="font-mono text-xs text-muted-foreground">{app.version || app.versions?.join(", ") || "—"}</span>
+                                                    <span className={`inline-flex w-28 items-center gap-1.5 text-xs ${app.installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                                                        {app.installed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                                                        {app.installed ? "Installed" : "Not installed"}
+                                                    </span>
+                                                </Link>
                                             ))}
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
+                                ) : (
+                                    <div className="border border-border bg-card">
+                                        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                            <div><h3 className="text-sm font-semibold">User Apps</h3><p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p></div>
+                                            <Button size="sm" className="gap-2" onClick={() => setAddAppOpen(true)}><Plus className="h-4 w-4" />Add App</Button>
+                                        </div>
+                                        {appsLoading ? (
+                                            <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                                        ) : appsError ? (
+                                            <p className="p-4 text-xs text-destructive">{appsError}</p>
+                                        ) : userApps.length === 0 ? (
+                                            <p className="p-4 text-xs text-muted-foreground">No apps found.</p>
+                                        ) : (
+                                            <div className="divide-y divide-border">
+                                                {userApps.map((app) => (
+                                                    <details key={app} className="group">
+                                                        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+                                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                                                            <Boxes className="h-4 w-4 shrink-0 text-primary" />
+                                                            <span className="min-w-0 flex-1 truncate font-medium" title={app}>{app}</span>
+                                                        </summary>
+                                                        <div className="border-t border-border bg-muted/20 px-10 py-5">
+                                                            <p className="text-xs font-medium text-foreground">Coming soon</p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">App details and configuration will be available here.</p>
+                                                        </div>
+                                                    </details>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )
                     ) : (
                         /* Empty state */
                         <div className="flex-grow flex flex-col items-center justify-center p-8 text-muted-foreground">
