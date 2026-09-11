@@ -22,6 +22,7 @@ import {
     XCircle,
     GitBranch,
     Upload,
+    Globe,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -29,6 +30,7 @@ import { Button } from "_layouts/_components/ui/button";
 import { useApp } from "_contexts/app";
 import { useTerminal } from "_contexts/terminal";
 import FilesRoute from "../../files";
+import VHostsRoute from "../../vhosts";
 
 interface LinuxUser {
     cpanelEnabled: boolean;
@@ -157,7 +159,7 @@ export default function UsersRoute() {
         event.preventDefault();
         event.stopPropagation();
         const menuWidth = 210;
-        const menuHeight = user.uid === 0 ? 190 : user.cpanelEnabled ? 226 : 258;
+        const menuHeight = user.uid === 0 ? 222 : user.cpanelEnabled ? 258 : 290;
         setSelectedUser(user);
         setContextMenu({
             user,
@@ -497,6 +499,7 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
                                             <UserSubItem username={u.username} section="apps" active={activeSection === "apps"} icon={Boxes} label="Apps" />
+                                            <UserSubItem username={u.username} section="vhosts" active={activeSection === "vhosts"} icon={Globe} label="VHosts" />
                                             <button
                                                 type="button"
                                                 onClick={() => openUserTerminal(u.username)}
@@ -653,7 +656,7 @@ export default function UsersRoute() {
                                         </div>
                                     )}
                                 </div>
-                                ) : (
+                                ) : activeSection === "apps" ? (
                                     <div className="border border-border bg-card">
                                         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                                             <div><h3 className="text-sm font-semibold">User Apps</h3><p className="mt-1 font-mono text-[11px] text-muted-foreground">{selectedUser.home}/htdocs</p></div>
@@ -683,7 +686,11 @@ export default function UsersRoute() {
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                ) : activeSection === "vhosts" ? (
+                                    <div className="space-y-4">
+                                        <VHostsRoute embedded={true} key={selectedUser.username} />
+                                    </div>
+                                ) : null}
                             </div>
                         )
                     ) : (
@@ -718,6 +725,9 @@ export default function UsersRoute() {
                     </button>
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("apps")} role="menuitem">
                         <Boxes className="h-3.5 w-3.5 text-muted-foreground" />Apps
+                    </button>
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("vhosts")} role="menuitem">
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />VHosts
                     </button>
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={openTerminalFromContextMenu} role="menuitem">
                         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />Open terminal
@@ -963,10 +973,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "apps";
+type UserSection = "overview" | "files" | "apps" | "vhosts";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "apps" ? section : "overview";
+    return section === "files" || section === "apps" || section === "vhosts" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {
