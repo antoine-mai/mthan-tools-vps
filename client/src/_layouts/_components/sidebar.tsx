@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
-    Server,
     Terminal,
     Folder,
     LogOut,
@@ -44,9 +43,17 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
         <aside className={`flex h-screen w-[60px] flex-col border-r border-border bg-card text-card-foreground z-30 ${className}`}>
             {/* Logo area */}
             <div className="flex h-14 items-center justify-center border-b border-border">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-primary/10 text-primary">
-                    <Server className="h-5 w-5" />
-                </div>
+                <Link
+                    to="/"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background p-1.5 transition-transform hover:scale-105"
+                    title="MThan VPS"
+                >
+                    <img
+                        src={`${runtime.basePath}/logo.svg`}
+                        alt="MThan VPS Logo"
+                        className="h-full w-full object-contain"
+                    />
+                </Link>
             </div>
 
             {/* Navigation links */}

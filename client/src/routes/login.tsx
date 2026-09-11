@@ -3,8 +3,6 @@ import {
     ArrowRight,
     Loader2,
     LockKeyhole,
-    Server,
-    ShieldAlert,
     ShieldCheck,
     User,
 } from "lucide-react";
@@ -125,10 +123,11 @@ function UserLoginLayout(props: LoginLayoutProps) {
                 <aside className="flex min-h-64 flex-col justify-between border-b border-border bg-muted/40 p-6 md:border-b-0 md:border-r">
                         <div className="space-y-6">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background">
-                                    <Server
-                                        className="h-5 w-5"
-                                        aria-hidden="true"
+                                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background p-1.5">
+                                    <img
+                                        src={`${runtime.basePath}/logo.svg`}
+                                        alt="MThan VPS"
+                                        className="h-full w-full object-contain"
                                     />
                                 </div>
                                 <div>
@@ -193,8 +192,12 @@ function RootLoginLayout(props: LoginLayoutProps) {
                 <div className="border-b border-red-500/20 bg-red-950/30 px-7 py-6">
                     <div className="mb-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500/15 text-red-400">
-                                <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-red-500/30 bg-red-500/15 p-1.5">
+                                <img
+                                    src={`${runtime.basePath}/logo.svg`}
+                                    alt="MThan VPS"
+                                    className="h-full w-full object-contain"
+                                />
                             </div>
                             <div>
                                 <p className="font-semibold">MThan VPS</p>
