@@ -80,12 +80,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 
 func authenticatedSystemHandler(sessions *services.SessionService, system *services.SystemService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(services.SessionCookieName)
-		if err != nil {
-			http.Error(w, "session invalid", http.StatusUnauthorized)
-			return
-		}
-		if _, ok := sessions.Get(cookie.Value); !ok {
+		if _, ok := sessions.GetRootSession(r); !ok {
 			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return
 		}
@@ -116,13 +111,7 @@ func rootSessionOnly(sessions *services.SessionService, next http.Handler) http.
 			return
 		}
 
-		cookie, err := r.Cookie(services.SessionCookieName)
-		if err != nil {
-			http.Error(w, "root session required", http.StatusUnauthorized)
-			return
-		}
-		session, ok := sessions.Get(cookie.Value)
-		if !ok || session.Mode != "root" || session.UID != 0 {
+		if _, ok := sessions.GetRootSession(r); !ok {
 			http.Error(w, "root session required", http.StatusForbidden)
 			return
 		}

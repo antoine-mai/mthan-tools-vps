@@ -5,13 +5,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 )
 
-const SessionCookieName = "vps_session"
+const (
+	RootSessionCookieName = "vps_root_session"
+	UserSessionCookieName = "vps_user_session"
+	SessionCookieName     = "vps_session"
+)
 
 var ErrInvalidSessionMode = errors.New("invalid session mode")
 
@@ -94,6 +99,34 @@ func (s *SessionService) Get(token string) (Session, bool) {
 
 func (s *SessionService) MaxAge() int {
 	return int(s.ttl.Seconds())
+}
+
+func (s *SessionService) GetRootSession(r *http.Request) (Session, bool) {
+	if cookie, err := r.Cookie(RootSessionCookieName); err == nil {
+		if session, ok := s.Get(cookie.Value); ok && session.Mode == "root" && session.UID == 0 {
+			return session, true
+		}
+	}
+	if cookie, err := r.Cookie(SessionCookieName); err == nil {
+		if session, ok := s.Get(cookie.Value); ok && session.Mode == "root" && session.UID == 0 {
+			return session, true
+		}
+	}
+	return Session{}, false
+}
+
+func (s *SessionService) GetUserSession(r *http.Request) (Session, bool) {
+	if cookie, err := r.Cookie(UserSessionCookieName); err == nil {
+		if session, ok := s.Get(cookie.Value); ok && session.Mode == "user" {
+			return session, true
+		}
+	}
+	if cookie, err := r.Cookie(SessionCookieName); err == nil {
+		if session, ok := s.Get(cookie.Value); ok && session.Mode == "user" {
+			return session, true
+		}
+	}
+	return Session{}, false
 }
 
 func sessionToken() (string, error) {

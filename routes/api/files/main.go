@@ -11,13 +11,7 @@ import (
 
 func Handler(sessions *services.SessionService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(services.SessionCookieName)
-		if err != nil {
-			http.Error(w, "session invalid", http.StatusUnauthorized)
-			return
-		}
-
-		session, ok := sessions.Get(cookie.Value)
+		session, ok := sessions.GetUserSession(r)
 		if !ok {
 			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return

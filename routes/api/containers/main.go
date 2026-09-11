@@ -93,11 +93,7 @@ func UserLogsHandler(sessions *services.SessionService, containers *services.Con
 }
 
 func requestSession(r *http.Request, sessions *services.SessionService) (services.Session, bool) {
-	cookie, err := r.Cookie(services.SessionCookieName)
-	if err != nil {
-		return services.Session{}, false
-	}
-	return sessions.Get(cookie.Value)
+	return sessions.GetUserSession(r)
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

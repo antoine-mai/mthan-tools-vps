@@ -79,11 +79,9 @@ func clientHandler(runtime ClientRuntime, sessions *services.SessionService, emb
 		if !runtime.IsRoot {
 			requestRuntime.UID = -1
 			requestRuntime.Username = ""
-			if cookie, err := r.Cookie(services.SessionCookieName); err == nil {
-				if session, ok := sessions.Get(cookie.Value); ok && session.Mode == "user" {
-					requestRuntime.UID = session.UID
-					requestRuntime.Username = session.Username
-				}
+			if session, ok := sessions.GetUserSession(r); ok {
+				requestRuntime.UID = session.UID
+				requestRuntime.Username = session.Username
 			}
 		}
 

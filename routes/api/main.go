@@ -120,12 +120,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 }
 
 func requestSession(r *http.Request, sessions *services.SessionService) (services.Session, bool) {
-	cookie, err := r.Cookie(services.SessionCookieName)
-	if err != nil {
-		return services.Session{}, false
-	}
-
-	return sessions.Get(cookie.Value)
+	return sessions.GetUserSession(r)
 }
 
 var (
@@ -204,7 +199,7 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, sessions *services
 	http.SetCookie(w, &http.Cookie{
 		HttpOnly: true,
 		MaxAge:   sessions.MaxAge(),
-		Name:     services.SessionCookieName,
+		Name:     services.UserSessionCookieName,
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil,

@@ -24,13 +24,13 @@ type wsMessage struct {
 func Handler(sessions *services.SessionService, startup services.StartupConfig, rootAccess bool) http.Handler {
 	return websocket.Handler(func(ws *websocket.Conn) {
 		req := ws.Request()
-		cookie, err := req.Cookie(services.SessionCookieName)
-		if err != nil {
-			_ = ws.Close()
-			return
+		var session services.Session
+		var exists bool
+		if rootAccess {
+			session, exists = sessions.GetRootSession(req)
+		} else {
+			session, exists = sessions.GetUserSession(req)
 		}
-
-		session, exists := sessions.Get(cookie.Value)
 		if !exists {
 			_ = ws.Close()
 			return
@@ -38,10 +38,6 @@ func Handler(sessions *services.SessionService, startup services.StartupConfig, 
 
 		var cmd *exec.Cmd
 		if rootAccess {
-			if session.Mode != "root" || session.UID != 0 {
-				_ = ws.Close()
-				return
-			}
 			targetUsername := req.URL.Query().Get("user")
 			if targetUsername != "" {
 				target, err := user.Lookup(targetUsername)
@@ -54,7 +50,7 @@ func Handler(sessions *services.SessionService, startup services.StartupConfig, 
 				cmd = loginShell()
 			}
 		} else {
-			if session.Mode != "user" || session.UID == 0 || req.URL.Query().Get("user") != "" {
+			if req.URL.Query().Get("user") != "" {
 				_ = ws.Close()
 				return
 			}

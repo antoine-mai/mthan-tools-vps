@@ -98,10 +98,6 @@ func LogsHandler(sessions *services.SessionService, containers *services.Contain
 }
 
 func validSession(r *http.Request, sessions *services.SessionService) bool {
-	cookie, err := r.Cookie(services.SessionCookieName)
-	if err != nil {
-		return false
-	}
-	_, ok := sessions.Get(cookie.Value)
+	_, ok := sessions.GetRootSession(r)
 	return ok
 }

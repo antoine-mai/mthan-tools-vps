@@ -51,7 +51,8 @@ func Handler(auth *services.AuthService, sessions *services.SessionService) http
 func setSessionCookie(w http.ResponseWriter, r *http.Request, sessions *services.SessionService, session services.Session) {
 	http.SetCookie(w, &http.Cookie{
 		HttpOnly: true,
-		Name:     services.SessionCookieName,
+		MaxAge:   sessions.MaxAge(),
+		Name:     services.RootSessionCookieName,
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil,
