@@ -41,7 +41,17 @@ interface ExplorerContextMenu {
 
 const apiEndpoint = runtime.isRoot ? "/post/files" : "/api/files";
 
-export default function FilesRoute() {
+export type FilesRouteProps = {
+    initialPath?: string;
+    rootLabel?: string;
+    embedded?: boolean;
+};
+
+export default function FilesRoute({
+    initialPath,
+    rootLabel,
+    embedded = false,
+}: FilesRouteProps = {}) {
     const [homePath, setHomePath] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -61,12 +71,12 @@ export default function FilesRoute() {
     const [copiedPath, setCopiedPath] = useState(false);
 
     // Initialize root / home directory
-    const initExplorer = async () => {
+    const initExplorer = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const initialPath = new URLSearchParams(window.location.search).get("path") ?? "";
-            const response = await fetch(`${apiEndpoint}?path=${encodeURIComponent(initialPath)}`);
+            const startPath = initialPath || new URLSearchParams(window.location.search).get("path") || "";
+            const response = await fetch(`${apiEndpoint}?path=${encodeURIComponent(startPath)}`);
             if (!response.ok) {
                 const text = await response.text();
                 throw new Error(text || "Failed to initialize root path");
@@ -76,14 +86,15 @@ export default function FilesRoute() {
 
             // Fetch and set items for the root folder
             const items = await fetchFolderContents(data.currentPath);
-            setExpanded((prev) => ({ ...prev, [data.currentPath]: items }));
-            setOpenPaths((prev) => ({ ...prev, [data.currentPath]: true }));
+            setExpanded({ [data.currentPath]: items });
+            setOpenPaths({ [data.currentPath]: true });
+            setSelectedFile(null);
         } catch (err: any) {
             setError(err.message || "Could not load file system.");
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [initialPath]);
 
     // Load folder contents (directories & files)
     const fetchFolderContents = async (path: string): Promise<FileItem[]> => {
@@ -239,68 +250,65 @@ export default function FilesRoute() {
         } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete item"); }
     };
 
-    return (
-        <DashboardLayout
-            title="Files"
-            description="Manage and edit configuration files exactly like VSCode."
-            fullWidth={true}
-        >
-            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background">
-                {/* 1. Left Explorer Sidebar (VSCode Explorer Style) */}
-                <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
-                    <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
-                        <span className="text-xs font-semibold text-muted-foreground">
-                            Explorer
-                        </span>
-                        <button
-                            onClick={initExplorer}
-                            className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                            title="Refresh Explorer"
-                            disabled={isLoading}
-                        >
-                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                        </button>
-                    </div>
+    const displayRootName = rootLabel || (homePath ? (runtime.isRoot && !initialPath ? "/" : (initialPath ? rootLabel || initialPath.split("/").filter(Boolean).pop() || initialPath : runtime.username)) : (runtime.isRoot ? "/" : runtime.username));
 
-                    <div className="flex-1 overflow-y-auto py-2 px-2">
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : error ? (
-                            <div className="text-xs text-destructive p-3 text-center">
-                                <AlertCircle className="h-5 w-5 mx-auto mb-2 text-destructive" />
-                                <span>{error}</span>
-                            </div>
-                        ) : homePath ? (
-                            <DirectoryTreeNode
-                                path={homePath}
-                                name={runtime.isRoot ? "/" : runtime.username}
-                                isDir={true}
-                                depth={0}
-                                selectedPath={selectedFile?.path || ""}
-                                onSelect={handleSelectNode}
-                                expanded={expanded}
-                                openPaths={openPaths}
-                                onToggle={handleToggleExpand}
-                                onContextMenu={openContextMenu}
-                            />
-                        ) : null}
-                    </div>
-                </aside>
+    const content = (
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background relative">
+            {/* 1. Left Explorer Sidebar (VSCode Explorer Style) */}
+            <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
+                <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
+                    <span className="text-xs font-semibold text-muted-foreground truncate" title={rootLabel || "Explorer"}>
+                        {rootLabel ? `${rootLabel} / Files` : "Explorer"}
+                    </span>
+                    <button
+                        onClick={initExplorer}
+                        className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        title="Refresh Explorer"
+                        disabled={isLoading}
+                    >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                    </button>
+                </div>
 
-                {/* 2. Right Editor Pane (VSCode Tab/Editor Style) */}
-                <FileEditor
-                    fileName={selectedFile?.name || ""}
-                    filePath={selectedFile?.path || ""}
-                    fileSize={fileSize}
-                    content={fileContent}
-                    isBinary={isBinary}
-                    isLoading={isContentLoading}
-                    error={contentError}
-                    onClose={() => setSelectedFile(null)}
-                />
-            </div>
+                <div className="flex-1 overflow-y-auto py-2 px-2">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : error ? (
+                        <div className="text-xs text-destructive p-3 text-center">
+                            <AlertCircle className="h-5 w-5 mx-auto mb-2 text-destructive" />
+                            <span>{error}</span>
+                        </div>
+                    ) : homePath ? (
+                        <DirectoryTreeNode
+                            path={homePath}
+                            name={displayRootName}
+                            isDir={true}
+                            depth={0}
+                            selectedPath={selectedFile?.path || ""}
+                            onSelect={handleSelectNode}
+                            expanded={expanded}
+                            openPaths={openPaths}
+                            onToggle={handleToggleExpand}
+                            onContextMenu={openContextMenu}
+                        />
+                    ) : null}
+                </div>
+            </aside>
+
+            {/* 2. Right Editor Pane (VSCode Tab/Editor Style) */}
+            <FileEditor
+                fileName={selectedFile?.name || ""}
+                filePath={selectedFile?.path || ""}
+                fileSize={fileSize}
+                content={fileContent}
+                isBinary={isBinary}
+                isLoading={isContentLoading}
+                error={contentError}
+                onClose={() => setSelectedFile(null)}
+            />
+
             {contextMenu ? (
                 <div
                     className="fixed z-[70] w-[190px] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
@@ -336,6 +344,20 @@ export default function FilesRoute() {
                     </button> : null}
                 </div>
             ) : null}
+        </div>
+    );
+
+    if (embedded) {
+        return content;
+    }
+
+    return (
+        <DashboardLayout
+            title="Files"
+            description="Manage and edit configuration files exactly like VSCode."
+            fullWidth={true}
+        >
+            {content}
         </DashboardLayout>
     );
 }

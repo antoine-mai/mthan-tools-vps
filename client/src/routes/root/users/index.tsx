@@ -28,6 +28,7 @@ import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import { useApp } from "_contexts/app";
 import { useTerminal } from "_contexts/terminal";
+import FilesRoute from "../../files";
 
 interface LinuxUser {
     cpanelEnabled: boolean;
@@ -592,12 +593,13 @@ export default function UsersRoute() {
                                 )}
                             </div>
                             ) : activeSection === "files" ? (
-                                <div className="rounded-md border border-border bg-card p-5">
-                                    <h3 className="text-sm font-semibold">User Files</h3>
-                                    <p className="mt-2 font-mono text-xs text-muted-foreground">{selectedUser.home}</p>
-                                    <Button variant="outline" size="sm" asChild className="mt-4">
-                                        <Link to={`/files?path=${encodeURIComponent(selectedUser.home)}`}>Open File Explorer</Link>
-                                    </Button>
+                                <div className="h-[calc(100vh-190px)] min-h-[480px] w-full overflow-hidden rounded-none border border-border bg-card">
+                                    <FilesRoute
+                                        key={selectedUser.username}
+                                        initialPath={selectedUser.home}
+                                        rootLabel={selectedUser.username}
+                                        embedded={true}
+                                    />
                                 </div>
                             ) : (
                                 <div className="border border-border bg-card">
