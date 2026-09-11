@@ -350,7 +350,7 @@ func serverForPort(output string, port int) (string, bool) {
 		}
 		lower := strings.ToLower(line)
 		for _, candidate := range []struct{ process, server string }{
-			{"caddy", "caddy"}, {"nginx", "nginx"}, {"apache2", "apache"}, {"httpd", "apache"},
+			{"caddy", "caddy"}, {"apache2", "apache"}, {"httpd", "apache"},
 		} {
 			if strings.Contains(lower, `"`+candidate.process+`"`) {
 				return candidate.server, true
@@ -359,108 +359,6 @@ func serverForPort(output string, port int) (string, bool) {
 		return "unknown", true
 	}
 	return "unknown", false
-}
-
-var nginxFilePattern = regexp.MustCompile(`(?m)^# configuration file ([^:]+):`)
-
-func parseNginxVHosts(output string) []VHost {
-	var result []VHost
-	for _, block := range nginxServerBlocks(output) {
-		body := output[block[1]:block[2]]
-		names := directiveValues(body, "server_name")
-		if len(names) == 0 {
-			continue
-		}
-		listen := directiveLines(body, "listen")
-		file := lastNginxFile(output[:block[0]])
-		validNames := make([]string, 0, len(names))
-		for _, hostname := range names {
-			if hostname != "_" && !strings.HasPrefix(hostname, "~") {
-				validNames = append(validNames, hostname)
-			}
-		}
-		if len(validNames) > 0 {
-			result = append(result, VHost{
-				Hostname: validNames[0], Aliases: validNames[1:], Server: "nginx", Listen: listen,
-				TLS: listensTLS(listen), Upstreams: directiveValues(body, "proxy_pass"),
-				Roots: directiveValues(body, "root"), ConfigFiles: nonEmptySlice(file),
-			})
-		}
-	}
-	return result
-}
-
-func nginxServerBlocks(output string) [][3]int {
-	startPattern := regexp.MustCompile(`\bserver\s*\{`)
-	var blocks [][3]int
-	for offset := 0; offset < len(output); {
-		location := startPattern.FindStringIndex(output[offset:])
-		if location == nil {
-			break
-		}
-		start := offset + location[0]
-		bodyStart := offset + location[1]
-		depth := 1
-		quote := byte(0)
-		escaped := false
-		end := bodyStart
-		for ; end < len(output) && depth > 0; end++ {
-			char := output[end]
-			if escaped {
-				escaped = false
-				continue
-			}
-			if quote != 0 {
-				if char == '\\' {
-					escaped = true
-				} else if char == quote {
-					quote = 0
-				}
-				continue
-			}
-			if char == '\'' || char == '"' {
-				quote = char
-				continue
-			}
-			switch char {
-			case '{':
-				depth++
-			case '}':
-				depth--
-			}
-		}
-		if depth == 0 {
-			blocks = append(blocks, [3]int{start, bodyStart, end - 1})
-		}
-		offset = end
-	}
-	return blocks
-}
-
-func directiveValues(body, name string) []string {
-	re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(name) + `\s+([^;]+);`)
-	var values []string
-	for _, match := range re.FindAllStringSubmatch(body, -1) {
-		values = append(values, strings.Fields(strings.TrimSpace(match[1]))...)
-	}
-	return uniqueStrings(values)
-}
-
-func directiveLines(body, name string) []string {
-	re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(name) + `\s+([^;]+);`)
-	var values []string
-	for _, match := range re.FindAllStringSubmatch(body, -1) {
-		values = append(values, strings.TrimSpace(match[1]))
-	}
-	return uniqueStrings(values)
-}
-
-func lastNginxFile(prefix string) string {
-	matches := nginxFilePattern.FindAllStringSubmatch(prefix, -1)
-	if len(matches) == 0 {
-		return ""
-	}
-	return strings.TrimSpace(matches[len(matches)-1][1])
 }
 
 var apacheHostPattern = regexp.MustCompile(`(?m)port\s+(\d+)\s+namevhost\s+(\S+)\s+\((.+):\d+\)`)

@@ -3,8 +3,6 @@ import { Boxes, Cpu, Settings, User } from "lucide-react";
 
 export const availableApps = [
     ["caddy", "Caddy"],
-    ["nginx", "Nginx"],
-    ["docker", "Docker"],
     ["podman", "Podman"],
 ] as const;
 

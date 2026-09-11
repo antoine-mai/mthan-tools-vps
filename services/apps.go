@@ -26,8 +26,6 @@ type appDefinition struct {
 
 var knownApps = []appDefinition{
 	{name: "caddy", binaries: []string{"caddy", "/usr/bin/caddy", "/usr/local/bin/caddy"}, services: []string{"caddy.service"}, versionArgs: []string{"version"}},
-	{name: "nginx", binaries: []string{"nginx"}, services: []string{"nginx.service"}, versionArgs: []string{"-v"}},
-	{name: "docker", binaries: []string{"docker", "/usr/bin/docker", "/usr/local/bin/docker"}, services: []string{"docker.service"}, versionArgs: []string{"--version"}},
 	{name: "podman", binaries: []string{"podman", "/usr/bin/podman", "/usr/local/bin/podman"}, versionArgs: []string{"--version"}},
 }
 

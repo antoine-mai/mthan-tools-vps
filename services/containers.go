@@ -62,7 +62,7 @@ func NewContainerService() *ContainerService {
 }
 
 func (s *ContainerService) ListAll() []Container {
-	result := s.listDocker()
+	result := s.listRootPodman()
 	users, _ := HomeUsers()
 
 	var mu sync.Mutex
@@ -204,16 +204,25 @@ func containerDockerfilePathFromInspect(output []byte, engine, owner string) (st
 	labels, _ := config["Labels"].(map[string]any)
 	path := strings.TrimSpace(fmt.Sprint(labels["mthan.dockerfile"]))
 	if path == "" || path == "<nil>" {
+		path = strings.TrimSpace(fmt.Sprint(labels["mthan.containerfile"]))
+	}
+	if path == "" || path == "<nil>" {
 		workingDirectory := strings.TrimSpace(fmt.Sprint(labels["com.docker.compose.project.working_dir"]))
 		if workingDirectory != "" && workingDirectory != "<nil>" {
 			path = filepath.Join(workingDirectory, "Dockerfile")
+			if _, err := os.Stat(path); err != nil {
+				containerfilePath := filepath.Join(workingDirectory, "Containerfile")
+				if _, err := os.Stat(containerfilePath); err == nil {
+					path = containerfilePath
+				}
+			}
 		}
 	}
 	path = filepath.Clean(path)
 	if path == "." || !filepath.IsAbs(path) {
 		return "", ErrContainerDockerfileMissing
 	}
-	if engine == "podman" {
+	if owner != "root" && owner != "system" {
 		linuxUser, exists, lookupErr := HomeUser(owner)
 		if lookupErr != nil || !exists || !pathWithin(path, linuxUser.Home) {
 			return "", ErrContainerDockerfileDenied
@@ -279,25 +288,21 @@ func pathWithin(path, root string) bool {
 }
 
 func (s *ContainerService) runForOwner(engine, owner string, args ...string) ([]byte, error) {
-	switch engine {
-	case "docker":
-		if owner != "root" && owner != "system" {
-			return nil, errors.New("invalid Docker owner")
-		}
-		return s.runner.Run("docker", args...)
-	case "podman":
-		linuxUser, exists, err := HomeUser(owner)
-		if err != nil || !exists || linuxUser.UID < 0 {
-			return nil, errors.New("invalid Podman owner")
-		}
-		command := []string{
-			"--user", linuxUser.Username, "--", "env", "HOME=" + linuxUser.Home,
-			fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%d", linuxUser.UID), "podman",
-		}
-		return s.runner.Run("runuser", append(command, args...)...)
-	default:
+	if engine != "" && engine != "podman" {
 		return nil, errors.New("invalid container engine")
 	}
+	if owner == "root" || owner == "system" {
+		return s.runner.Run("podman", args...)
+	}
+	linuxUser, exists, err := HomeUser(owner)
+	if err != nil || !exists || linuxUser.UID < 0 {
+		return nil, errors.New("invalid Podman owner")
+	}
+	command := []string{
+		"--user", linuxUser.Username, "--", "env", "HOME=" + linuxUser.Home,
+		fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%d", linuxUser.UID), "podman",
+	}
+	return s.runner.Run("runuser", append(command, args...)...)
 }
 
 func containerActionArgs(id, action string) ([]string, error) {
@@ -315,12 +320,12 @@ func isCurrentUser(username string) bool {
 	return err == nil && current.Username == username
 }
 
-func (s *ContainerService) listDocker() []Container {
-	output, err := s.runner.Run("docker", "ps", "-a", "--format", "{{json .}}")
+func (s *ContainerService) listRootPodman() []Container {
+	output, err := s.runner.Run("podman", "ps", "-a", "--format", "json")
 	if err != nil {
 		return nil
 	}
-	return parseDockerContainers(output)
+	return parsePodmanContainers(output, "root")
 }
 
 func (s *ContainerService) listRootlessPodman(linuxUser LinuxUser) []Container {
@@ -333,26 +338,6 @@ func (s *ContainerService) listRootlessPodman(linuxUser LinuxUser) []Container {
 		return nil
 	}
 	return parsePodmanContainers(output, linuxUser.Username)
-}
-
-func parseDockerContainers(output []byte) []Container {
-	var result []Container
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		var item map[string]any
-		if json.Unmarshal([]byte(line), &item) != nil {
-			continue
-		}
-		result = append(result, Container{
-			ID: textField(item, "ID"), Name: textField(item, "Names"), Image: textField(item, "Image"),
-			Command: textField(item, "Command"), Engine: "docker", Owner: "root",
-			State: textField(item, "State"), Status: textField(item, "Status"),
-			CreatedAt: textField(item, "CreatedAt"), Ports: splitDockerPorts(textField(item, "Ports")),
-		})
-	}
-	return result
 }
 
 func parsePodmanContainers(output []byte, owner string) []Container {
@@ -415,17 +400,6 @@ func joinedField(value any) string {
 	default:
 		return ""
 	}
-}
-
-func splitDockerPorts(value string) []string {
-	if strings.TrimSpace(value) == "" {
-		return []string{}
-	}
-	parts := strings.Split(value, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-	}
-	return parts
 }
 
 func podmanPorts(value any) []string {

@@ -5,7 +5,7 @@ import (
 )
 
 func TestKnownAppsIncludeWebServersAndContainers(t *testing.T) {
-	want := []string{"caddy", "nginx", "docker", "podman"}
+	want := []string{"caddy", "podman"}
 	found := make(map[string]appDefinition, len(knownApps))
 	for _, app := range knownApps {
 		found[app.name] = app
@@ -31,8 +31,7 @@ func TestSemanticVersionPattern(t *testing.T) {
 		output string
 		want   string
 	}{
-		{output: "nginx version: nginx/1.24.0", want: "1.24.0"},
-		{output: "Docker version 27.3.1, build ce12230", want: "27.3.1"},
+		{output: "v2.8.4", want: "2.8.4"},
 		{output: "v22.14.0", want: "22.14.0"},
 	} {
 		if got := semanticVersionPattern.FindString(test.output); got != test.want {

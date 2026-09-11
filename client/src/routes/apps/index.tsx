@@ -67,34 +67,10 @@ export default function AppsRoute() {
         },
         {
             id: "1",
-            name: "nginx",
-            displayName: "Nginx",
-            serviceName: "nginx.service",
-            version: "1.24.0",
-            description: "High-performance HTTP server, reverse proxy, and load balancer.",
-            running: true,
-            uptime: "—",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "2",
-            name: "docker",
-            displayName: "Docker",
-            serviceName: "docker.service",
-            version: "System",
-            description: "Container engine and runtime.",
-            running: false,
-            uptime: "Stopped",
-            installed: false,
-            manageable: true,
-        },
-        {
-            id: "3",
             name: "podman",
             displayName: "Podman",
             version: "System",
-            description: "Daemonless container engine.",
+            description: "Daemonless container engine for rootless containers.",
             running: false,
             uptime: "Stopped",
             installed: false,
@@ -321,7 +297,7 @@ export default function AppsRoute() {
                                 </div>
                             </div>
 
-                            {selectedApp.name === "docker" || selectedApp.name === "podman" ? (
+                            {selectedApp.name === "podman" ? (
                                 <ContainerEngineConfiguration
                                     app={selectedApp}
                                     canEdit={isRoot}
@@ -370,7 +346,7 @@ export default function AppsRoute() {
     );
 }
 
-type ContainerEngineName = "docker" | "podman";
+type ContainerEngineName = "podman";
 
 type ConfigurationItem = {
     label: string;
@@ -388,43 +364,6 @@ const containerEngineDetails: Record<
         commands: Array<{ label: string; command: string }>;
     }
 > = {
-    docker: {
-        summary: "Docker uses a system daemon to manage containers, images, networks, and volumes.",
-        items: [
-            {
-                label: "Daemon configuration",
-                value: "/etc/docker/daemon.json",
-                icon: FileCode2,
-                description: "System-wide daemon options such as log drivers, registry mirrors, and address pools.",
-                editablePath: "/etc/docker/daemon.json",
-            },
-            {
-                label: "Engine data",
-                value: "/var/lib/docker",
-                icon: HardDrive,
-                description: "Default storage location for images, writable layers, volumes, and engine metadata.",
-            },
-            {
-                label: "API socket",
-                value: "/var/run/docker.sock",
-                icon: Network,
-                description: "Local Unix socket used by the Docker CLI and API clients.",
-            },
-            {
-                label: "Client configuration",
-                value: "~/.docker/config.json",
-                icon: Settings2,
-                description: "Per-user CLI preferences, credential helpers, and registry authentication settings.",
-            },
-        ],
-        commands: [
-            { label: "Engine information", command: "docker info" },
-            { label: "Running containers", command: "docker ps" },
-            { label: "All containers", command: "docker ps -a" },
-            { label: "Disk usage", command: "docker system df" },
-            { label: "Compose projects", command: "docker compose ls" },
-        ],
-    },
     podman: {
         summary: "These system-wide defaults apply to Podman installations. Individual rootless users can override them in ~/.config/containers/.",
         items: [

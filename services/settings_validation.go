@@ -29,7 +29,7 @@ func ValidSetting(key, value string) bool {
 		if json.Unmarshal([]byte(value), &apps) != nil || len(apps) > 4 {
 			return false
 		}
-		allowed := map[string]bool{"caddy": true, "nginx": true, "docker": true, "podman": true}
+		allowed := map[string]bool{"caddy": true, "podman": true}
 		seen := make(map[string]bool)
 		for _, app := range apps {
 			if !allowed[app] || seen[app] {

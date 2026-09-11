@@ -32,9 +32,6 @@ func NewAppConfigService() *AppConfigService {
 		"caddy": {
 			"/etc/caddy/Caddyfile": true,
 		},
-		"docker": {
-			"/etc/docker/daemon.json": true,
-		},
 		"podman": {
 			"/etc/containers/containers.conf": true,
 			"/etc/containers/registries.conf": true,

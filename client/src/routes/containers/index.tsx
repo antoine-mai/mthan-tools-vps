@@ -10,7 +10,7 @@ type ContainerRecord = {
     name: string;
     image: string;
     command?: string;
-    engine: "docker" | "podman";
+    engine: "podman" | string;
     owner: string;
     state: string;
     status: string;
@@ -137,7 +137,7 @@ export default function ContainersRoute() {
     return (
         <DashboardLayout
             title="Containers"
-            description="View Docker system containers and isolated rootless Podman containers."
+            description="View system and isolated rootless Podman containers."
             wide
             actions={
                 <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
@@ -156,7 +156,7 @@ export default function ContainersRoute() {
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border text-center">
                     <ContainerIcon className="mb-3 h-9 w-9 text-muted-foreground/40" />
                     <p className="text-sm font-medium text-foreground">No containers found</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Docker and Podman are available from their respective user terminals.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Podman is available from user terminals.</p>
                 </div>
             ) : null}
 
@@ -266,7 +266,7 @@ export default function ContainersRoute() {
                         {dockerfileError ? (
                             <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-3 text-xs text-destructive">
                                 {dockerfileError.trim()}
-                                {!dockerfilePath ? <span className="mt-1 block text-muted-foreground">Add the label mthan.dockerfile=/absolute/path/Dockerfile when creating the container, or use Docker Compose from a directory containing Dockerfile.</span> : null}
+                                {!dockerfilePath ? <span className="mt-1 block text-muted-foreground">Add the label mthan.dockerfile=/absolute/path/Dockerfile (or mthan.containerfile) when creating the container, or use Podman Compose from a directory containing Dockerfile/Containerfile.</span> : null}
                             </div>
                         ) : null}
                         <div className="min-h-0 flex-1 bg-background">

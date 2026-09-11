@@ -10,20 +10,20 @@ import (
 
 var appPackages = map[string]map[string][][]string{
 	"apt-get": {
-		"caddy": {{"caddy"}}, "nginx": {{"nginx"}},
-		"docker": {{"docker.io"}, {"docker-ce"}}, "podman": {{"podman"}},
+		"caddy": {{"caddy"}},
+		"podman": {{"podman"}},
 	},
 	"dnf": {
-		"caddy": {{"caddy"}}, "nginx": {{"nginx"}},
-		"docker": {{"docker"}, {"moby-engine"}, {"docker-ce"}}, "podman": {{"podman"}},
+		"caddy": {{"caddy"}},
+		"podman": {{"podman"}},
 	},
 	"yum": {
-		"caddy": {{"caddy"}}, "nginx": {{"nginx"}},
-		"docker": {{"docker"}, {"moby-engine"}, {"docker-ce"}}, "podman": {{"podman"}},
+		"caddy": {{"caddy"}},
+		"podman": {{"podman"}},
 	},
 	"pacman": {
-		"caddy": {{"caddy"}}, "nginx": {{"nginx"}},
-		"docker": {{"docker"}}, "podman": {{"podman"}},
+		"caddy": {{"caddy"}},
+		"podman": {{"podman"}},
 	},
 }
 
