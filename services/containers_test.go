@@ -52,3 +52,19 @@ func TestParsePodmanContainers(t *testing.T) {
 		t.Fatalf("unexpected ports: %#v", got.Ports)
 	}
 }
+
+func TestContainerActionArgs(t *testing.T) {
+	for _, action := range []string{"start", "stop", "restart"} {
+		args, err := containerActionArgs("c123", action)
+		if err != nil || len(args) != 2 || args[0] != action || args[1] != "c123" {
+			t.Fatalf("unexpected args for %s: %v, %v", action, args, err)
+		}
+	}
+	args, err := containerActionArgs("c123", "rm")
+	if err != nil || len(args) != 3 || args[0] != "rm" || args[1] != "-f" || args[2] != "c123" {
+		t.Fatalf("unexpected args for rm: %v, %v", args, err)
+	}
+	if _, err := containerActionArgs("c123", "invalid"); err == nil {
+		t.Fatal("expected error for invalid action")
+	}
+}

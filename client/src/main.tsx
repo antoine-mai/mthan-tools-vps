@@ -1,4 +1,5 @@
 import { AppProvider } from "./_contexts/app";
+import { UserProvider } from "./_contexts/user";
 import Routes from "./routes";
 import { BrowserRouter } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -10,10 +11,12 @@ export default function Main() {
     return (
         <BrowserRouter basename={runtime.basePath || undefined}>
             <AppProvider>
-                <TerminalProvider>
-                    <Routes />
-                    <GlobalTerminal />
-                </TerminalProvider>
+                <UserProvider>
+                    <TerminalProvider>
+                        <Routes />
+                        <GlobalTerminal />
+                    </TerminalProvider>
+                </UserProvider>
             </AppProvider>
         </BrowserRouter>
     );

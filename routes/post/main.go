@@ -109,7 +109,7 @@ func rootSessionOnly(sessions *services.SessionService, next http.Handler) http.
 		}
 
 		if _, ok := sessions.GetRootSession(r); !ok {
-			http.Error(w, "root session required", http.StatusForbidden)
+			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)

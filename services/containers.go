@@ -309,8 +309,11 @@ func containerActionArgs(id, action string) ([]string, error) {
 	if !allowedContainerID.MatchString(id) {
 		return nil, errors.New("invalid container")
 	}
-	if action != "start" && action != "stop" && action != "restart" {
+	if action != "start" && action != "stop" && action != "restart" && action != "rm" {
 		return nil, errors.New("invalid container action")
+	}
+	if action == "rm" {
+		return []string{"rm", "-f", id}, nil
 	}
 	return []string{action, id}, nil
 }

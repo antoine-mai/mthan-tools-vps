@@ -1,11 +1,10 @@
 import { type ReactNode, useEffect, useState } from "react";
 
-import { UserProvider, useUser } from "../_contexts/user";
+import { redirectToLogin, useUser } from "../_contexts/user";
 import Sidebar from "./_components/sidebar";
 import Header from "./_components/header";
 import { useApp } from "../_contexts/app";
 import { useTerminal } from "../_contexts/terminal";
-import { runtime } from "../runtime";
 
 type DashboardLayoutProps = {
     actions?: ReactNode;
@@ -31,7 +30,7 @@ function DashboardLayoutContent({
 
     useEffect(() => {
         if (!isLoggedIn) {
-            window.location.href = `${runtime.basePath}/login`;
+            redirectToLogin();
         }
     }, [isLoggedIn]);
 
@@ -108,9 +107,5 @@ function DashboardLayoutContent({
 }
 
 export default function DashboardLayout(props: DashboardLayoutProps) {
-    return (
-        <UserProvider>
-            <DashboardLayoutContent {...props} />
-        </UserProvider>
-    );
+    return <DashboardLayoutContent {...props} />;
 }
