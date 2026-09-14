@@ -225,7 +225,7 @@ function TerminalSession({
     );
 }
 
-function useResolvedColorMode(): ColorMode {
+export function useResolvedColorMode(): ColorMode {
     const [colorMode, setColorMode] = useState<ColorMode>(readDocumentColorMode);
 
     useEffect(() => {
@@ -248,7 +248,7 @@ function useResolvedColorMode(): ColorMode {
     return colorMode;
 }
 
-function readDocumentColorMode(): ColorMode {
+export function readDocumentColorMode(): ColorMode {
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
@@ -273,7 +273,7 @@ function shortOSName(osName: string) {
     return match ?? normalized.split(/\s+/)[0] ?? "Linux";
 }
 
-function terminalTheme(colorMode: ColorMode) {
+export function terminalTheme(colorMode: ColorMode) {
     if (colorMode === "light") {
         return {
             background: "#ffffff",

@@ -26,7 +26,7 @@ import {
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
 import { useApp } from "_contexts/app";
-import { useTerminal } from "_contexts/terminal";
+import UserTerminal from "_components/user-terminal";
 import FilesRoute from "../../files";
 import VHostsRoute from "../../vhosts";
 import ContainersRoute from "../../containers";
@@ -61,7 +61,6 @@ const systemAppNames: Record<string, string> = {
 
 export default function UsersRoute() {
     const { settings } = useApp();
-    const { addTab: openUserTerminal } = useTerminal();
     const navigate = useNavigate();
     const params = useParams<{ username?: string; section?: string }>();
     const autoUsername = (settings.users_auto_username ?? "false") === "true";
@@ -156,12 +155,6 @@ export default function UsersRoute() {
         const username = contextMenu.user.username;
         setContextMenu(null);
         navigate(`/users/${encodeURIComponent(username)}/${section}`);
-    };
-
-    const openTerminalFromContextMenu = () => {
-        if (!contextMenu) return;
-        openUserTerminal(contextMenu.user.username);
-        setContextMenu(null);
     };
 
     const activateFromContextMenu = () => {
@@ -442,14 +435,7 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
                                             <UserSubItem username={u.username} section="containers" active={activeSection === "containers"} icon={ContainerIcon} label="Containers" />
                                             <UserSubItem username={u.username} section="vhosts" active={activeSection === "vhosts"} icon={Globe} label="VHosts" />
-                                            <button
-                                                type="button"
-                                                onClick={() => openUserTerminal(u.username)}
-                                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground"
-                                            >
-                                                <Terminal className="h-3.5 w-3.5" />
-                                                Terminal
-                                            </button>
+                                            <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
                                         </nav>
                                     ) : null}
                                     </div>
@@ -519,6 +505,14 @@ export default function UsersRoute() {
                                         initialPath={selectedUser.home}
                                         rootLabel={selectedUser.username}
                                         embedded={true}
+                                    />
+                                </div>
+                            ) : activeSection === "terminal" ? (
+                                /* Embedded User Terminal filling 100% remaining space */
+                                <div className="flex-1 min-h-0 w-full overflow-hidden">
+                                    <UserTerminal
+                                        username={selectedUser.username}
+                                        key={selectedUser.username}
                                     />
                                 </div>
                             ) : (
@@ -597,8 +591,8 @@ export default function UsersRoute() {
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("vhosts")} role="menuitem">
                         <Globe className="h-3.5 w-3.5 text-muted-foreground" />VHosts
                     </button>
-                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={openTerminalFromContextMenu} role="menuitem">
-                        <Terminal className="h-3.5 w-3.5 text-muted-foreground" />Open terminal
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("terminal")} role="menuitem">
+                        <Terminal className="h-3.5 w-3.5 text-muted-foreground" />Terminal
                     </button>
                     {!contextMenu.user.cpanelEnabled ? (
                         <>
@@ -819,10 +813,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "containers" | "vhosts";
+type UserSection = "overview" | "files" | "containers" | "vhosts" | "terminal";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "containers" || section === "vhosts" ? section : "overview";
+    return section === "files" || section === "containers" || section === "vhosts" || section === "terminal" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {
