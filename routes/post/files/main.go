@@ -55,9 +55,10 @@ func Handler(sessions *services.SessionService) http.Handler {
 
 func handleMutation(w http.ResponseWriter, r *http.Request, homeDir string, isRoot bool) {
 	var input struct {
-		Path string `json:"path"`
-		Name string `json:"name"`
-		Kind string `json:"kind"`
+		Path    string `json:"path"`
+		Name    string `json:"name"`
+		Kind    string `json:"kind"`
+		Content string `json:"content"`
 	}
 	if json.NewDecoder(r.Body).Decode(&input) != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -70,6 +71,13 @@ func handleMutation(w http.ResponseWriter, r *http.Request, homeDir string, isRo
 		err = services.CreateFileItem(input.Path, input.Name, homeDir, isRoot, input.Kind == "folder")
 	case http.MethodPatch:
 		resultPath, err = services.RenameFileItem(input.Path, input.Name, homeDir, isRoot)
+	case http.MethodPut:
+		targetPath := input.Path
+		if targetPath == "" {
+			targetPath = r.URL.Query().Get("path")
+		}
+		err = services.SaveFileContent(targetPath, input.Content, homeDir, isRoot)
+		resultPath = targetPath
 	case http.MethodDelete:
 		err = services.DeleteFileItem(input.Path, homeDir, isRoot)
 	default:

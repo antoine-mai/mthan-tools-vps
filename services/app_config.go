@@ -117,7 +117,13 @@ func (s *AppConfigService) Write(app, requestedPath, content string) (AppConfigF
 func (s *AppConfigService) allowedPath(app, requestedPath string) (string, error) {
 	app = strings.ToLower(strings.TrimSpace(app))
 	path := filepath.Clean(strings.TrimSpace(requestedPath))
-	if path == "." || !filepath.IsAbs(path) || !s.allowed[app][path] {
+	if path == "." || !filepath.IsAbs(path) {
+		return "", ErrAppConfigDenied
+	}
+	if app == "caddy" && strings.HasPrefix(path, CaddyUsersDir+string(filepath.Separator)) && strings.HasSuffix(path, ".caddy") {
+		return path, nil
+	}
+	if !s.allowed[app][path] {
 		return "", ErrAppConfigDenied
 	}
 	return path, nil

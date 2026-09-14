@@ -555,7 +555,7 @@ export default function UsersRoute() {
                                     </div>
                                 ) : activeSection === "vhosts" ? (
                                     <div className="space-y-4">
-                                        <VHostsRoute embedded={true} key={selectedUser.username} />
+                                        <VHostsRoute embedded={true} ownerFilter={selectedUser.username} key={selectedUser.username} />
                                     </div>
                                 ) : null}
                                 </div>

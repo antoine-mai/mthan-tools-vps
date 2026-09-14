@@ -125,12 +125,47 @@ func ensureResolvedInHome(path, homeDir string) error {
 	}
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			parentResolved, parentErr := filepath.EvalSymlinks(filepath.Dir(path))
+			if parentErr != nil {
+				return parentErr
+			}
+			if parentResolved != home && !strings.HasPrefix(parentResolved, home+string(filepath.Separator)) {
+				return ErrAccessDenied
+			}
+			return nil
+		}
 		return err
 	}
 	if resolved != home && !strings.HasPrefix(resolved, home+string(filepath.Separator)) {
 		return ErrAccessDenied
 	}
 	return nil
+}
+
+func SaveFileContent(filePath string, content string, homeDir string, isRoot bool) error {
+	path, err := mutableFilePath(filePath, homeDir, isRoot)
+	if err != nil {
+		return err
+	}
+	const maxFileSize = 10 * 1024 * 1024 // 10MB limit
+	if len(content) > maxFileSize {
+		return errors.New("file content exceeds 10MB limit")
+	}
+	stat, err := os.Stat(path)
+	if err == nil {
+		if stat.IsDir() {
+			return errors.New("cannot write to a directory")
+		}
+		perm := stat.Mode().Perm()
+		if perm == 0 {
+			perm = 0644
+		}
+		return os.WriteFile(path, []byte(content), perm)
+	} else if errors.Is(err, os.ErrNotExist) {
+		return os.WriteFile(path, []byte(content), 0644)
+	}
+	return err
 }
 
 func ListDirectory(requestedPath string, homeDir string, isRoot bool) (DirectoryList, error) {

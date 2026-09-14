@@ -11,7 +11,8 @@ import (
 
 func Handler(sessions *services.SessionService, vhosts *services.VHostService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := sessions.GetUserSession(r); !ok {
+		session, ok := sessions.GetUserSession(r)
+		if !ok {
 			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return
 		}
@@ -21,7 +22,35 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 		case "", "/":
 			writeJSON(w, http.StatusOK, vhosts.Status())
 		case "/list":
-			writeJSON(w, http.StatusOK, map[string]any{"vhosts": vhosts.Summaries()})
+			writeJSON(w, http.StatusOK, map[string]any{"vhosts": vhosts.SummariesForOwner(session.Username)})
+		case "/config":
+			_ = services.CreateUserCaddyfile(session.Username)
+			configPath := services.UserCaddyfilePath(session.Username)
+			configs := services.NewAppConfigService()
+			if r.Method == http.MethodGet {
+				file, err := configs.Read("caddy", configPath)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, file)
+				return
+			}
+			var input struct {
+				Content string `json:"content"`
+			}
+			if json.NewDecoder(r.Body).Decode(&input) != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			file, err := configs.Write("caddy", configPath, input.Content)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			_ = vhosts.Reload()
+			writeJSON(w, http.StatusOK, file)
+			return
 		default:
 			hostname := strings.TrimPrefix(path, "/")
 			if hostname == "" || strings.Contains(hostname, "/") {

@@ -162,6 +162,7 @@ export default function FilesRoute({
 
     useEffect(() => {
         initExplorer();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -214,14 +215,44 @@ export default function FilesRoute({
         if (!response.ok) throw new Error((await response.text()) || "File operation failed");
     };
 
+    const handleSaveFile = async (newContent: string) => {
+        if (!selectedFile) return;
+        setError(null);
+        const response = await fetch(apiEndpoint, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: selectedFile.path, content: newContent }),
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || "Failed to save file");
+        }
+        setFileContent(newContent);
+        setFileSize(new Blob([newContent]).size);
+    };
+
     const createItem = async (kind: "file" | "folder") => {
         if (!contextMenu) return;
         const name = window.prompt(kind === "file" ? "New file name" : "New folder name");
         if (!name) return;
         const folder = contextMenu.item.path;
         setContextMenu(null);
-        try { await mutateItem("POST", { path: folder, name, kind }); await refreshFolder(folder); }
-        catch (reason) { setError(reason instanceof Error ? reason.message : `Could not create ${kind}`); }
+        try {
+            await mutateItem("POST", { path: folder, name, kind });
+            await refreshFolder(folder);
+            if (kind === "file") {
+                const newFilePath = folder === "/" ? `/${name}` : `${folder}/${name}`;
+                await handleSelectNode({
+                    name,
+                    isDir: false,
+                    path: newFilePath,
+                    size: 0,
+                    modTime: "",
+                });
+            }
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : `Could not create ${kind}`);
+        }
     };
 
     const renameItem = async () => {
@@ -307,6 +338,7 @@ export default function FilesRoute({
                 isLoading={isContentLoading}
                 error={contentError}
                 onClose={() => setSelectedFile(null)}
+                onSave={handleSaveFile}
             />
 
             {contextMenu ? (
@@ -317,7 +349,12 @@ export default function FilesRoute({
                     role="menu"
                 >
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void handleSelectNode(contextMenu.item); setContextMenu(null); }} role="menuitem">
-                        <MousePointer2 className="h-3.5 w-3.5 text-muted-foreground" />Open
+                        {contextMenu.item.isDir ? (
+                            <MousePointer2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        {contextMenu.item.isDir ? "Open" : "Edit file"}
                     </button>
                     {contextMenu.item.isDir ? (
                         <>

@@ -111,6 +111,7 @@ type VHost struct {
 	Hostname    string   `json:"hostname"`
 	Aliases     []string `json:"aliases"`
 	Server      string   `json:"server"`
+	Owner       string   `json:"owner"`
 	Listen      []string `json:"listen"`
 	TLS         bool     `json:"tls"`
 	Upstreams   []string `json:"upstreams"`
@@ -119,11 +120,13 @@ type VHost struct {
 }
 
 type VHostSummary struct {
-	Hostname string   `json:"hostname"`
-	Aliases  []string `json:"aliases"`
-	Server   string   `json:"server"`
-	Listen   []string `json:"listen"`
-	TLS      bool     `json:"tls"`
+	Hostname    string   `json:"hostname"`
+	Aliases     []string `json:"aliases"`
+	Server      string   `json:"server"`
+	Owner       string   `json:"owner"`
+	Listen      []string `json:"listen"`
+	TLS         bool     `json:"tls"`
+	ConfigFiles []string `json:"configFiles"`
 }
 
 type VHostStatus struct {
@@ -167,11 +170,47 @@ func (s *VHostService) List() []VHost {
 		all = append(all, parseCaddyVHosts(output, "/etc/caddy/Caddyfile")...)
 	}
 	all = mergeVHosts(all)
-	sort.Slice(all, func(i, j int) bool {
-		if all[i].Hostname == all[j].Hostname {
-			return all[i].Server < all[j].Server
+	ownerMap := vhostOwnerMap()
+	for i := range all {
+		hostKey := strings.ToLower(all[i].Hostname)
+		if info, ok := ownerMap[hostKey]; ok {
+			all[i].Owner = info.owner
+			all[i].ConfigFiles = []string{info.file}
+		} else {
+			found := false
+			for _, alias := range all[i].Aliases {
+				if info, ok := ownerMap[strings.ToLower(alias)]; ok {
+					all[i].Owner = info.owner
+					all[i].ConfigFiles = []string{info.file}
+					found = true
+					break
+				}
+			}
+			if !found {
+				for _, root := range all[i].Roots {
+					if strings.HasPrefix(root, "/home/") {
+						parts := strings.Split(strings.TrimPrefix(root, "/home/"), "/")
+						if len(parts) > 0 && parts[0] != "" {
+							all[i].Owner = parts[0]
+							found = true
+							break
+						}
+					}
+				}
+				if !found {
+					all[i].Owner = "system"
+				}
+			}
 		}
-		return all[i].Hostname < all[j].Hostname
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].Owner == all[j].Owner {
+			if all[i].Hostname == all[j].Hostname {
+				return all[i].Server < all[j].Server
+			}
+			return all[i].Hostname < all[j].Hostname
+		}
+		return all[i].Owner < all[j].Owner
 	})
 	return all
 }
@@ -182,8 +221,20 @@ func (s *VHostService) Summaries() []VHostSummary {
 	for _, host := range vhosts {
 		result = append(result, VHostSummary{
 			Hostname: host.Hostname, Aliases: host.Aliases, Server: host.Server,
-			Listen: host.Listen, TLS: host.TLS,
+			Owner: host.Owner, Listen: host.Listen, TLS: host.TLS,
+			ConfigFiles: host.ConfigFiles,
 		})
+	}
+	return result
+}
+
+func (s *VHostService) SummariesForOwner(owner string) []VHostSummary {
+	all := s.Summaries()
+	result := make([]VHostSummary, 0)
+	for _, item := range all {
+		if strings.EqualFold(item.Owner, owner) {
+			result = append(result, item)
+		}
 	}
 	return result
 }
@@ -524,4 +575,94 @@ func nonEmptySlice(value string) []string {
 		return nil
 	}
 	return []string{value}
+}
+
+func vhostOwnerMap() map[string]struct{ owner, file string } {
+	owners := make(map[string]struct{ owner, file string })
+	entries, err := os.ReadDir(CaddyUsersDir)
+	if err != nil {
+		return owners
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".caddy") {
+			continue
+		}
+		username := strings.TrimSuffix(entry.Name(), ".caddy")
+		filePath := filepath.Join(CaddyUsersDir, entry.Name())
+		data, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			continue
+		}
+		hosts := extractCaddyHostnames(string(data))
+		for _, h := range hosts {
+			owners[h] = struct{ owner, file string }{owner: username, file: filePath}
+		}
+	}
+	return owners
+}
+
+func extractCaddyHostnames(content string) []string {
+	var hostnames []string
+	depth, start := 0, -1
+	var quote byte
+	escaped, comment := false, false
+	for i := 0; i < len(content); i++ {
+		char := content[i]
+		if comment {
+			if char == '\n' {
+				comment = false
+			}
+			continue
+		}
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quote != 0 {
+			if char == '\\' {
+				escaped = true
+			} else if char == quote {
+				quote = 0
+			}
+			continue
+		}
+		if char == '#' {
+			comment = true
+			continue
+		}
+		if char == '"' || char == '\'' {
+			quote = char
+			continue
+		}
+		switch char {
+		case '{':
+			if depth == 0 {
+				start = strings.LastIndex(content[:i], "\n") + 1
+			}
+			depth++
+		case '}':
+			if depth == 0 {
+				continue
+			}
+			depth--
+			if depth == 0 && start >= 0 {
+				brace := strings.Index(content[start:i], "{")
+				if brace >= 0 {
+					label := strings.TrimSpace(content[start : start+brace])
+					for _, address := range strings.Split(label, ",") {
+						candidate := strings.TrimSpace(address)
+						candidate = strings.TrimPrefix(candidate, "http://")
+						candidate = strings.TrimPrefix(candidate, "https://")
+						candidate = strings.Split(candidate, ":")[0]
+						candidate = strings.ToLower(strings.TrimSuffix(candidate, "."))
+						if candidate != "" {
+							hostnames = append(hostnames, candidate)
+						}
+					}
+				}
+				start = -1
+			}
+		}
+	}
+	return hostnames
 }

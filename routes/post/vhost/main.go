@@ -21,7 +21,44 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 		case "", "/":
 			writeJSON(w, vhosts.Status())
 		case "/list":
-			writeJSON(w, map[string]any{"vhosts": vhosts.Summaries()})
+			owner := r.URL.Query().Get("owner")
+			if owner != "" {
+				writeJSON(w, map[string]any{"vhosts": vhosts.SummariesForOwner(owner)})
+			} else {
+				writeJSON(w, map[string]any{"vhosts": vhosts.Summaries()})
+			}
+		case "/config":
+			owner := r.URL.Query().Get("owner")
+			configPath := "/etc/caddy/Caddyfile"
+			if owner != "" && owner != "system" {
+				_ = services.CreateUserCaddyfile(owner)
+				configPath = services.UserCaddyfilePath(owner)
+			}
+			configs := services.NewAppConfigService()
+			if r.Method == http.MethodGet {
+				file, err := configs.Read("caddy", configPath)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, file)
+				return
+			}
+			var input struct {
+				Content string `json:"content"`
+			}
+			if json.NewDecoder(r.Body).Decode(&input) != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			file, err := configs.Write("caddy", configPath, input.Content)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			_ = vhosts.Reload()
+			writeJSON(w, file)
+			return
 		case "/reload":
 			if r.Method != http.MethodPost {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -86,3 +86,20 @@ func TestCaddyConstants(t *testing.T) {
 		t.Fatalf("UserCaddyfilePath(testuser) = %q, want %q", UserCaddyfilePath("testuser"), expected)
 	}
 }
+
+func TestExtractCaddyHostnames(t *testing.T) {
+	input := `# Comment
+alice.example.com, www.alice.example.com {
+	reverse_proxy localhost:8080
+}
+
+http://sub.domain.com:8443 {
+	file_server
+}
+`
+	hosts := extractCaddyHostnames(input)
+	expected := []string{"alice.example.com", "www.alice.example.com", "sub.domain.com"}
+	if !reflect.DeepEqual(hosts, expected) {
+		t.Fatalf("extractCaddyHostnames() = %v, want %v", hosts, expected)
+	}
+}
