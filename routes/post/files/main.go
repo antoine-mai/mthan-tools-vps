@@ -3,7 +3,10 @@ package files
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"mthan/vps/services"
 )
@@ -17,11 +20,28 @@ func Handler(sessions *services.SessionService) http.Handler {
 
 		requestedPath := r.URL.Query().Get("path")
 		isContent := r.URL.Query().Get("content") == "true"
+		isDownload := r.URL.Query().Get("download") == "true"
 
 		// Root mode exposes the full filesystem and starts the explorer at /.
 		homeDir := "/"
 		if r.Method != http.MethodGet {
 			handleMutation(w, r, homeDir, true)
+			return
+		}
+
+		if isDownload {
+			target, err := services.AllowedFilePath(requestedPath, homeDir, true)
+			if err != nil {
+				http.Error(w, "access denied", http.StatusForbidden)
+				return
+			}
+			stat, err := os.Stat(target)
+			if err != nil || stat.IsDir() {
+				http.Error(w, "file not found", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(target)))
+			http.ServeFile(w, r, target)
 			return
 		}
 
@@ -68,7 +88,11 @@ func handleMutation(w http.ResponseWriter, r *http.Request, homeDir string, isRo
 	var err error
 	switch r.Method {
 	case http.MethodPost:
-		err = services.CreateFileItem(input.Path, input.Name, homeDir, isRoot, input.Kind == "folder")
+		if input.Kind == "duplicate" {
+			resultPath, err = services.DuplicateFileItem(input.Path, homeDir, isRoot)
+		} else {
+			err = services.CreateFileItem(input.Path, input.Name, homeDir, isRoot, input.Kind == "folder")
+		}
 	case http.MethodPatch:
 		resultPath, err = services.RenameFileItem(input.Path, input.Name, homeDir, isRoot)
 	case http.MethodPut:

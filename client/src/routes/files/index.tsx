@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Folder,
     ChevronRight,
@@ -8,11 +8,12 @@ import {
     AlertCircle,
     RefreshCw,
     Clipboard,
-    MousePointer2,
     FilePlus2,
     FolderPlus,
     Pencil,
     Trash2,
+    Download,
+    Copy,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -70,6 +71,8 @@ export default function FilesRoute({
     const [contextMenu, setContextMenu] = useState<ExplorerContextMenu | null>(null);
     const [copiedPath, setCopiedPath] = useState(false);
 
+    const menuRef = useRef<HTMLDivElement>(null);
+
     // Initialize root / home directory
     const initExplorer = useCallback(async () => {
         setIsLoading(true);
@@ -102,7 +105,7 @@ export default function FilesRoute({
             const response = await fetch(`${apiEndpoint}?path=${encodeURIComponent(path)}`);
             if (!response.ok) return [];
             const data: DirectoryList = await response.json();
-            
+
             // Sort: directories first, then files
             return (data.items || []).sort((a, b) => {
                 if (a.isDir && !b.isDir) return -1;
@@ -116,7 +119,7 @@ export default function FilesRoute({
 
     const handleToggleExpand = async (path: string) => {
         const isOpen = openPaths[path] || false;
-        
+
         if (!isOpen) {
             if (!expanded[path]) {
                 const items = await fetchFolderContents(path);
@@ -165,29 +168,46 @@ export default function FilesRoute({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Robust click-outside & escape listener for context menu
     useEffect(() => {
         if (!contextMenu) return;
-        const close = () => setContextMenu(null);
-        window.addEventListener("pointerdown", close);
-        window.addEventListener("blur", close);
-        window.addEventListener("resize", close);
+
+        const handleOutsideClick = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setContextMenu(null);
+            }
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setContextMenu(null);
+        };
+
+        const timer = setTimeout(() => {
+            document.addEventListener("mousedown", handleOutsideClick);
+            document.addEventListener("contextmenu", handleOutsideClick);
+        }, 10);
+
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("resize", () => setContextMenu(null));
+
         return () => {
-            window.removeEventListener("pointerdown", close);
-            window.removeEventListener("blur", close);
-            window.removeEventListener("resize", close);
+            clearTimeout(timer);
+            document.removeEventListener("mousedown", handleOutsideClick);
+            document.removeEventListener("contextmenu", handleOutsideClick);
+            window.removeEventListener("keydown", handleKeyDown);
         };
     }, [contextMenu]);
 
     const openContextMenu = (event: React.MouseEvent, item: FileItem) => {
         event.preventDefault();
         event.stopPropagation();
-        const menuWidth = 190;
-        const menuHeight = item.isDir ? 242 : 148;
         setCopiedPath(false);
+        const menuWidth = 200;
+        const menuHeight = item.isDir ? 250 : 230;
         setContextMenu({
             item,
-            x: Math.min(event.clientX, window.innerWidth - menuWidth - 8),
-            y: Math.min(event.clientY, window.innerHeight - menuHeight - 8),
+            x: Math.min(event.clientX, window.innerWidth - menuWidth - 12),
+            y: Math.min(event.clientY, window.innerHeight - menuHeight - 12),
         });
     };
 
@@ -196,16 +216,19 @@ export default function FilesRoute({
         try {
             await navigator.clipboard.writeText(contextMenu.item.path);
             setCopiedPath(true);
-            window.setTimeout(() => setContextMenu(null), 450);
+            window.setTimeout(() => setContextMenu(null), 500);
         } catch {
             setError("Could not copy the path to the clipboard.");
             setContextMenu(null);
         }
     };
 
-    const parentPath = (path: string) => path === "/" ? "/" : path.slice(0, path.lastIndexOf("/")) || "/";
+    const parentPath = (path: string) => (path === "/" ? "/" : path.slice(0, path.lastIndexOf("/")) || "/");
 
-    const mutateItem = async (method: "POST" | "PATCH" | "DELETE", payload: { path: string; name?: string; kind?: string }) => {
+    const mutateItem = async (
+        method: "POST" | "PATCH" | "DELETE" | "PUT",
+        payload: { path: string; name?: string; kind?: string; content?: string }
+    ) => {
         setError(null);
         const response = await fetch(apiEndpoint, {
             method,
@@ -255,6 +278,31 @@ export default function FilesRoute({
         }
     };
 
+    const duplicateItem = async () => {
+        if (!contextMenu) return;
+        const item = contextMenu.item;
+        setContextMenu(null);
+        try {
+            await mutateItem("POST", { path: item.path, kind: "duplicate" });
+            await refreshFolder(parentPath(item.path));
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Could not duplicate item");
+        }
+    };
+
+    const downloadItem = () => {
+        if (!contextMenu) return;
+        const item = contextMenu.item;
+        setContextMenu(null);
+        const url = `${apiEndpoint}?path=${encodeURIComponent(item.path)}&download=true`;
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = item.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
     const renameItem = async () => {
         if (!contextMenu) return;
         const item = contextMenu.item;
@@ -265,27 +313,46 @@ export default function FilesRoute({
             await mutateItem("PATCH", { path: item.path, name });
             if (selectedFile?.path === item.path) setSelectedFile(null);
             await refreshFolder(parentPath(item.path));
-        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not rename item"); }
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Could not rename item");
+        }
     };
 
     const deleteItem = async () => {
         if (!contextMenu) return;
         const item = contextMenu.item;
-        if (!window.confirm(`Delete ${item.name}${item.isDir ? " and everything inside it" : ""}? This cannot be undone.`)) return;
+        if (!window.confirm(`Delete ${item.name}${item.isDir ? " and everything inside it" : ""}? This cannot be undone.`))
+            return;
         setContextMenu(null);
         try {
             await mutateItem("DELETE", { path: item.path });
             if (selectedFile?.path === item.path || selectedFile?.path.startsWith(item.path + "/")) setSelectedFile(null);
-            setExpanded((prev) => { const next = { ...prev }; delete next[item.path]; return next; });
+            setExpanded((prev) => {
+                const next = { ...prev };
+                delete next[item.path];
+                return next;
+            });
             await refreshFolder(parentPath(item.path));
-        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete item"); }
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Could not delete item");
+        }
     };
 
-    const displayRootName = rootLabel || (homePath ? (runtime.isRoot && !initialPath ? "/" : (initialPath ? rootLabel || initialPath.split("/").filter(Boolean).pop() || initialPath : runtime.username)) : (runtime.isRoot ? "/" : runtime.username));
+    const displayRootName =
+        rootLabel ||
+        (homePath
+            ? runtime.isRoot && !initialPath
+                ? "/"
+                : initialPath
+                ? rootLabel || initialPath.split("/").filter(Boolean).pop() || initialPath
+                : runtime.username
+            : runtime.isRoot
+            ? "/"
+            : runtime.username);
 
     const content = (
         <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background relative">
-            {/* 1. Left Explorer Sidebar (VSCode Explorer Style) */}
+            {/* 1. Left Explorer Sidebar */}
             <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
                 <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
                     <span className="text-xs font-semibold text-muted-foreground truncate" title={rootLabel || "Explorer"}>
@@ -301,7 +368,20 @@ export default function FilesRoute({
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto py-2 px-2">
+                <div
+                    className="flex-1 overflow-y-auto py-2 px-2"
+                    onContextMenu={(e) => {
+                        if (e.target === e.currentTarget && homePath) {
+                            openContextMenu(e, {
+                                name: displayRootName,
+                                isDir: true,
+                                path: homePath,
+                                size: 0,
+                                modTime: "",
+                            });
+                        }
+                    }}
+                >
                     {isLoading ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -318,6 +398,7 @@ export default function FilesRoute({
                             isDir={true}
                             depth={0}
                             selectedPath={selectedFile?.path || ""}
+                            contextMenuPath={contextMenu?.item.path}
                             onSelect={handleSelectNode}
                             expanded={expanded}
                             openPaths={openPaths}
@@ -328,7 +409,7 @@ export default function FilesRoute({
                 </div>
             </aside>
 
-            {/* 2. Right Editor Pane (VSCode Tab/Editor Style) */}
+            {/* 2. Right Editor Pane */}
             <FileEditor
                 fileName={selectedFile?.name || ""}
                 filePath={selectedFile?.path || ""}
@@ -341,46 +422,145 @@ export default function FilesRoute({
                 onSave={handleSaveFile}
             />
 
-            {contextMenu ? (
+            {/* Context Menu for Files and Folders */}
+            {contextMenu && (
                 <div
-                    className="fixed z-[70] w-[190px] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+                    ref={menuRef}
+                    className="fixed z-[70] w-[200px] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl animate-in fade-in zoom-in-95 duration-100"
                     style={{ left: contextMenu.x, top: contextMenu.y }}
-                    onPointerDown={(event) => event.stopPropagation()}
                     role="menu"
                 >
-                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void handleSelectNode(contextMenu.item); setContextMenu(null); }} role="menuitem">
-                        {contextMenu.item.isDir ? (
-                            <MousePointer2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : (
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                        {contextMenu.item.isDir ? "Open" : "Edit file"}
-                    </button>
                     {contextMenu.item.isDir ? (
+                        /* FOLDER Context Menu */
                         <>
-                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void createItem("file")} role="menuitem">
-                            <FilePlus2 className="h-3.5 w-3.5 text-muted-foreground" />New file
-                        </button>
-                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void createItem("folder")} role="menuitem">
-                            <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />New folder
-                        </button>
-                        <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => { void refreshFolder(contextMenu.item.path); setContextMenu(null); }} role="menuitem">
-                            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />Refresh folder
-                        </button>
+                            <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground truncate border-b border-border mb-1 flex items-center gap-1.5">
+                                <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span className="truncate">{contextMenu.item.name}</span>
+                            </div>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void createItem("file")}
+                                role="menuitem"
+                            >
+                                <FilePlus2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>New file</span>
+                            </button>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void createItem("folder")}
+                                role="menuitem"
+                            >
+                                <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>New folder</span>
+                            </button>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => {
+                                    void refreshFolder(contextMenu.item.path);
+                                    setContextMenu(null);
+                                }}
+                                role="menuitem"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Refresh folder</span>
+                            </button>
+                            <div className="my-1 border-t border-border" />
+                            {contextMenu.item.path !== homePath && (
+                                <button
+                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                    onClick={() => void renameItem()}
+                                    role="menuitem"
+                                >
+                                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span>Rename</span>
+                                </button>
+                            )}
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void copyPath()}
+                                role="menuitem"
+                            >
+                                <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{copiedPath ? "Copied!" : "Copy path"}</span>
+                            </button>
+                            {contextMenu.item.path !== homePath && (
+                                <>
+                                    <div className="my-1 border-t border-border" />
+                                    <button
+                                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                                        onClick={() => void deleteItem()}
+                                        role="menuitem"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <span>Delete folder</span>
+                                    </button>
+                                </>
+                            )}
                         </>
-                    ) : null}
-                    <div className="my-1 border-t border-border" />
-                    {contextMenu.item.path !== homePath ? <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void renameItem()} role="menuitem">
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />Rename
-                    </button> : null}
-                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => void copyPath()} role="menuitem">
-                        <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />{copiedPath ? "Copied" : "Copy path"}
-                    </button>
-                    {contextMenu.item.path !== homePath ? <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => void deleteItem()} role="menuitem">
-                        <Trash2 className="h-3.5 w-3.5" />Delete
-                    </button> : null}
+                    ) : (
+                        /* FILE Context Menu */
+                        <>
+                            <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground truncate border-b border-border mb-1 flex items-center gap-1.5">
+                                <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{contextMenu.item.name}</span>
+                            </div>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors font-medium text-foreground"
+                                onClick={() => {
+                                    void handleSelectNode(contextMenu.item);
+                                    setContextMenu(null);
+                                }}
+                                role="menuitem"
+                            >
+                                <Pencil className="h-3.5 w-3.5 text-primary" />
+                                <span>Edit file</span>
+                            </button>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void duplicateItem()}
+                                role="menuitem"
+                            >
+                                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Duplicate</span>
+                            </button>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => downloadItem()}
+                                role="menuitem"
+                            >
+                                <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Download</span>
+                            </button>
+                            <div className="my-1 border-t border-border" />
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void renameItem()}
+                                role="menuitem"
+                            >
+                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Rename</span>
+                            </button>
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors"
+                                onClick={() => void copyPath()}
+                                role="menuitem"
+                            >
+                                <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{copiedPath ? "Copied!" : "Copy path"}</span>
+                            </button>
+                            <div className="my-1 border-t border-border" />
+                            <button
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                                onClick={() => void deleteItem()}
+                                role="menuitem"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Delete file</span>
+                            </button>
+                        </>
+                    )}
                 </div>
-            ) : null}
+            )}
         </div>
     );
 
@@ -406,6 +586,7 @@ interface DirectoryTreeNodeProps {
     isDir: boolean;
     depth: number;
     selectedPath: string;
+    contextMenuPath?: string;
     onSelect: (item: FileItem) => void;
     expanded: Record<string, FileItem[]>;
     openPaths: Record<string, boolean>;
@@ -419,6 +600,7 @@ function DirectoryTreeNode({
     isDir,
     depth,
     selectedPath,
+    contextMenuPath,
     onSelect,
     expanded,
     openPaths,
@@ -426,7 +608,7 @@ function DirectoryTreeNode({
     onContextMenu,
 }: DirectoryTreeNodeProps) {
     const isExpanded = openPaths[path] || false;
-    const isSelected = selectedPath === path;
+    const isSelected = selectedPath === path || contextMenuPath === path;
     const children = expanded[path] || [];
 
     const handleToggle = async (e: React.MouseEvent) => {
@@ -462,7 +644,6 @@ function DirectoryTreeNode({
                         )}
                     </button>
                 ) : (
-                    // File spacer to align with folders
                     <div className="w-4 h-4 shrink-0" />
                 )}
                 {isDir ? (
@@ -483,6 +664,7 @@ function DirectoryTreeNode({
                             isDir={item.isDir}
                             depth={depth + 1}
                             selectedPath={selectedPath}
+                            contextMenuPath={contextMenuPath}
                             onSelect={onSelect}
                             expanded={expanded}
                             openPaths={openPaths}

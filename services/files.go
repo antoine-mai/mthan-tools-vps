@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,6 +90,10 @@ func validFileName(name string) bool {
 	return name != "" && name != "." && name != ".." && filepath.Base(name) == name && !strings.ContainsRune(name, 0)
 }
 
+func AllowedFilePath(path, homeDir string, isRoot bool) (string, error) {
+	return allowedFilePath(path, homeDir, isRoot)
+}
+
 func allowedFilePath(path, homeDir string, isRoot bool) (string, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {
@@ -100,6 +106,55 @@ func allowedFilePath(path, homeDir string, isRoot bool) (string, error) {
 		}
 	}
 	return path, nil
+}
+
+func DuplicateFileItem(srcPath, homeDir string, isRoot bool) (string, error) {
+	src, err := allowedFilePath(srcPath, homeDir, isRoot)
+	if err != nil {
+		return "", err
+	}
+	stat, err := os.Stat(src)
+	if err != nil {
+		return "", err
+	}
+	if stat.IsDir() {
+		return "", errors.New("cannot duplicate directory")
+	}
+
+	dir := filepath.Dir(src)
+	base := filepath.Base(src)
+	ext := filepath.Ext(base)
+	nameWithoutExt := strings.TrimSuffix(base, ext)
+
+	target := filepath.Join(dir, nameWithoutExt+"_copy"+ext)
+	for i := 2; ; i++ {
+		if _, err := os.Stat(target); errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		target = filepath.Join(dir, fmt.Sprintf("%s_copy_%d%s", nameWithoutExt, i, ext))
+	}
+
+	target, err = mutableFilePath(target, homeDir, isRoot)
+	if err != nil {
+		return "", err
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_EXCL, stat.Mode().Perm())
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return "", err
+	}
+	return target, nil
 }
 
 func mutableFilePath(path, homeDir string, isRoot bool) (string, error) {
