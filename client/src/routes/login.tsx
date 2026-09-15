@@ -21,7 +21,7 @@ export default function LoginRoute() {
     const isLoading = status === "loading";
 
     useEffect(() => {
-        document.title = "Login | MThan VPS";
+        document.title = "Login | MTHAN VPS";
         const isLoggedIn = loginStorage().getItem(loginStorageKey()) === "true";
         if (isLoggedIn) {
             window.location.href = appPath("/");
@@ -132,7 +132,7 @@ function UserLoginLayout(props: LoginLayoutProps) {
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold">
-                                        MThan VPS
+                                        MTHAN VPS
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                         User access
@@ -200,7 +200,7 @@ function RootLoginLayout(props: LoginLayoutProps) {
                                 />
                             </div>
                             <div>
-                                <p className="font-semibold">MThan VPS</p>
+                                <p className="font-semibold">MTHAN VPS</p>
                                 <p className="text-xs text-red-300/70">Privileged access</p>
                             </div>
                         </div>

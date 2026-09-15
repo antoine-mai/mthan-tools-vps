@@ -60,7 +60,7 @@ func NewSettingsService() (*SettingsService, error) {
 		}
 	}
 	for key, value := range map[string]string{
-		"general_app_name":    "MThan VPS Panel",
+		"general_app_name":    "MTHAN VPS",
 		"general_color_mode":  "system",
 		"apps_header":         "[]",
 		"users_default_shell": "/bin/bash",
@@ -73,6 +73,7 @@ func NewSettingsService() (*SettingsService, error) {
 			return nil, err
 		}
 	}
+	_, _ = db.Exec("UPDATE settings SET value = 'MTHAN VPS' WHERE key = 'general_app_name' AND value IN ('MThan VPS Panel', 'MThan VPS')")
 	return &SettingsService{db: db}, nil
 }
 

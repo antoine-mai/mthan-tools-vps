@@ -22,6 +22,7 @@ import (
 	userdelete "mthan/vps/routes/post/user/delete"
 	userlist "mthan/vps/routes/post/user/list"
 	userlogin "mthan/vps/routes/post/user/login"
+	useroverview "mthan/vps/routes/post/user/overview"
 	userpassword "mthan/vps/routes/post/user/password"
 	postvhost "mthan/vps/routes/post/vhost"
 	"mthan/vps/services"
@@ -48,6 +49,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("POST /post/update", postOnly(deps.Startup, deps.Sessions, update.SelfUpdateHandler(deps.Update)))
 	mux.Handle("POST /post/ping", postOnly(deps.Startup, deps.Sessions, ping.Handler()))
 	mux.Handle("GET /post/user/list", postOnly(deps.Startup, deps.Sessions, userlist.Handler()))
+	mux.Handle("GET /post/user/overview", postOnly(deps.Startup, deps.Sessions, useroverview.Handler()))
 	mux.Handle("POST /post/user/password", postOnly(deps.Startup, deps.Sessions, userpassword.Handler()))
 	mux.Handle("GET /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
 	mux.Handle("POST /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))

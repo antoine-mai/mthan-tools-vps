@@ -16,7 +16,7 @@ import {
     Trash2,
     LayoutDashboard,
     Folder,
-    Boxes,
+    HardDrive,
     CheckCircle2,
     XCircle,
     Globe,
@@ -41,11 +41,38 @@ interface LinuxUser {
     username: string;
 }
 
-interface SystemAppStatus {
-    installed: boolean;
-    name: string;
-    version?: string;
-    versions?: string[];
+interface UserOverviewData {
+    username: string;
+    home: string;
+    containers: {
+        total: number;
+        running: number;
+        stopped: number;
+        items: Array<{
+            id: string;
+            name: string;
+            image: string;
+            status: string;
+            ports?: string;
+        }>;
+    };
+    vhosts: {
+        total: number;
+        items: Array<{
+            hostname: string;
+            aliases?: string[];
+            tls: boolean;
+            listen?: string[];
+        }>;
+    };
+    storage: {
+        homePath: string;
+        homeUsed: number;
+        diskTotal: number;
+        diskUsed: number;
+        diskUsage: number;
+        breakdown?: Record<string, number>;
+    };
 }
 
 interface UserContextMenu {
@@ -54,10 +81,13 @@ interface UserContextMenu {
     y: number;
 }
 
-const systemAppNames: Record<string, string> = {
-    caddy: "Caddy",
-    podman: "Podman",
-};
+function formatStorageBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 export default function UsersRoute() {
     const { settings } = useApp();
@@ -72,9 +102,9 @@ export default function UsersRoute() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [systemApps, setSystemApps] = useState<SystemAppStatus[]>([]);
-    const [systemAppsError, setSystemAppsError] = useState<string | null>(null);
-    const [systemAppsLoading, setSystemAppsLoading] = useState(false);
+    const [overviewData, setOverviewData] = useState<UserOverviewData | null>(null);
+    const [overviewLoading, setOverviewLoading] = useState(false);
+    const [overviewError, setOverviewError] = useState<string | null>(null);
     const [activationOpen, setActivationOpen] = useState(false);
     const [activationPassword, setActivationPassword] = useState("");
     const [activationConfirm, setActivationConfirm] = useState("");
@@ -220,26 +250,31 @@ export default function UsersRoute() {
 
 
     useEffect(() => {
-        if (activeSection !== "overview") return;
+        if (activeSection !== "overview" || !selectedUser) return;
 
         const controller = new AbortController();
-        setSystemAppsLoading(true);
-        setSystemAppsError(null);
-        fetch("/post/apps", { cache: "no-store", signal: controller.signal })
+        setOverviewLoading(true);
+        setOverviewError(null);
+        fetch(`/post/user/overview?user=${encodeURIComponent(selectedUser.username)}`, {
+            cache: "no-store",
+            signal: controller.signal,
+        })
             .then(async (response) => {
-                if (!response.ok) throw new Error((await response.text()) || "Failed to load system apps");
+                if (!response.ok) throw new Error((await response.text()) || "Failed to load user overview");
                 return response.json();
             })
-            .then((data) => setSystemApps(data.apps || []))
+            .then((data) => {
+                if (data.overview) setOverviewData(data.overview);
+            })
             .catch((requestError) => {
-                if (requestError.name !== "AbortError") setSystemAppsError(requestError.message || "Failed to load system apps");
+                if (requestError.name !== "AbortError") setOverviewError(requestError.message || "Failed to load user overview");
             })
             .finally(() => {
-                if (!controller.signal.aborted) setSystemAppsLoading(false);
+                if (!controller.signal.aborted) setOverviewLoading(false);
             });
 
         return () => controller.abort();
-    }, [activeSection]);
+    }, [activeSection, selectedUser?.username]);
 
 
     const handleCreateUser = async (e: FormEvent) => {
@@ -518,31 +553,262 @@ export default function UsersRoute() {
                             ) : (
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                     {activeSection === "overview" ? (
-                                        <div className="border border-border bg-card">
-                                            <div className="border-b border-border px-4 py-3">
-                                                <h3 className="text-sm font-semibold">System Apps</h3>
-                                                <p className="mt-1 text-xs text-muted-foreground">Installation status and detected versions from the system Apps route.</p>
-                                            </div>
-                                            {systemAppsLoading ? (
-                                        <div className="flex items-center justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-                                    ) : systemAppsError ? (
-                                        <p className="p-4 text-xs text-destructive">{systemAppsError}</p>
-                                    ) : (
-                                        <div className="divide-y divide-border">
-                                            {systemApps.map((app) => (
-                                                <Link key={app.name} to={`/settings/apps/${encodeURIComponent(app.name)}`} className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50">
-                                                    <Boxes className="h-4 w-4 shrink-0 text-primary" />
-                                                    <span className="min-w-0 flex-1 truncate font-medium">{systemAppNames[app.name] || app.name}</span>
-                                                    <span className="font-mono text-xs text-muted-foreground">{app.version || app.versions?.join(", ") || "—"}</span>
-                                                    <span className={`inline-flex w-28 items-center gap-1.5 text-xs ${app.installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                                                        {app.installed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                                                        {app.installed ? "Installed" : "Not installed"}
-                                                    </span>
-                                                </Link>
-                                            ))}
+                                        <div className="space-y-6">
+                                            {overviewLoading ? (
+                                                <div className="flex items-center justify-center p-16">
+                                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                                </div>
+                                            ) : overviewError ? (
+                                                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-xs text-destructive">
+                                                    {overviewError}
+                                                </div>
+                                            ) : overviewData ? (
+                                                <div className="space-y-6">
+                                                    {/* 3 Metric Summary Cards */}
+                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                        {/* Card 1: Containers */}
+                                                        <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                                        Containers
+                                                                    </span>
+                                                                    <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                                                        <ContainerIcon className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-3 flex items-baseline gap-2">
+                                                                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                                                                        {overviewData.containers.total}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground">total</span>
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                                    {overviewData.containers.running} running · {overviewData.containers.stopped} stopped
+                                                                </p>
+                                                            </div>
+                                                            <div className="mt-4 pt-3 border-t border-border">
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/containers`}
+                                                                    className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                                                                >
+                                                                    Manage containers →
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Card 2: Virtual Hosts */}
+                                                        <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                                        Virtual Hosts
+                                                                    </span>
+                                                                    <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                                                        <Globe className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-3 flex items-baseline gap-2">
+                                                                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                                                                        {overviewData.vhosts.total}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground">configured</span>
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                                    {overviewData.vhosts.items.filter((v) => v.tls).length} with SSL/TLS enabled
+                                                                </p>
+                                                            </div>
+                                                            <div className="mt-4 pt-3 border-t border-border">
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/vhosts`}
+                                                                    className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                                                                >
+                                                                    Manage vhosts →
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Card 3: Storage */}
+                                                        <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                                        Storage
+                                                                    </span>
+                                                                    <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                                                        <HardDrive className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-3 flex items-baseline gap-2">
+                                                                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                                                                        {formatStorageBytes(overviewData.storage.homeUsed)}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground">home directory</span>
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground truncate" title={overviewData.storage.homePath}>
+                                                                    Disk: {overviewData.storage.diskUsage.toFixed(1)}% ({formatStorageBytes(overviewData.storage.diskUsed)} / {formatStorageBytes(overviewData.storage.diskTotal)})
+                                                                </p>
+                                                            </div>
+                                                            <div className="mt-4 pt-3 border-t border-border">
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/files`}
+                                                                    className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                                                                >
+                                                                    Browse files →
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Storage Overview Progress & Breakdown */}
+                                                    <div className="border border-border bg-card">
+                                                        <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
+                                                            <div>
+                                                                <h3 className="text-sm font-semibold text-foreground">Storage Overview</h3>
+                                                                <p className="text-xs text-muted-foreground font-mono">{overviewData.storage.homePath}</p>
+                                                            </div>
+                                                            <span className="text-xs font-mono font-medium text-muted-foreground">
+                                                                {formatStorageBytes(overviewData.storage.homeUsed)} used
+                                                            </span>
+                                                        </div>
+                                                        <div className="p-5 space-y-4">
+                                                            <div>
+                                                                <div className="flex justify-between text-xs mb-1.5">
+                                                                    <span className="text-muted-foreground">Filesystem Capacity</span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        {formatStorageBytes(overviewData.storage.diskUsed)} / {formatStorageBytes(overviewData.storage.diskTotal)} ({overviewData.storage.diskUsage.toFixed(1)}%)
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full transition-all duration-300 ${
+                                                                            overviewData.storage.diskUsage > 90
+                                                                                ? "bg-destructive"
+                                                                                : overviewData.storage.diskUsage > 75
+                                                                                ? "bg-amber-500"
+                                                                                : "bg-primary"
+                                                                        }`}
+                                                                        style={{ width: `${Math.min(100, Math.max(0, overviewData.storage.diskUsage))}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {overviewData.storage.breakdown && Object.keys(overviewData.storage.breakdown).length > 0 && (
+                                                                <div className="pt-3 border-t border-border">
+                                                                    <h4 className="text-xs font-semibold text-muted-foreground mb-3">Directories in Home</h4>
+                                                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                                                        {Object.entries(overviewData.storage.breakdown).map(([dir, size]) => (
+                                                                            <div key={dir} className="p-2.5 rounded border border-border bg-muted/20">
+                                                                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                                                                                    <Folder className="h-3.5 w-3.5 text-primary" />
+                                                                                    <span className="font-medium truncate">{dir}/</span>
+                                                                                </div>
+                                                                                <span className="font-mono text-xs font-semibold text-foreground">
+                                                                                    {formatStorageBytes(size)}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Containers & VHosts Preview Rows */}
+                                                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                                                        {/* Containers List */}
+                                                        <div className="border border-border bg-card flex flex-col">
+                                                            <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <ContainerIcon className="h-4 w-4 text-primary" />
+                                                                    <h3 className="text-sm font-semibold text-foreground">Containers</h3>
+                                                                </div>
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/containers`}
+                                                                    className="text-xs text-primary hover:underline font-medium"
+                                                                >
+                                                                    View all ({overviewData.containers.total})
+                                                                </Link>
+                                                            </div>
+                                                            <div className="p-4 flex-1">
+                                                                {overviewData.containers.items.length === 0 ? (
+                                                                    <div className="text-center py-6 text-xs text-muted-foreground">
+                                                                        No containers found for this user.
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="divide-y divide-border">
+                                                                        {overviewData.containers.items.slice(0, 5).map((c) => (
+                                                                            <div key={c.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                                                                                <div className="min-w-0">
+                                                                                    <div className="font-medium text-foreground truncate">{c.name}</div>
+                                                                                    <div className="text-muted-foreground font-mono truncate text-[11px]">{c.image}</div>
+                                                                                </div>
+                                                                                <span
+                                                                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                                                                                        c.status === "running"
+                                                                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                                                                            : "bg-muted text-muted-foreground border border-border"
+                                                                                    }`}
+                                                                                >
+                                                                                    {c.status}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Virtual Hosts List */}
+                                                        <div className="border border-border bg-card flex flex-col">
+                                                            <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Globe className="h-4 w-4 text-primary" />
+                                                                    <h3 className="text-sm font-semibold text-foreground">Virtual Hosts</h3>
+                                                                </div>
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/vhosts`}
+                                                                    className="text-xs text-primary hover:underline font-medium"
+                                                                >
+                                                                    View all ({overviewData.vhosts.total})
+                                                                </Link>
+                                                            </div>
+                                                            <div className="p-4 flex-1">
+                                                                {overviewData.vhosts.items.length === 0 ? (
+                                                                    <div className="text-center py-6 text-xs text-muted-foreground">
+                                                                        No virtual hosts configured for this user.
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="divide-y divide-border">
+                                                                        {overviewData.vhosts.items.slice(0, 5).map((v) => (
+                                                                            <div key={v.hostname} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                                                                                <div className="min-w-0">
+                                                                                    <div className="font-medium text-foreground truncate">{v.hostname}</div>
+                                                                                    {v.aliases && v.aliases.length > 0 && (
+                                                                                        <div className="text-muted-foreground truncate text-[11px]">
+                                                                                            {v.aliases.join(", ")}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span
+                                                                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                                                                                        v.tls
+                                                                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                                                                            : "bg-muted text-muted-foreground border border-border"
+                                                                                    }`}
+                                                                                >
+                                                                                    {v.tls ? "SSL / TLS" : "HTTP"}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : null}
                                         </div>
-                                    )}
-                                </div>
                                 ) : activeSection === "containers" ? (
                                     <div className="space-y-4">
                                         <ContainersRoute embedded={true} ownerFilter={selectedUser.username} key={selectedUser.username} />

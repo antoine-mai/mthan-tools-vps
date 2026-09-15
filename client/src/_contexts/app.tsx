@@ -43,7 +43,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 if (!settings) return;
                 setSettings(settings);
                 if (settings.general_app_name) {
-                    setCurrentAppName(storeAppName(settings.general_app_name));
+                    const resolvedName = (settings.general_app_name === "MThan VPS Panel" || settings.general_app_name === "MThan VPS")
+                        ? "MTHAN VPS"
+                        : settings.general_app_name;
+                    setCurrentAppName(storeAppName(resolvedName));
                 }
                 if (["system", "light", "dark"].includes(settings.general_color_mode)) {
                     setColorModePreference(settings.general_color_mode as ColorModePreference);

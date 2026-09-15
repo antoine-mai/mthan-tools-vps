@@ -1,13 +1,18 @@
-export const defaultAppName = "MThan VPS Panel";
+export const defaultAppName = "MTHAN VPS";
 
 const appNameStorageKey = "vps-app-name";
 
 export function getAppName() {
-    return window.localStorage.getItem(appNameStorageKey)?.trim() || defaultAppName;
+    const stored = window.localStorage.getItem(appNameStorageKey)?.trim();
+    if (!stored || stored === "MThan VPS Panel" || stored === "MThan VPS") {
+        return defaultAppName;
+    }
+    return stored;
 }
 
 export function storeAppName(appName: string) {
     const value = appName.trim() || defaultAppName;
-    window.localStorage.setItem(appNameStorageKey, value);
-    return value;
+    const finalValue = value === "MThan VPS Panel" || value === "MThan VPS" ? defaultAppName : value;
+    window.localStorage.setItem(appNameStorageKey, finalValue);
+    return finalValue;
 }

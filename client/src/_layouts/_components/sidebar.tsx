@@ -46,11 +46,11 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                 <Link
                     to="/"
                     className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background p-1.5 transition-transform hover:scale-105"
-                    title="MThan VPS"
+                    title="MTHAN VPS"
                 >
                     <img
                         src={`${runtime.basePath}/logo.svg`}
-                        alt="MThan VPS Logo"
+                        alt="MTHAN VPS Logo"
                         className="h-full w-full object-contain"
                     />
                 </Link>
