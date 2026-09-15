@@ -112,6 +112,7 @@ export default function UsersRoute() {
     const [activationSaving, setActivationSaving] = useState(false);
     const [activationError, setActivationError] = useState("");
     const [contextMenu, setContextMenu] = useState<UserContextMenu | null>(null);
+    const [deleteConfirmUser, setDeleteConfirmUser] = useState<LinuxUser | null>(null);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,9 +198,9 @@ export default function UsersRoute() {
 
     const deleteFromContextMenu = () => {
         if (!contextMenu) return;
-        const username = contextMenu.user.username;
+        const user = contextMenu.user;
         setContextMenu(null);
-        void handleDeleteUser(username);
+        setDeleteConfirmUser(user);
     };
 
     const fetchUsers = async (showRefresh = false) => {
@@ -341,10 +342,14 @@ export default function UsersRoute() {
         setModalError(null);
     };
 
-    const handleDeleteUser = async (username: string) => {
-        if (!window.confirm(`Are you sure you want to delete user "${username}"? All files in their home folder will be permanently deleted.`)) {
-            return;
-        }
+    const openDeleteConfirm = (user: LinuxUser) => {
+        setDeleteConfirmUser(user);
+    };
+
+    const confirmDeleteUser = async () => {
+        if (!deleteConfirmUser) return;
+        const username = deleteConfirmUser.username;
+        setDeleteConfirmUser(null);
 
         setIsDeleting(true);
         try {
@@ -518,7 +523,7 @@ export default function UsersRoute() {
                                             size="sm"
                                             variant="outline"
                                             className="h-7 text-destructive border-destructive/20 hover:bg-destructive/10 gap-1.5 shrink-0 rounded-none"
-                                            onClick={() => handleDeleteUser(selectedUser.username)}
+                                            onClick={() => openDeleteConfirm(selectedUser)}
                                             disabled={isDeleting}
                                         >
                                             {isDeleting ? (
@@ -879,6 +884,46 @@ export default function UsersRoute() {
                 </div>
             ) : null}
 
+
+            {deleteConfirmUser ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm border border-border bg-card shadow-lg">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <h3 className="text-sm font-semibold">Delete User</h3>
+                            </div>
+                            <button type="button" onClick={() => setDeleteConfirmUser(null)} disabled={isDeleting} aria-label="Close">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-3 p-5">
+                            <p className="text-sm text-muted-foreground">
+                                Are you sure you want to permanently delete this account?
+                            </p>
+                            <div className="rounded-none border border-destructive/20 bg-destructive/5 px-3 py-2.5">
+                                <p className="font-mono text-sm font-semibold text-destructive">{deleteConfirmUser.username}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{deleteConfirmUser.home}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                All files in their home directory will be <span className="font-semibold text-destructive">permanently deleted</span> and cannot be recovered.
+                            </p>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+                            <Button type="button" variant="outline" onClick={() => setDeleteConfirmUser(null)} disabled={isDeleting}>Cancel</Button>
+                            <Button
+                                type="button"
+                                className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={confirmDeleteUser}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Delete permanently
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {activationOpen && selectedUser ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">

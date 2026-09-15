@@ -31,12 +31,6 @@ func Handler() http.Handler {
 			return
 		}
 
-		// Security constraint: only recognize and delete home users starting with "user-"
-		if !strings.HasPrefix(username, "user-") {
-			http.Error(w, "permission denied: only accounts starting with 'user-' can be deleted", http.StatusForbidden)
-			return
-		}
-
 		// Run userdel -r <username>
 		cmd := exec.Command("userdel", "-r", username)
 		if output, err := cmd.CombinedOutput(); err != nil {
