@@ -158,15 +158,109 @@ function VHostsStandalone() {
                 </aside>
 
                 {/* Main content */}
-                <main className="overflow-y-auto p-6">
-                    <VHostsContent
-                        ownerFilter={ownerFilter}
-                        pageTitle={pageTitle}
-                        activeOwner={activeOwner}
-                    />
-                </main>
+                {activeOwner === "caddyfile" ? (
+                    <main className="overflow-y-auto p-6">
+                        <VHostsContent
+                            ownerFilter={undefined}
+                            pageTitle="Caddyfile — All VHosts"
+                            activeOwner="caddyfile"
+                        />
+                    </main>
+                ) : (
+                    <UserCaddyfileEditor username={activeOwner} key={activeOwner} />
+                )}
             </div>
         </DashboardLayout>
+    );
+}
+
+// ─── Inline user Caddyfile editor ────────────────────────────────────────────
+
+function UserCaddyfileEditor({ username }: { username: string }) {
+    const path = `/etc/caddy/Caddyfile.d/mthan-users/${username}.caddy`;
+    const [content, setContent] = useState("");
+    const [loadingFile, setLoadingFile] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        setLoadingFile(true);
+        setError("");
+        setSaved(false);
+        const query = new URLSearchParams({ app: "caddy", path });
+        fetch(`/post/apps/config?${query}`, { cache: "no-store" })
+            .then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
+            .then((data: { content: string }) => setContent(data.content ?? ""))
+            .catch((reason) => setError(reason instanceof Error ? reason.message : "Failed to load Caddyfile"))
+            .finally(() => setLoadingFile(false));
+    }, [path]);
+
+    const save = async () => {
+        setSaving(true);
+        setSaved(false);
+        setError("");
+        try {
+            const query = new URLSearchParams({ app: "caddy", path });
+            const response = await fetch(`/post/apps/config?${query}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || "Failed to save Caddyfile");
+            const reload = await fetch("/post/vhost/reload", { method: "POST" });
+            if (!reload.ok) throw new Error((await reload.text()) || "Caddyfile saved, but Caddy could not be reloaded");
+            setSaved(true);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Failed to save Caddyfile");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="flex h-full flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-5 py-3">
+                <div>
+                    <p className="text-sm font-semibold text-foreground">{username}.caddy</p>
+                    <code className="text-[11px] text-muted-foreground">{path}</code>
+                </div>
+                <div className="flex items-center gap-2">
+                    {saved && !saving ? (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved & reloaded</span>
+                    ) : null}
+                    <Button size="sm" className="gap-2" onClick={save} disabled={loadingFile || saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save & reload
+                    </Button>
+                </div>
+            </div>
+
+            {/* Error */}
+            {error ? (
+                <div className="shrink-0 border-b border-destructive/20 bg-destructive/10 px-5 py-2 text-xs text-destructive">
+                    {error.trim()}
+                </div>
+            ) : null}
+
+            {/* Editor body */}
+            <div className="min-h-0 flex-1 bg-background">
+                {loadingFile ? (
+                    <div className="flex h-full items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <textarea
+                        value={content}
+                        onChange={(e) => { setContent(e.target.value); setSaved(false); }}
+                        spellCheck={false}
+                        className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 text-foreground outline-none"
+                        aria-label={`${username}.caddy content`}
+                    />
+                )}
+            </div>
+        </div>
     );
 }
 
