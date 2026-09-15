@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
+	"strconv"
+	"syscall"
 
 	"github.com/creack/pty"
 	"golang.org/x/net/websocket"
@@ -45,9 +48,10 @@ func Handler(sessions *services.SessionService, startup services.StartupConfig, 
 					_ = ws.Close()
 					return
 				}
-				cmd = exec.Command("su", "-", targetUsername)
+				cmd = userShell(target)
 			} else {
 				cmd = loginShell()
+				cmd.Env = append(os.Environ(), "TERM=xterm-256color", "USER="+session.Username)
 			}
 		} else {
 			if req.URL.Query().Get("user") != "" {
@@ -60,16 +64,16 @@ func Handler(sessions *services.SessionService, startup services.StartupConfig, 
 					_ = ws.Close()
 					return
 				}
-				cmd = exec.Command("su", "-", session.Username)
+				cmd = userShell(target)
 			} else {
 				if startup.UID != session.UID || startup.Username != session.Username {
 					_ = ws.Close()
 					return
 				}
 				cmd = loginShell()
+				cmd.Env = append(os.Environ(), "TERM=xterm-256color", "USER="+session.Username)
 			}
 		}
-		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "USER="+session.Username)
 
 		ptmx, err := pty.Start(cmd)
 		if err != nil {
@@ -130,4 +134,62 @@ func loginShell() *exec.Cmd {
 		shell = "/bin/sh"
 	}
 	return exec.Command(shell)
+}
+
+func userShell(target *user.User) *exec.Cmd {
+	shell := "/bin/bash"
+	if _, err := os.Stat(shell); os.IsNotExist(err) {
+		shell = "/bin/sh"
+	}
+
+	var cmd *exec.Cmd
+	uid, errUid := strconv.ParseUint(target.Uid, 10, 32)
+	gid, errGid := strconv.ParseUint(target.Gid, 10, 32)
+
+	if os.Geteuid() == 0 && errUid == nil && errGid == nil {
+		cmd = exec.Command(shell)
+		var groups []uint32
+		if gids, err := target.GroupIds(); err == nil {
+			for _, g := range gids {
+				if gVal, err := strconv.ParseUint(g, 10, 32); err == nil {
+					groups = append(groups, uint32(gVal))
+				}
+			}
+		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid:    uint32(uid),
+				Gid:    uint32(gid),
+				Groups: groups,
+			},
+		}
+	} else {
+		// Non-root fallback without login flag to prevent PAM lastlog output
+		cmd = exec.Command("su", "-s", shell, target.Username)
+	}
+
+	if target.HomeDir != "" {
+		if _, err := os.Stat(target.HomeDir); err == nil {
+			cmd.Dir = target.HomeDir
+		}
+		// Ensure .hushlogin exists to suppress Last login on any PAM/login implementations
+		hushPath := filepath.Join(target.HomeDir, ".hushlogin")
+		if _, err := os.Stat(hushPath); os.IsNotExist(err) {
+			if f, err := os.OpenFile(hushPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644); err == nil {
+				_ = f.Close()
+				if os.Geteuid() == 0 && errUid == nil && errGid == nil {
+					_ = os.Chown(hushPath, int(uid), int(gid))
+				}
+			}
+		}
+	}
+
+	cmd.Env = append(os.Environ(),
+		"TERM=xterm-256color",
+		"USER="+target.Username,
+		"LOGNAME="+target.Username,
+		"HOME="+target.HomeDir,
+		"SHELL="+shell,
+	)
+	return cmd
 }
