@@ -19,6 +19,7 @@ export default function AppRoutes() {
             <Route path="/login" element={<LoginRoute />} />
             <Route path="/files" element={<FilesRoute />} />
             <Route path="/vhosts" element={<VHostsRoute />} />
+            <Route path="/vhosts/:owner" element={<VHostsRoute />} />
             <Route path="/containers" element={<ContainersRoute />} />
             <Route path="/agent" element={<AgentRoute />} />
             {runtime.isRoot ? (

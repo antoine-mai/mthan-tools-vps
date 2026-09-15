@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileCode2, Globe, Loader2, Pencil, RefreshCw, Save, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import {
+    ChevronDown,
+    ChevronRight,
+    ExternalLink,
+    FileCode2,
+    Globe,
+    Loader2,
+    Pencil,
+    RefreshCw,
+    Save,
+    Search,
+    ShieldCheck,
+    ShieldOff,
+    Trash2,
+    User,
+    X,
+} from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
@@ -20,6 +37,14 @@ type EditTarget = {
     path: string;
 };
 
+type LinuxUser = {
+    username: string;
+    uid: number;
+    home: string;
+};
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
 export default function VHostsRoute({
     embedded = false,
     ownerFilter,
@@ -27,15 +52,149 @@ export default function VHostsRoute({
     embedded?: boolean;
     ownerFilter?: string;
 } = {}) {
+    if (embedded) {
+        return <VHostsContent ownerFilter={ownerFilter} embedded />;
+    }
+    return <VHostsStandalone />;
+}
+
+// ─── Standalone with subsidebar ───────────────────────────────────────────────
+
+function VHostsStandalone() {
+    const { owner: ownerParam } = useParams<{ owner?: string }>();
+    const activeOwner = ownerParam || "caddyfile";
+
+    const [users, setUsers] = useState<LinuxUser[]>([]);
+    const [usersOpen, setUsersOpen] = useState(true);
+    const [loadingUsers, setLoadingUsers] = useState(runtime.isRoot);
+
+    useEffect(() => {
+        if (!runtime.isRoot) return;
+        setLoadingUsers(true);
+        fetch("/post/user/list", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                const list: LinuxUser[] = (data?.users ?? []).filter(
+                    (u: LinuxUser) => u.uid !== 0
+                );
+                setUsers(list);
+            })
+            .catch(() => setUsers([]))
+            .finally(() => setLoadingUsers(false));
+    }, []);
+
+    const ownerFilter = activeOwner === "caddyfile" ? undefined : activeOwner;
+    const pageTitle =
+        activeOwner === "caddyfile"
+            ? "Caddyfile — All VHosts"
+            : `${activeOwner} — VHosts`;
+
+    return (
+        <DashboardLayout title="VHosts" fullWidth>
+            <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[220px_1fr]">
+                {/* Subsidebar */}
+                <aside className="flex h-full flex-col overflow-y-auto border-r border-border bg-card/60">
+                    {/* Root node: Caddyfile */}
+                    <Link
+                        to="/vhosts"
+                        className={`flex items-center gap-2.5 border-b border-border px-3 py-3 text-xs font-semibold transition-colors ${
+                            activeOwner === "caddyfile"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                    >
+                        <FileCode2 className="h-4 w-4 shrink-0" />
+                        Caddyfile
+                        {activeOwner === "caddyfile" ? (
+                            <span className="ml-auto text-[10px] font-medium text-primary/60">All</span>
+                        ) : null}
+                    </Link>
+
+                    {/* Users subtree (root only) */}
+                    {runtime.isRoot && (
+                        <div className="flex flex-col">
+                            <button
+                                type="button"
+                                onClick={() => setUsersOpen((v) => !v)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                                {usersOpen ? (
+                                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                                ) : (
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                                )}
+                                Users
+                            </button>
+
+                            {usersOpen && (
+                                <nav className="flex flex-col gap-0.5 pb-2 pl-5 pr-2">
+                                    {loadingUsers ? (
+                                        <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            Loading…
+                                        </div>
+                                    ) : users.length === 0 ? (
+                                        <p className="px-2 py-1 text-[11px] text-muted-foreground">No users</p>
+                                    ) : (
+                                        users.map((u) => (
+                                            <Link
+                                                key={u.username}
+                                                to={`/vhosts/${encodeURIComponent(u.username)}`}
+                                                className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-[11px] transition-colors ${
+                                                    activeOwner === u.username
+                                                        ? "font-semibold text-primary"
+                                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                }`}
+                                            >
+                                                <User className="h-3.5 w-3.5 shrink-0" />
+                                                {u.username}
+                                            </Link>
+                                        ))
+                                    )}
+                                </nav>
+                            )}
+                        </div>
+                    )}
+                </aside>
+
+                {/* Main content */}
+                <main className="overflow-y-auto p-6">
+                    <VHostsContent
+                        ownerFilter={ownerFilter}
+                        pageTitle={pageTitle}
+                        activeOwner={activeOwner}
+                    />
+                </main>
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Shared content (table + modals) ─────────────────────────────────────────
+
+function VHostsContent({
+    embedded = false,
+    ownerFilter,
+    pageTitle,
+    activeOwner,
+}: {
+    embedded?: boolean;
+    ownerFilter?: string;
+    pageTitle?: string;
+    activeOwner?: string;
+}) {
     const [vhosts, setVhosts] = useState<CaddyVHost[]>([]);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [editing, setEditing] = useState<EditTarget | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
     const endpoint = runtime.isRoot
-        ? (ownerFilter ? `/post/vhost/list?owner=${encodeURIComponent(ownerFilter)}` : "/post/vhost/list")
+        ? ownerFilter
+            ? `/post/vhost/list?owner=${encodeURIComponent(ownerFilter)}`
+            : "/post/vhost/list"
         : "/api/vhost/list";
 
     const loadVHosts = useCallback(async () => {
@@ -43,9 +202,10 @@ export default function VHostsRoute({
         setError("");
         try {
             const response = await fetch(endpoint, { cache: "no-store" });
-            if (!response.ok) throw new Error((await response.text()) || "Failed to load Caddy virtual hosts");
+            if (!response.ok)
+                throw new Error((await response.text()) || "Failed to load Caddy virtual hosts");
             const data: { vhosts?: CaddyVHost[] } = await response.json();
-            setVhosts((data.vhosts ?? []).filter((vhost) => vhost.server === "caddy"));
+            setVhosts((data.vhosts ?? []).filter((v) => v.server === "caddy"));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : "Failed to load Caddy virtual hosts");
         } finally {
@@ -65,23 +225,27 @@ export default function VHostsRoute({
     const filtered = useMemo(() => {
         const value = query.trim().toLowerCase();
         if (!value) return baseVHosts;
-        return baseVHosts.filter((vhost) =>
-            vhost.hostname.toLowerCase().includes(value) ||
-            vhost.aliases.some((alias) => alias.toLowerCase().includes(value)) ||
-            (vhost.owner && vhost.owner.toLowerCase().includes(value))
+        return baseVHosts.filter(
+            (vhost) =>
+                vhost.hostname.toLowerCase().includes(value) ||
+                vhost.aliases.some((a) => a.toLowerCase().includes(value)) ||
+                (vhost.owner && vhost.owner.toLowerCase().includes(value))
         );
     }, [query, baseVHosts]);
 
-    const deleteVHost = async (hostname: string) => {
-        if (!window.confirm(`Delete ${hostname} from the Caddy configuration? This cannot be undone.`)) return;
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        const hostname = deleteTarget;
+        setDeleteTarget(null);
         setDeleting(hostname);
         setError("");
         try {
-            const deleteEndpoint = runtime.isRoot
+            const ep = runtime.isRoot
                 ? `/post/vhost/${encodeURIComponent(hostname)}`
                 : `/api/vhost/${encodeURIComponent(hostname)}`;
-            const response = await fetch(deleteEndpoint, { method: "DELETE" });
-            if (!response.ok) throw new Error((await response.text()) || "Failed to delete virtual host");
+            const response = await fetch(ep, { method: "DELETE" });
+            if (!response.ok)
+                throw new Error((await response.text()) || "Failed to delete virtual host");
             await loadVHosts();
         } catch (deleteError) {
             setError(deleteError instanceof Error ? deleteError.message : "Failed to delete virtual host");
@@ -90,65 +254,88 @@ export default function VHostsRoute({
         }
     };
 
-    const content = (
+    return (
         <div className="space-y-4">
-            {embedded ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 className="text-sm font-semibold text-foreground">Virtual Hosts</h3>
-                        <p className="text-xs text-muted-foreground">Caddy virtual hosts owned by {ownerFilter || "this user"}.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Filter hosts..."
-                                className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
-                            />
-                        </div>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={loadVHosts} disabled={loading}>
-                            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                            Refresh
-                        </Button>
-                        {ownerFilter && runtime.isRoot ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => setEditing({
-                                    title: `${ownerFilter}.caddy`,
-                                    path: `/etc/caddy/Caddyfile.d/mthan-users/${ownerFilter}.caddy`,
-                                })}
-                            >
-                                <FileCode2 className="h-4 w-4" />
-                                Edit Caddyfile
-                            </Button>
-                        ) : null}
-                    </div>
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                    {embedded ? (
+                        <>
+                            <h3 className="text-sm font-semibold text-foreground">Virtual Hosts</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Caddy virtual hosts owned by {ownerFilter || "this user"}.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-base font-semibold text-foreground">{pageTitle}</h2>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {filtered.length} of {baseVHosts.length} virtual host
+                                {baseVHosts.length !== 1 ? "s" : ""}
+                            </p>
+                        </>
+                    )}
                 </div>
-            ) : (
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-10 max-w-md flex-1 items-center gap-2 rounded-md border border-border bg-card px-3">
-                        <Search className="h-4 w-4 text-muted-foreground" />
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search Caddy hosts by hostname, alias, owner..."
-                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Filter hosts…"
+                            className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                         />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        {filtered.length} of {baseVHosts.length} virtual hosts
-                    </p>
-                </div>
-            )}
 
-            {error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error.trim()}</div> : null}
+                    <Button variant="outline" size="sm" className="gap-2" onClick={loadVHosts} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+
+                    {ownerFilter && runtime.isRoot ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() =>
+                                setEditing({
+                                    title: `${ownerFilter}.caddy`,
+                                    path: `/etc/caddy/Caddyfile.d/mthan-users/${ownerFilter}.caddy`,
+                                })
+                            }
+                        >
+                            <FileCode2 className="h-4 w-4" />
+                            Edit Caddyfile
+                        </Button>
+                    ) : null}
+
+                    {!ownerFilter && !embedded && runtime.isRoot ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() =>
+                                setEditing({ title: "Caddyfile", path: "/etc/caddy/Caddyfile" })
+                            }
+                        >
+                            <FileCode2 className="h-4 w-4" />
+                            Edit Caddyfile
+                        </Button>
+                    ) : null}
+                </div>
+            </div>
+
+            {error ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {error.trim()}
+                </div>
+            ) : null}
 
             {loading ? (
-                <div className="flex min-h-64 items-center justify-center rounded-md border border-border bg-card"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                <div className="flex min-h-64 items-center justify-center rounded-md border border-border bg-card">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
             ) : filtered.length === 0 ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border text-center">
                     <Globe className="mb-3 h-9 w-9 text-muted-foreground/40" />
@@ -176,41 +363,82 @@ export default function VHostsRoute({
                             <tbody className="divide-y divide-border">
                                 {filtered.map((vhost) => (
                                     <tr key={vhost.hostname} className="hover:bg-muted/30">
-                                        <td className="px-4 py-3 font-medium text-foreground"><span className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" />{vhost.hostname}</span></td>
                                         <td className="px-4 py-3 font-medium text-foreground">
+                                            <span className="flex items-center gap-2">
+                                                <Globe className="h-4 w-4 text-primary" />
+                                                {vhost.hostname}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
                                             <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground">
                                                 {vhost.owner || "system"}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground">{vhost.aliases.length ? vhost.aliases.join(", ") : "—"}</td>
-                                        <td className="px-4 py-3 font-mono text-muted-foreground">{vhost.listen.length ? vhost.listen.join(", ") : ":80, :443"}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">
+                                            {vhost.aliases.length ? vhost.aliases.join(", ") : "—"}
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-muted-foreground">
+                                            {vhost.listen.length ? vhost.listen.join(", ") : ":80, :443"}
+                                        </td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center gap-1.5 ${vhost.tls ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                                                {vhost.tls ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 ${
+                                                    vhost.tls
+                                                        ? "text-emerald-600 dark:text-emerald-400"
+                                                        : "text-muted-foreground"
+                                                }`}
+                                            >
+                                                {vhost.tls ? (
+                                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ShieldOff className="h-3.5 w-3.5" />
+                                                )}
                                                 {vhost.tls ? "Automatic" : "HTTP"}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <span className="inline-flex items-center gap-1.5">
-                                            {runtime.isRoot ? <>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 gap-1.5 px-2 text-xs"
-                                                    onClick={() => setEditing({
-                                                        title: vhost.hostname,
-                                                        path: vhost.configFiles?.[0] || "/etc/caddy/Caddyfile",
-                                                    })}
+                                                {runtime.isRoot ? (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 gap-1.5 px-2 text-xs"
+                                                            onClick={() =>
+                                                                setEditing({
+                                                                    title: vhost.hostname,
+                                                                    path: vhost.configFiles?.[0] || "/etc/caddy/Caddyfile",
+                                                                })
+                                                            }
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                            Edit
+                                                        </Button>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="outline"
+                                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                                            onClick={() => setDeleteTarget(vhost.hostname)}
+                                                            disabled={deleting === vhost.hostname}
+                                                            aria-label={`Delete ${vhost.hostname}`}
+                                                        >
+                                                            {deleting === vhost.hostname ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </Button>
+                                                    </>
+                                                ) : null}
+                                                <a
+                                                    href={`${vhost.tls ? "https" : "http"}://${vhost.hostname}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                    aria-label={`Open ${vhost.hostname}`}
                                                 >
-                                                    <Pencil className="h-3.5 w-3.5" />Edit
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteVHost(vhost.hostname)} disabled={deleting === vhost.hostname} aria-label={`Delete ${vhost.hostname}`} title={`Delete ${vhost.hostname}`}>
-                                                    {deleting === vhost.hostname ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                                                </Button>
-                                            </> : null}
-                                            <a href={`${vhost.tls ? "https" : "http"}://${vhost.hostname}`} target="_blank" rel="noreferrer" className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Open ${vhost.hostname}`} title={`Open ${vhost.hostname}`}>
-                                                <ExternalLink className="h-3.5 w-3.5" />
-                                            </a>
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                </a>
                                             </span>
                                         </td>
                                     </tr>
@@ -220,37 +448,54 @@ export default function VHostsRoute({
                     </div>
                 </div>
             )}
+
+            {/* Delete confirm modal */}
+            {deleteTarget ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm border border-border bg-card shadow-lg">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <h3 className="text-sm font-semibold">Delete Virtual Host</h3>
+                            </div>
+                            <button type="button" onClick={() => setDeleteTarget(null)} aria-label="Close">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-3 p-5">
+                            <p className="text-sm text-muted-foreground">
+                                Remove this virtual host from the Caddy configuration?
+                            </p>
+                            <div className="border border-destructive/20 bg-destructive/5 px-3 py-2.5">
+                                <p className="font-mono text-sm font-semibold text-destructive">{deleteTarget}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                This action <span className="font-semibold text-destructive">cannot be undone</span>.
+                            </p>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+                            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                            <Button
+                                className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={confirmDelete}
+                                disabled={!!deleting}
+                            >
+                                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Delete
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             {editing ? (
-                <CaddyEditor
-                    title={editing.title}
-                    path={editing.path}
-                    onClose={() => setEditing(null)}
-                    onSaved={loadVHosts}
-                />
+                <CaddyEditor title={editing.title} path={editing.path} onClose={() => setEditing(null)} onSaved={loadVHosts} />
             ) : null}
         </div>
     );
-
-    if (embedded) {
-        return content;
-    }
-
-    return (
-        <DashboardLayout
-            title="Caddy VHosts"
-            description="View public hosts and routes loaded from the system Caddyfile."
-            wide
-            actions={
-                <Button variant="outline" size="sm" className="gap-2" onClick={loadVHosts} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    Refresh
-                </Button>
-            }
-        >
-            {content}
-        </DashboardLayout>
-    );
 }
+
+// ─── Caddy file editor modal ───────────────────────────────────────────────────
 
 function CaddyEditor({
     title,
@@ -264,17 +509,17 @@ function CaddyEditor({
     onSaved: () => Promise<void>;
 }) {
     const [content, setContent] = useState("");
-    const [loading, setLoading] = useState(true);
+    const [loadingFile, setLoadingFile] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
         const query = new URLSearchParams({ app: "caddy", path });
         fetch(`/post/apps/config?${query}`, { cache: "no-store" })
-            .then(async (response) => { if (!response.ok) throw new Error(await response.text()); return response.json(); })
+            .then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
             .then((data: { content: string }) => setContent(data.content ?? ""))
             .catch((reason) => setError(reason instanceof Error ? reason.message : "Failed to load Caddyfile"))
-            .finally(() => setLoading(false));
+            .finally(() => setLoadingFile(false));
     }, [path]);
 
     const save = async () => {
@@ -311,14 +556,20 @@ function CaddyEditor({
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
-                {error ? <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-2 text-xs text-destructive">{error.trim()}</div> : null}
+                {error ? (
+                    <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-2 text-xs text-destructive">
+                        {error.trim()}
+                    </div>
+                ) : null}
                 <div className="min-h-0 flex-1 bg-background">
-                    {loading ? (
-                        <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                    {loadingFile ? (
+                        <div className="flex h-full items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
                     ) : (
                         <textarea
                             value={content}
-                            onChange={(event) => setContent(event.target.value)}
+                            onChange={(e) => setContent(e.target.value)}
                             spellCheck={false}
                             className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 text-foreground outline-none"
                             aria-label="Caddyfile content"
@@ -327,7 +578,7 @@ function CaddyEditor({
                 </div>
                 <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
                     <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-                    <Button size="sm" className="gap-2" onClick={save} disabled={loading || saving}>
+                    <Button size="sm" className="gap-2" onClick={save} disabled={loadingFile || saving}>
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Save & reload
                     </Button>
