@@ -181,62 +181,59 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
     const content = (
         <div className="space-y-4">
             {/* Header / Actions bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                    {embedded ? (
-                        <>
-                            <h3 className="text-base font-semibold text-foreground">User Backups</h3>
-                            <p className="text-xs text-muted-foreground">
-                                Manage backup archives stored in {activeUser}&apos;s home backup directory.
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <h2 className="text-lg font-bold tracking-tight text-foreground">Backups</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Create, download, restore and manage compressed user data archives.
-                            </p>
-                        </>
-                    )}
+            {embedded ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-sm font-semibold text-foreground">User Backups</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Manage backup archives stored in {activeUser}&apos;s home backup directory.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Filter backups…"
+                                className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                            />
+                        </div>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loading}>
+                            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="gap-2"
+                            onClick={handleCreateBackup}
+                            disabled={actionLoading !== null}
+                        >
+                            {actionLoading === "create" ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Plus className="h-4 w-4" />
+                            )}
+                            Create Backup
+                        </Button>
+                    </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
+            ) : (
+                <div className="flex items-center justify-between gap-3">
+                    <div className="relative w-80">
                         <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Filter backups…"
-                            className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                            placeholder="Search by archive name or user…"
+                            className="h-9 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                         />
                     </div>
-
-                    <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loading}>
-                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                        Refresh
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => {
-                            if (activeUser) {
-                                handleCreateBackup();
-                            } else {
-                                setCreateModalOpen(true);
-                            }
-                        }}
-                        disabled={actionLoading !== null}
-                    >
-                        {actionLoading === "create" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Plus className="h-4 w-4" />
-                        )}
-                        Create Backup
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                        {filtered.length} of {backups.length} backup{backups.length !== 1 ? "s" : ""}
+                    </p>
                 </div>
-            </div>
+            )}
 
             {error ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
@@ -479,10 +476,31 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
             description="Manage and restore user and system backup archives."
             wide
             actions={
-                <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                            if (activeUser) {
+                                handleCreateBackup();
+                            } else {
+                                setCreateModalOpen(true);
+                            }
+                        }}
+                        disabled={actionLoading !== null}
+                    >
+                        {actionLoading === "create" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4" />
+                        )}
+                        Create Backup
+                    </Button>
+                </div>
             }
         >
             {content}
