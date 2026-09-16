@@ -23,6 +23,7 @@ type Dependencies struct {
 	Sessions    *services.SessionService
 	System      *services.SystemService
 	Startup     services.StartupConfig
+	Settings    *services.SettingsService
 }
 
 func Register(mux *http.ServeMux, deps Dependencies) {
@@ -118,6 +119,13 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("POST /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("DELETE /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("POST /api/backup/restore", public(apibackup.RestoreHandler(deps.Sessions, services.NewBackupService())))
+	if deps.Settings != nil {
+		if backupStorageSvc, err := services.NewBackupStorageService(deps.Settings.DB()); err == nil {
+			mux.Handle("GET /api/backup/storage", public(apibackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+			mux.Handle("POST /api/backup/storage", public(apibackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+			mux.Handle("DELETE /api/backup/storage", public(apibackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+		}
+	}
 
 	mux.Handle("GET /healthz", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, deps.Health.Status())

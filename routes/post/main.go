@@ -80,6 +80,11 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("POST /post/backup", postOnly(deps.Startup, deps.Sessions, postbackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("DELETE /post/backup", postOnly(deps.Startup, deps.Sessions, postbackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("POST /post/backup/restore", postOnly(deps.Startup, deps.Sessions, postbackup.RestoreHandler(deps.Sessions, services.NewBackupService())))
+	if backupStorageSvc, err := services.NewBackupStorageService(deps.Settings.DB()); err == nil {
+		mux.Handle("GET /post/backup/storage", postOnly(deps.Startup, deps.Sessions, postbackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+		mux.Handle("POST /post/backup/storage", postOnly(deps.Startup, deps.Sessions, postbackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+		mux.Handle("DELETE /post/backup/storage", postOnly(deps.Startup, deps.Sessions, postbackup.StorageHandler(deps.Sessions, backupStorageSvc)))
+	}
 }
 
 func authenticatedSystemHandler(sessions *services.SessionService, system *services.SystemService) http.Handler {

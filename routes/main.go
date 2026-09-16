@@ -28,6 +28,7 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 		Sessions:    deps.Sessions,
 		System:      deps.System,
 		Startup:     deps.Startup,
+		Settings:    deps.Settings,
 	})
 
 	post.Register(mux, post.Dependencies{

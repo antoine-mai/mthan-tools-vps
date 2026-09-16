@@ -108,6 +108,10 @@ func (s *SettingsService) Get(key, fallback string) string {
 	return value
 }
 
+func (s *SettingsService) DB() *sql.DB {
+	return s.db
+}
+
 func settingsDBPath() string {
 	if path := os.Getenv(settingsDBEnv); path != "" {
 		return path
