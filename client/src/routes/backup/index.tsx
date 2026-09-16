@@ -10,6 +10,7 @@ import {
     RotateCcw,
     Search,
     Settings2,
+    SlidersHorizontal,
     Trash2,
     X,
 } from "lucide-react";
@@ -69,7 +70,8 @@ function formatDate(iso: string): string {
 }
 
 export default function BackupRoute({ embedded = false, username }: BackupRouteProps) {
-    const [storageSettingsOpen, setStorageSettingsOpen] = useState(false);
+    const [backupSettingsOpen, setBackupSettingsOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<"storage" | "general">("storage");
 
     // Backups state
     const [backups, setBackups] = useState<BackupItem[]>([]);
@@ -353,15 +355,11 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                                 className="gap-2"
                                 onClick={() => {
                                     fetchStorages();
-                                    setStorageSettingsOpen(true);
+                                    setBackupSettingsOpen(true);
                                 }}
                             >
                                 <Settings2 className="h-4 w-4" />
                                 Settings
-                            </Button>
-                            <Button variant="outline" size="sm" className="gap-2" onClick={openAddStorageModal}>
-                                <Plus className="h-4 w-4" />
-                                Add Storage
                             </Button>
                             <Button
                                 size="sm"
@@ -504,160 +502,253 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                     )}
                 </div>
 
-            {/* Storage Settings Modal */}
-            {storageSettingsOpen && (
+            {/* Backup Settings Modal */}
+            {backupSettingsOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
                     <div className="flex max-h-[85vh] w-full max-w-3xl flex-col border border-border bg-card shadow-lg">
                         {/* Header */}
                         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                            <div className="flex items-center gap-2">
-                                <Settings2 className="h-4 w-4 text-primary" />
+                            <div className="flex items-center gap-2.5">
+                                <Settings2 className="h-5 w-5 text-primary" />
                                 <div>
-                                    <h3 className="text-sm font-semibold">Storage Settings</h3>
+                                    <h3 className="text-sm font-semibold text-foreground">Backup Settings</h3>
                                     <p className="text-xs text-muted-foreground">
-                                        Configure remote cloud storage destinations (Amazon S3, Cloudflare R2, Google Drive, Microsoft OneDrive).
+                                        Configure remote cloud storage, retention policies, and general backup options.
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button size="sm" className="gap-1.5" onClick={openAddStorageModal}>
-                                    <Plus className="h-4 w-4" />
-                                    Add Storage
-                                </Button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStorageSettingsOpen(false)}
-                                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setBackupSettingsOpen(false)}
+                                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Modal Sub-navigation Tabs */}
+                        <div className="flex border-b border-border px-5 bg-muted/20">
+                            <button
+                                type="button"
+                                onClick={() => setSettingsTab("storage")}
+                                className={`flex items-center gap-2 border-b-2 py-2.5 px-3 text-xs font-semibold transition-colors ${
+                                    settingsTab === "storage"
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Cloud className="h-4 w-4" />
+                                Storage Destinations
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground font-normal">
+                                    {storages.length}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSettingsTab("general")}
+                                className={`flex items-center gap-2 border-b-2 py-2.5 px-3 text-xs font-semibold transition-colors ${
+                                    settingsTab === "general"
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <SlidersHorizontal className="h-4 w-4" />
+                                General
+                            </button>
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                            {storageError ? (
-                                <div className="rounded border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
-                                    {storageError.trim()}
-                                </div>
-                            ) : null}
+                            {settingsTab === "storage" && (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-foreground">Storage Locations</h4>
+                                            <p className="text-xs text-muted-foreground">
+                                                Configure remote cloud storage destinations (Amazon S3, Cloudflare R2, Google Drive, Microsoft OneDrive).
+                                            </p>
+                                        </div>
+                                        <Button size="sm" className="gap-1.5" onClick={openAddStorageModal}>
+                                            <Plus className="h-4 w-4" />
+                                            Add Storage
+                                        </Button>
+                                    </div>
 
-                            {loadingStorages ? (
-                                <div className="flex min-h-56 items-center justify-center">
-                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                </div>
-                            ) : storages.length === 0 ? (
-                                <div className="flex min-h-56 flex-col items-center justify-center rounded border border-dashed border-border p-8 text-center">
-                                    <Cloud className="mb-3 h-10 w-10 text-muted-foreground/40" />
-                                    <p className="text-sm font-medium text-foreground">No storage destinations configured</p>
-                                    <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                                        Add an S3 bucket, Cloudflare R2 bucket, Google Drive folder, or OneDrive destination to manage remote backups.
-                                    </p>
-                                    <Button size="sm" className="mt-4 gap-2" onClick={openAddStorageModal}>
-                                        <Plus className="h-4 w-4" />
-                                        Add Storage Destination
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {storages.map((st) => (
-                                        <div key={st.id} className="relative flex flex-col justify-between rounded border border-border bg-background p-4 shadow-sm">
-                                            <div>
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="rounded bg-primary/10 p-2 text-primary">
-                                                            <Cloud className="h-4 w-4" />
+                                    {storageError ? (
+                                        <div className="rounded border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+                                            {storageError.trim()}
+                                        </div>
+                                    ) : null}
+
+                                    {loadingStorages ? (
+                                        <div className="flex min-h-56 items-center justify-center">
+                                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                        </div>
+                                    ) : storages.length === 0 ? (
+                                        <div className="flex min-h-56 flex-col items-center justify-center rounded border border-dashed border-border p-8 text-center">
+                                            <Cloud className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                                            <p className="text-sm font-medium text-foreground">No storage destinations configured</p>
+                                            <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+                                                Add an S3 bucket, Cloudflare R2 bucket, Google Drive folder, or OneDrive destination to manage remote backups.
+                                            </p>
+                                            <Button size="sm" className="mt-4 gap-2" onClick={openAddStorageModal}>
+                                                <Plus className="h-4 w-4" />
+                                                Add Storage Destination
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                            {storages.map((st) => (
+                                                <div key={st.id} className="relative flex flex-col justify-between rounded border border-border bg-background p-4 shadow-sm">
+                                                    <div>
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="rounded bg-primary/10 p-2 text-primary">
+                                                                    <Cloud className="h-4 w-4" />
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                                        {st.name}
+                                                                        {st.isDefault && (
+                                                                            <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                                                                Default
+                                                                            </span>
+                                                                        )}
+                                                                    </h4>
+                                                                    <p className="text-xs text-muted-foreground capitalize">
+                                                                        {st.provider === "s3"
+                                                                            ? "Amazon S3 / Compatible"
+                                                                            : st.provider === "r2"
+                                                                            ? "Cloudflare R2"
+                                                                            : st.provider === "gdrive"
+                                                                            ? "Google Drive"
+                                                                            : "Microsoft OneDrive"}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-7 w-7"
+                                                                    onClick={() => openEditStorageModal(st)}
+                                                                    title="Edit storage"
+                                                                >
+                                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                                    onClick={() => setDeleteStorageModal(st)}
+                                                                    title="Delete storage"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                                {st.name}
-                                                                {st.isDefault && (
-                                                                    <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                                                        Default
-                                                                    </span>
-                                                                )}
-                                                            </h4>
-                                                            <p className="text-xs text-muted-foreground capitalize">
-                                                                {st.provider === "s3"
-                                                                    ? "Amazon S3 / Compatible"
-                                                                    : st.provider === "r2"
-                                                                    ? "Cloudflare R2"
-                                                                    : st.provider === "gdrive"
-                                                                    ? "Google Drive"
-                                                                    : "Microsoft OneDrive"}
-                                                            </p>
+
+                                                        <div className="mt-3 space-y-1 rounded bg-muted/40 p-2.5 text-xs">
+                                                            {st.bucket && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">Bucket:</span>
+                                                                    <span className="font-mono font-medium text-foreground">{st.bucket}</span>
+                                                                </div>
+                                                            )}
+                                                            {st.pathPrefix && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">Path / Prefix:</span>
+                                                                    <span className="font-mono text-foreground">{st.pathPrefix}</span>
+                                                                </div>
+                                                            )}
+                                                            {st.config?.region && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">Region:</span>
+                                                                    <span className="font-mono text-foreground">{st.config.region}</span>
+                                                                </div>
+                                                            )}
+                                                            {st.config?.endpoint && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">Endpoint:</span>
+                                                                    <span className="truncate max-w-[200px] font-mono text-foreground" title={st.config.endpoint}>{st.config.endpoint}</span>
+                                                                </div>
+                                                            )}
+                                                            {st.config?.folder_id && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">Folder ID:</span>
+                                                                    <span className="font-mono text-foreground">{st.config.folder_id}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-7 w-7"
-                                                            onClick={() => openEditStorageModal(st)}
-                                                            title="Edit storage"
-                                                        >
-                                                            <Edit2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                            onClick={() => setDeleteStorageModal(st)}
-                                                            title="Delete storage"
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
+                                                    <div className="mt-3 pt-2 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
+                                                        <span>Configured {formatDate(st.createdAt)}</span>
+                                                        {!embedded && st.owner && (
+                                                            <span className="font-mono font-medium">Owner: {st.owner}</span>
+                                                        )}
                                                     </div>
                                                 </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                                <div className="mt-3 space-y-1 rounded bg-muted/40 p-2.5 text-xs">
-                                                    {st.bucket && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Bucket:</span>
-                                                            <span className="font-mono font-medium text-foreground">{st.bucket}</span>
-                                                        </div>
-                                                    )}
-                                                    {st.pathPrefix && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Path / Prefix:</span>
-                                                            <span className="font-mono text-foreground">{st.pathPrefix}</span>
-                                                        </div>
-                                                    )}
-                                                    {st.config?.region && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Region:</span>
-                                                            <span className="font-mono text-foreground">{st.config.region}</span>
-                                                        </div>
-                                                    )}
-                                                    {st.config?.endpoint && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Endpoint:</span>
-                                                            <span className="truncate max-w-[200px] font-mono text-foreground" title={st.config.endpoint}>{st.config.endpoint}</span>
-                                                        </div>
-                                                    )}
-                                                    {st.config?.folder_id && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-muted-foreground">Folder ID:</span>
-                                                            <span className="font-mono text-foreground">{st.config.folder_id}</span>
-                                                        </div>
-                                                    )}
+                            {settingsTab === "general" && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-foreground">General Preferences</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            Overview of local storage directories, default destination, and archive formats.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div className="rounded border border-border bg-background p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h5 className="text-xs font-semibold text-foreground">Default Remote Destination</h5>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        The default storage target configured for automated offsite sync.
+                                                    </p>
                                                 </div>
-                                            </div>
-                                            <div className="mt-3 pt-2 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                                                <span>Configured {formatDate(st.createdAt)}</span>
-                                                {!embedded && st.owner && (
-                                                    <span className="font-mono font-medium">Owner: {st.owner}</span>
-                                                )}
+                                                <span className="font-mono text-xs font-medium text-primary">
+                                                    {storages.find((s) => s.isDefault)?.name || "None (Local only)"}
+                                                </span>
                                             </div>
                                         </div>
-                                    ))}
+
+                                        <div className="rounded border border-border bg-background p-4 space-y-2">
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-foreground">Local Storage Directory</h5>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Backup archives are generated and stored in each user&apos;s isolated home directory:
+                                                </p>
+                                            </div>
+                                            <div className="rounded bg-muted/40 p-2 font-mono text-xs text-foreground">
+                                                /home/{`{username}`}/backups/
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded border border-border bg-background p-4 space-y-2">
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-foreground">Archive Packaging Format</h5>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Uses standard gzip-compressed tarballs (.tar.gz) preserving Unix ownership and file permissions.
+                                                </p>
+                                            </div>
+                                            <div className="rounded bg-muted/40 p-2 font-mono text-xs text-foreground">
+                                                backup-{`{username}`}-{`{timestamp}`}.tar.gz
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
                         <div className="flex justify-end border-t border-border px-5 py-3">
-                            <Button variant="outline" size="sm" onClick={() => setStorageSettingsOpen(false)}>
+                            <Button variant="outline" size="sm" onClick={() => setBackupSettingsOpen(false)}>
                                 Close
                             </Button>
                         </div>
@@ -1163,15 +1254,11 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                         className="gap-2"
                         onClick={() => {
                             fetchStorages();
-                            setStorageSettingsOpen(true);
+                            setBackupSettingsOpen(true);
                         }}
                     >
                         <Settings2 className="h-4 w-4" />
                         Settings
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={openAddStorageModal}>
-                        <Plus className="h-4 w-4" />
-                        Add Storage
                     </Button>
                     <Button
                         size="sm"
