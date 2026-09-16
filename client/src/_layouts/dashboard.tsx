@@ -23,16 +23,16 @@ function DashboardLayoutContent({
     fullWidth,
     wide,
 }: DashboardLayoutProps) {
-    const { isLoggedIn } = useUser();
+    const { isLoggedIn, isCheckingSession } = useUser();
     const { appName } = useApp();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const { isOpen: isTerminalOpen, openRoot } = useTerminal();
 
     useEffect(() => {
-        if (!isLoggedIn) {
+        if (!isCheckingSession && !isLoggedIn) {
             redirectToLogin();
         }
-    }, [isLoggedIn]);
+    }, [isCheckingSession, isLoggedIn]);
 
     useEffect(() => {
         if (title) {
@@ -41,6 +41,10 @@ function DashboardLayoutContent({
             document.title = appName;
         }
     }, [appName, title]);
+
+    if (isCheckingSession || !isLoggedIn) {
+        return <div className="flex h-screen w-screen items-center justify-center bg-background" />;
+    }
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">

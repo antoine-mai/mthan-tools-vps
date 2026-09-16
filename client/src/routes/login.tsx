@@ -22,9 +22,19 @@ export default function LoginRoute() {
 
     useEffect(() => {
         document.title = "Login | MTHAN VPS";
-        const isLoggedIn = loginStorage().getItem(loginStorageKey()) === "true";
-        if (isLoggedIn) {
-            window.location.href = appPath("/");
+        const hasFlag = loginStorage().getItem(loginStorageKey()) === "true";
+        if (hasFlag) {
+            fetch(Api.current.session, { cache: "no-store" })
+                .then((res) => {
+                    if (res.ok) {
+                        window.location.href = appPath("/");
+                    } else {
+                        loginStorage().removeItem(loginStorageKey());
+                    }
+                })
+                .catch(() => {
+                    loginStorage().removeItem(loginStorageKey());
+                });
         }
     }, []);
 

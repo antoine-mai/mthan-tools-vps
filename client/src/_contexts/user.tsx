@@ -5,6 +5,7 @@ import { runtime } from "../runtime";
 
 type UserContextType = {
     isLoggedIn: boolean;
+    isCheckingSession: boolean;
     setIsLoggedIn: (status: boolean) => void;
     logout: () => void;
     checkSession: () => Promise<boolean>;
@@ -53,9 +54,15 @@ export function setupAuthInterceptor() {
 setupAuthInterceptor();
 
 export function UserProvider({ children }: { children: ReactNode }) {
+    const isLoginRoute = typeof window !== "undefined" && (
+        window.location.pathname === getLoginUrl() ||
+        window.location.pathname === `${getLoginUrl()}/`
+    );
+
     const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
         return loginStorage().getItem(loginStorageKey()) === "true";
     });
+    const [isCheckingSession, setIsCheckingSession] = useState<boolean>(!isLoginRoute);
 
     useEffect(() => {
         loginStorage().setItem(loginStorageKey(), isLoggedIn.toString());
@@ -63,63 +70,71 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     const logout = () => {
         setIsLoggedIn(false);
+        setIsCheckingSession(false);
         redirectToLogin();
     };
 
     const checkSession = useCallback(async (): Promise<boolean> => {
         const localStatus = loginStorage().getItem(loginStorageKey()) === "true";
         if (!localStatus) {
-            if (isLoggedIn) {
-                setIsLoggedIn(false);
+            setIsLoggedIn(false);
+            setIsCheckingSession(false);
+            if (!isLoginRoute) {
+                redirectToLogin();
             }
-            redirectToLogin();
             return false;
         }
 
         try {
             const response = await fetch(Api.current.session, { cache: "no-store" });
             if (response.ok) {
-                if (!isLoggedIn) {
-                    setIsLoggedIn(true);
-                }
+                setIsLoggedIn(true);
+                setIsCheckingSession(false);
                 return true;
             }
             if (response.status !== 401 && response.status !== 403) {
                 // Preserve the local session during transient restarts and gateway failures.
+                setIsCheckingSession(false);
                 return localStatus;
             }
         } catch {
             // Network failure: preserve local status so temporary offline doesn't force logout
+            setIsCheckingSession(false);
             return localStatus;
         }
 
-        if (isLoggedIn) {
-            setIsLoggedIn(false);
-        }
+        setIsLoggedIn(false);
+        setIsCheckingSession(false);
         redirectToLogin();
         return false;
-    }, [isLoggedIn]);
+    }, [isLoginRoute]);
 
     useEffect(() => {
-        checkSession();
+        if (!isLoginRoute) {
+            checkSession();
+        }
 
         const onFocus = () => {
-            checkSession();
+            if (!isLoginRoute) {
+                checkSession();
+            }
         };
         window.addEventListener("focus", onFocus);
 
         const interval = setInterval(() => {
-            checkSession();
+            if (!isLoginRoute) {
+                checkSession();
+            }
         }, 30000);
 
         return () => {
             window.removeEventListener("focus", onFocus);
             clearInterval(interval);
         };
-    }, [checkSession]);
+    }, [checkSession, isLoginRoute]);
 
     return (
-        <UserContext.Provider value={{ isLoggedIn, setIsLoggedIn, logout, checkSession }}>
+        <UserContext.Provider value={{ isLoggedIn, isCheckingSession, setIsLoggedIn, logout, checkSession }}>
             {children}
         </UserContext.Provider>
     );

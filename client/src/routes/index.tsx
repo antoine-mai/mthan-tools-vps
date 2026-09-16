@@ -1,5 +1,7 @@
-import { Route, Routes as RouterRoutes } from "react-router-dom";
+import { type ReactNode } from "react";
+import { Navigate, Route, Routes as RouterRoutes } from "react-router-dom";
 
+import { useUser } from "../_contexts/user";
 import { runtime } from "../runtime";
 import AgentRoute from "./agent";
 import AppsRoute from "./apps";
@@ -14,29 +16,43 @@ import UserRoutes from "./user";
 import VHostsRoute from "./vhosts";
 import BackupRoute from "./backup";
 
+function ProtectedRoute({ children }: { children: ReactNode }) {
+    const { isLoggedIn, isCheckingSession } = useUser();
+
+    if (isCheckingSession) {
+        return <div className="flex h-screen w-screen items-center justify-center bg-background" />;
+    }
+
+    if (!isLoggedIn) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <>{children}</>;
+}
+
 export default function AppRoutes() {
     return (
         <RouterRoutes>
             <Route path="/login" element={<LoginRoute />} />
-            <Route path="/files" element={<FilesRoute />} />
-            <Route path="/vhosts" element={<VHostsRoute />} />
-            <Route path="/vhosts/:owner" element={<VHostsRoute />} />
-            <Route path="/containers" element={<ContainersRoute />} />
-            <Route path="/backup" element={<BackupRoute />} />
-            <Route path="/agent" element={<AgentRoute />} />
+            <Route path="/files" element={<ProtectedRoute><FilesRoute /></ProtectedRoute>} />
+            <Route path="/vhosts" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
+            <Route path="/vhosts/:owner" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
+            <Route path="/containers" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
+            <Route path="/backup" element={<ProtectedRoute><BackupRoute /></ProtectedRoute>} />
+            <Route path="/agent" element={<ProtectedRoute><AgentRoute /></ProtectedRoute>} />
             {runtime.isRoot ? (
                 <>
-                    <Route path="/apis" element={<APIsRoute />} />
-                    <Route path="/settings" element={<SettingsRoute />} />
-                    <Route path="/settings/:section" element={<SettingsRoute />} />
-                    <Route path="/settings/apps/:app" element={<AppsRoute />} />
-                    <Route path="/users" element={<UsersRoute />} />
-                    <Route path="/users/:username" element={<UsersRoute />} />
-                    <Route path="/users/:username/:section" element={<UsersRoute />} />
-                    <Route path="*" element={<RootRoutes />} />
+                    <Route path="/apis" element={<ProtectedRoute><APIsRoute /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><SettingsRoute /></ProtectedRoute>} />
+                    <Route path="/settings/:section" element={<ProtectedRoute><SettingsRoute /></ProtectedRoute>} />
+                    <Route path="/settings/apps/:app" element={<ProtectedRoute><AppsRoute /></ProtectedRoute>} />
+                    <Route path="/users" element={<ProtectedRoute><UsersRoute /></ProtectedRoute>} />
+                    <Route path="/users/:username" element={<ProtectedRoute><UsersRoute /></ProtectedRoute>} />
+                    <Route path="/users/:username/:section" element={<ProtectedRoute><UsersRoute /></ProtectedRoute>} />
+                    <Route path="*" element={<ProtectedRoute><RootRoutes /></ProtectedRoute>} />
                 </>
             ) : (
-                <Route path="*" element={<UserRoutes />} />
+                <Route path="*" element={<ProtectedRoute><UserRoutes /></ProtectedRoute>} />
             )}
         </RouterRoutes>
     );

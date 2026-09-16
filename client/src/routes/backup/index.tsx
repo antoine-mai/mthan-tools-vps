@@ -2,14 +2,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
     Archive,
     Download,
-    HardDriveDownload,
     Loader2,
     Plus,
     RefreshCw,
     RotateCcw,
     Search,
     Trash2,
-    User,
     X,
 } from "lucide-react";
 
