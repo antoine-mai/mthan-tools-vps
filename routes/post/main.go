@@ -11,6 +11,7 @@ import (
 	postapps "mthan/vps/routes/post/apps"
 	appconfig "mthan/vps/routes/post/apps/config"
 	postcontainers "mthan/vps/routes/post/containers"
+	postbackup "mthan/vps/routes/post/backup"
 	postfiles "mthan/vps/routes/post/files"
 	postlogin "mthan/vps/routes/post/login"
 	"mthan/vps/routes/post/ping"
@@ -75,6 +76,10 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("DELETE /post/vhost/", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
 	mux.Handle("POST /post/vhost/reload", postOnly(deps.Startup, deps.Sessions, postvhost.Handler(deps.Sessions, services.NewVHostService())))
 	mux.Handle("GET /post/terminal", postOnly(deps.Startup, deps.Sessions, terminal.Handler(deps.Sessions, deps.Startup, true)))
+	mux.Handle("GET /post/backup", postOnly(deps.Startup, deps.Sessions, postbackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("POST /post/backup", postOnly(deps.Startup, deps.Sessions, postbackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("DELETE /post/backup", postOnly(deps.Startup, deps.Sessions, postbackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("POST /post/backup/restore", postOnly(deps.Startup, deps.Sessions, postbackup.RestoreHandler(deps.Sessions, services.NewBackupService())))
 }
 
 func authenticatedSystemHandler(sessions *services.SessionService, system *services.SystemService) http.Handler {

@@ -154,6 +154,51 @@ install_caddy() {
   configure_caddy_users_dir
 }
 
+install_rclone() {
+  if command -v rclone >/dev/null 2>&1; then
+    echo "rclone is already installed"
+    return
+  fi
+
+  echo "Installing rclone..."
+  local installed=0
+
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y rclone; then
+      installed=1
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    if dnf install -y rclone; then
+      installed=1
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    if yum install -y rclone; then
+      installed=1
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    if pacman -Sy --noconfirm --needed rclone; then
+      installed=1
+    fi
+  fi
+
+  if [[ "${installed}" -eq 0 ]] || ! command -v rclone >/dev/null 2>&1; then
+    echo "Attempting official rclone installation script..."
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL https://rclone.org/install.sh | bash || true
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO- https://rclone.org/install.sh | bash || true
+    fi
+  fi
+
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "rclone installation did not provide an rclone binary" >&2
+    exit 1
+  fi
+
+  echo "rclone installed successfully: $(rclone version 2>/dev/null | head -n 1)"
+}
+
 configure_caddy_users_dir() {
   local caddy_conf_dir="/etc/caddy/Caddyfile.d/mthan-users"
   local caddyfile="/etc/caddy/Caddyfile"
@@ -316,6 +361,7 @@ main() {
 
   install_libcrypt
   install_caddy
+  install_rclone
 
   if [[ "${REINSTALL}" == "1" ]]; then
     cleanup_old_install

@@ -12,6 +12,7 @@ import UsersRoute from "./root/users";
 import SettingsRoute from "./settings";
 import UserRoutes from "./user";
 import VHostsRoute from "./vhosts";
+import BackupRoute from "./backup";
 
 export default function AppRoutes() {
     return (
@@ -21,6 +22,7 @@ export default function AppRoutes() {
             <Route path="/vhosts" element={<VHostsRoute />} />
             <Route path="/vhosts/:owner" element={<VHostsRoute />} />
             <Route path="/containers" element={<ContainersRoute />} />
+            <Route path="/backup" element={<BackupRoute />} />
             <Route path="/agent" element={<AgentRoute />} />
             {runtime.isRoot ? (
                 <>

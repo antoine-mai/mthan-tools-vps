@@ -11,6 +11,7 @@ import {
     Settings,
     Braces,
     Container,
+    Archive,
 } from "lucide-react";
 import { useUser } from "../../_contexts/user";
 import { runtime } from "../../runtime";
@@ -32,6 +33,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
         { icon: Globe, label: "VHosts", href: "/vhosts" },
         { icon: Container, label: "Containers", href: "/containers" },
         { icon: Folder, label: "Files", href: "/files" },
+        { icon: Archive, label: "Backup", href: "/backup" },
     ];
 
     const handleLogoutClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -165,7 +167,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                                 <p className="text-xs font-semibold truncate">
                                     {runtime.username || "System User"}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground capitalize mt-0.5">
+                                <p className="text-xs text-muted-foreground capitalize mt-0.5">
                                     {runtime.mode} session
                                 </p>
                             </div>

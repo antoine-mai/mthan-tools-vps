@@ -21,6 +21,7 @@ import {
     XCircle,
     Globe,
     Container as ContainerIcon,
+    Archive,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -30,6 +31,7 @@ import UserTerminal from "_components/user-terminal";
 import FilesRoute from "../../files";
 import VHostsRoute from "../../vhosts";
 import ContainersRoute from "../../containers";
+import BackupRoute from "../../backup";
 
 interface LinuxUser {
     cpanelEnabled: boolean;
@@ -476,6 +478,7 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="containers" active={activeSection === "containers"} icon={ContainerIcon} label="Containers" />
                                             <UserSubItem username={u.username} section="vhosts" active={activeSection === "vhosts"} icon={Globe} label="VHosts" />
                                             <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
+                                            <UserSubItem username={u.username} section="backup" active={activeSection === "backup"} icon={Archive} label="Backup" />
                                         </nav>
                                     ) : null}
                                     </div>
@@ -746,10 +749,10 @@ export default function UsersRoute() {
                                                                             <div key={c.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                                                                                 <div className="min-w-0">
                                                                                     <div className="font-medium text-foreground truncate">{c.name}</div>
-                                                                                    <div className="text-muted-foreground font-mono truncate text-[11px]">{c.image}</div>
+                                                                                    <div className="text-muted-foreground font-mono truncate text-xs">{c.image}</div>
                                                                                 </div>
                                                                                 <span
-                                                                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                                                                                    className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${
                                                                                         c.status === "running"
                                                                                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                                                                             : "bg-muted text-muted-foreground border border-border"
@@ -790,13 +793,13 @@ export default function UsersRoute() {
                                                                                 <div className="min-w-0">
                                                                                     <div className="font-medium text-foreground truncate">{v.hostname}</div>
                                                                                     {v.aliases && v.aliases.length > 0 && (
-                                                                                        <div className="text-muted-foreground truncate text-[11px]">
+                                                                                        <div className="text-muted-foreground truncate text-xs">
                                                                                             {v.aliases.join(", ")}
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
                                                                                 <span
-                                                                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                                                                                    className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${
                                                                                         v.tls
                                                                                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                                                                             : "bg-muted text-muted-foreground border border-border"
@@ -822,6 +825,10 @@ export default function UsersRoute() {
                                     <div className="space-y-4">
                                         <VHostsRoute embedded={true} ownerFilter={selectedUser.username} key={selectedUser.username} />
                                     </div>
+                                ) : activeSection === "backup" ? (
+                                    <div className="space-y-4">
+                                        <BackupRoute embedded={true} username={selectedUser.username} key={selectedUser.username} />
+                                    </div>
                                 ) : null}
                                 </div>
                             )}
@@ -846,7 +853,7 @@ export default function UsersRoute() {
                 >
                     <div className="border-b border-border px-2 py-1.5">
                         <p className="truncate text-xs font-semibold">{contextMenu.user.username}</p>
-                        <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                        <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                             UID {contextMenu.user.uid} · {contextMenu.user.home}
                         </p>
                     </div>
@@ -864,6 +871,9 @@ export default function UsersRoute() {
                     </button>
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("terminal")} role="menuitem">
                         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />Terminal
+                    </button>
+                    <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("backup")} role="menuitem">
+                        <Archive className="h-3.5 w-3.5 text-muted-foreground" />Backup
                     </button>
                     {!contextMenu.user.cpanelEnabled ? (
                         <>
@@ -1124,10 +1134,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "containers" | "vhosts" | "terminal";
+type UserSection = "overview" | "files" | "containers" | "vhosts" | "terminal" | "backup";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "containers" || section === "vhosts" || section === "terminal" ? section : "overview";
+    return section === "files" || section === "containers" || section === "vhosts" || section === "terminal" || section === "backup" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {
@@ -1140,11 +1150,11 @@ function UserSubItem({ username, section, active, icon: Icon, label }: {
     return (
         <Link
             to={`/users/${encodeURIComponent(username)}/${section}`}
-            className={`flex items-center gap-2 px-2 py-1.5 text-[11px] ${
-                active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
+            className={`flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
+                active ? "font-semibold text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
         >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
         </Link>
     );
@@ -1156,10 +1166,10 @@ function UserInfoBox({ icon: Icon, label, value }: {
     value: string;
 }) {
     return (
-        <div className="flex h-6 min-w-0 max-w-full items-center gap-1.5 border border-border bg-card/40 px-2">
-            <Icon className="h-3 w-3 shrink-0 text-primary" />
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-            <span className="max-w-48 truncate font-mono text-[10px] text-foreground" title={value}>{value}</span>
+        <div className="flex h-7 min-w-0 max-w-full items-center gap-2 border border-border bg-card/40 px-2.5 rounded-sm">
+            <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <span className="max-w-48 truncate font-mono text-xs text-foreground" title={value}>{value}</span>
         </div>
     );
 }

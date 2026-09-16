@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	apibackup "mthan/vps/routes/api/backup"
 	containersroute "mthan/vps/routes/api/containers"
 	apifiles "mthan/vps/routes/api/files"
 	vhostroute "mthan/vps/routes/api/vhost"
@@ -113,6 +114,10 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("GET /api/vhost", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
 	mux.Handle("GET /api/vhost/", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
 	mux.Handle("GET /api/terminal", public(terminal.Handler(deps.Sessions, deps.Startup, false)))
+	mux.Handle("GET /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("POST /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("DELETE /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
+	mux.Handle("POST /api/backup/restore", public(apibackup.RestoreHandler(deps.Sessions, services.NewBackupService())))
 
 	mux.Handle("GET /healthz", public(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, deps.Health.Status())

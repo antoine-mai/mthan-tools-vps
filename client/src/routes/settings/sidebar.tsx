@@ -20,7 +20,7 @@ export default function SettingsSidebar({ section, app }: { section: SettingsSec
                         <Link
                             key={name}
                             to={`/settings/apps/${encodeURIComponent(name)}`}
-                            className={`flex items-center gap-2 px-2 py-1.5 text-[11px] ${app === name ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${app === name ? "font-semibold text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                         >
                             <Cpu className="h-3.5 w-3.5" />
                             {label}

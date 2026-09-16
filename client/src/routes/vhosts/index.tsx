@@ -83,12 +83,6 @@ function VHostsStandalone() {
             .finally(() => setLoadingUsers(false));
     }, []);
 
-    const ownerFilter = activeOwner === "caddyfile" ? undefined : activeOwner;
-    const pageTitle =
-        activeOwner === "caddyfile"
-            ? "Caddyfile — All VHosts"
-            : `${activeOwner} — VHosts`;
-
     return (
         <DashboardLayout title="VHosts" fullWidth>
             <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[220px_1fr]">
@@ -106,7 +100,7 @@ function VHostsStandalone() {
                         <FileCode2 className="h-4 w-4 shrink-0" />
                         Caddyfile
                         {activeOwner === "caddyfile" ? (
-                            <span className="ml-auto text-[10px] font-medium text-primary/60">All</span>
+                            <span className="ml-auto text-xs font-medium text-primary/60">All</span>
                         ) : null}
                     </Link>
 
@@ -116,7 +110,7 @@ function VHostsStandalone() {
                             <button
                                 type="button"
                                 onClick={() => setUsersOpen((v) => !v)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
                                 {usersOpen ? (
                                     <ChevronDown className="h-3.5 w-3.5 shrink-0" />
@@ -129,20 +123,20 @@ function VHostsStandalone() {
                             {usersOpen && (
                                 <nav className="flex flex-col gap-0.5 pb-2 pl-5 pr-2">
                                     {loadingUsers ? (
-                                        <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
-                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                             Loading…
                                         </div>
                                     ) : users.length === 0 ? (
-                                        <p className="px-2 py-1 text-[11px] text-muted-foreground">No users</p>
+                                        <p className="px-2 py-1 text-xs text-muted-foreground">No users</p>
                                     ) : (
                                         users.map((u) => (
                                             <Link
                                                 key={u.username}
                                                 to={`/vhosts/${encodeURIComponent(u.username)}`}
-                                                className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-[11px] transition-colors ${
+                                                className={`flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
                                                     activeOwner === u.username
-                                                        ? "font-semibold text-primary"
+                                                        ? "font-semibold text-primary bg-primary/10"
                                                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                                 }`}
                                             >
@@ -224,7 +218,7 @@ function UserCaddyfileEditor({ username }: { username: string }) {
             <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-5 py-3">
                 <div>
                     <p className="text-sm font-semibold text-foreground">{username}.caddy</p>
-                    <code className="text-[11px] text-muted-foreground">{path}</code>
+                    <code className="text-xs text-muted-foreground">{path}</code>
                 </div>
                 <div className="flex items-center gap-2">
                     {saved && !saving ? (
@@ -464,7 +458,7 @@ function VHostsContent({
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground">
+                                            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
                                                 {vhost.owner || "system"}
                                             </span>
                                         </td>
