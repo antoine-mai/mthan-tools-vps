@@ -69,7 +69,7 @@ function formatDate(iso: string): string {
 }
 
 export default function BackupRoute({ embedded = false, username }: BackupRouteProps) {
-    const [activeTab, setActiveTab] = useState<"backups" | "settings">("backups");
+    const [storageSettingsOpen, setStorageSettingsOpen] = useState(false);
 
     // Backups state
     const [backups, setBackups] = useState<BackupItem[]>([]);
@@ -149,13 +149,8 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
 
     useEffect(() => {
         fetchBackups();
-    }, [fetchBackups]);
-
-    useEffect(() => {
-        if (activeTab === "settings") {
-            fetchStorages();
-        }
-    }, [activeTab, fetchStorages]);
+        fetchStorages();
+    }, [fetchBackups, fetchStorages]);
 
     useEffect(() => {
         if (runtime.isRoot && !activeUser) {
@@ -328,76 +323,62 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
 
     const content = (
         <div className="space-y-4">
-            {/* Tabs Navigation */}
-            <div className="flex border-b border-border">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("backups")}
-                    className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
-                        activeTab === "backups"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                    <Archive className="h-4 w-4" />
-                    Backups
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("settings")}
-                    className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
-                        activeTab === "settings"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                    <Settings2 className="h-4 w-4" />
-                    Storage Settings
-                </button>
-            </div>
-
-            {/* Tab 1: Backups */}
-            {activeTab === "backups" && (
-                <div className="space-y-4">
-                    {/* Header / Actions bar */}
-                    {embedded ? (
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">User Backups</h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Manage backup archives stored in {activeUser}&apos;s home backup directory.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
-                                        placeholder="Filter backups…"
-                                        className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
-                                    />
-                                </div>
-                                <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loadingBackups}>
-                                    <RefreshCw className={`h-4 w-4 ${loadingBackups ? "animate-spin" : ""}`} />
-                                    Refresh
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    className="gap-2"
-                                    onClick={handleCreateBackup}
-                                    disabled={actionLoading !== null}
-                                >
-                                    {actionLoading === "create" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Plus className="h-4 w-4" />
-                                    )}
-                                    Create Backup
-                                </Button>
-                            </div>
+            <div className="space-y-4">
+                {/* Header / Actions bar */}
+                {embedded ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-foreground">User Backups</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Manage backup archives stored in {activeUser}&apos;s home backup directory.
+                            </p>
                         </div>
-                    ) : (
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Filter backups…"
+                                    className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                                />
+                            </div>
+                            <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loadingBackups}>
+                                <RefreshCw className={`h-4 w-4 ${loadingBackups ? "animate-spin" : ""}`} />
+                                Refresh
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => {
+                                    fetchStorages();
+                                    setStorageSettingsOpen(true);
+                                }}
+                            >
+                                <Settings2 className="h-4 w-4" />
+                                Settings
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-2" onClick={openAddStorageModal}>
+                                <Plus className="h-4 w-4" />
+                                Add Storage
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="gap-2"
+                                onClick={handleCreateBackup}
+                                disabled={actionLoading !== null}
+                            >
+                                {actionLoading === "create" ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4" />
+                                )}
+                                Create Backup
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
                         <div className="flex items-center justify-between gap-3">
                             <div className="relative w-80">
                                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -522,147 +503,165 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                         </div>
                     )}
                 </div>
-            )}
 
-            {/* Tab 2: Storage Settings */}
-            {activeTab === "settings" && (
-                <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-foreground">Storage Locations</h3>
-                            <p className="text-xs text-muted-foreground">
-                                Configure remote cloud storage destinations (Amazon S3, Cloudflare R2, Google Drive, Microsoft OneDrive).
-                            </p>
+            {/* Storage Settings Modal */}
+            {storageSettingsOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="flex max-h-[85vh] w-full max-w-3xl flex-col border border-border bg-card shadow-lg">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div className="flex items-center gap-2">
+                                <Settings2 className="h-4 w-4 text-primary" />
+                                <div>
+                                    <h3 className="text-sm font-semibold">Storage Settings</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        Configure remote cloud storage destinations (Amazon S3, Cloudflare R2, Google Drive, Microsoft OneDrive).
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button size="sm" className="gap-1.5" onClick={openAddStorageModal}>
+                                    <Plus className="h-4 w-4" />
+                                    Add Storage
+                                </Button>
+                                <button
+                                    type="button"
+                                    onClick={() => setStorageSettingsOpen(false)}
+                                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="gap-2" onClick={fetchStorages} disabled={loadingStorages}>
-                                <RefreshCw className={`h-4 w-4 ${loadingStorages ? "animate-spin" : ""}`} />
-                                Refresh
-                            </Button>
-                            <Button size="sm" className="gap-2" onClick={openAddStorageModal}>
-                                <Plus className="h-4 w-4" />
-                                Add Storage
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                            {storageError ? (
+                                <div className="rounded border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+                                    {storageError.trim()}
+                                </div>
+                            ) : null}
+
+                            {loadingStorages ? (
+                                <div className="flex min-h-56 items-center justify-center">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : storages.length === 0 ? (
+                                <div className="flex min-h-56 flex-col items-center justify-center rounded border border-dashed border-border p-8 text-center">
+                                    <Cloud className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                                    <p className="text-sm font-medium text-foreground">No storage destinations configured</p>
+                                    <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+                                        Add an S3 bucket, Cloudflare R2 bucket, Google Drive folder, or OneDrive destination to manage remote backups.
+                                    </p>
+                                    <Button size="sm" className="mt-4 gap-2" onClick={openAddStorageModal}>
+                                        <Plus className="h-4 w-4" />
+                                        Add Storage Destination
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {storages.map((st) => (
+                                        <div key={st.id} className="relative flex flex-col justify-between rounded border border-border bg-background p-4 shadow-sm">
+                                            <div>
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="rounded bg-primary/10 p-2 text-primary">
+                                                            <Cloud className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                                {st.name}
+                                                                {st.isDefault && (
+                                                                    <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                                                        Default
+                                                                    </span>
+                                                                )}
+                                                            </h4>
+                                                            <p className="text-xs text-muted-foreground capitalize">
+                                                                {st.provider === "s3"
+                                                                    ? "Amazon S3 / Compatible"
+                                                                    : st.provider === "r2"
+                                                                    ? "Cloudflare R2"
+                                                                    : st.provider === "gdrive"
+                                                                    ? "Google Drive"
+                                                                    : "Microsoft OneDrive"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-7 w-7"
+                                                            onClick={() => openEditStorageModal(st)}
+                                                            title="Edit storage"
+                                                        >
+                                                            <Edit2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                            onClick={() => setDeleteStorageModal(st)}
+                                                            title="Delete storage"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 space-y-1 rounded bg-muted/40 p-2.5 text-xs">
+                                                    {st.bucket && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Bucket:</span>
+                                                            <span className="font-mono font-medium text-foreground">{st.bucket}</span>
+                                                        </div>
+                                                    )}
+                                                    {st.pathPrefix && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Path / Prefix:</span>
+                                                            <span className="font-mono text-foreground">{st.pathPrefix}</span>
+                                                        </div>
+                                                    )}
+                                                    {st.config?.region && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Region:</span>
+                                                            <span className="font-mono text-foreground">{st.config.region}</span>
+                                                        </div>
+                                                    )}
+                                                    {st.config?.endpoint && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Endpoint:</span>
+                                                            <span className="truncate max-w-[200px] font-mono text-foreground" title={st.config.endpoint}>{st.config.endpoint}</span>
+                                                        </div>
+                                                    )}
+                                                    {st.config?.folder_id && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-muted-foreground">Folder ID:</span>
+                                                            <span className="font-mono text-foreground">{st.config.folder_id}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 pt-2 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
+                                                <span>Configured {formatDate(st.createdAt)}</span>
+                                                {!embedded && st.owner && (
+                                                    <span className="font-mono font-medium">Owner: {st.owner}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex justify-end border-t border-border px-5 py-3">
+                            <Button variant="outline" size="sm" onClick={() => setStorageSettingsOpen(false)}>
+                                Close
                             </Button>
                         </div>
                     </div>
-
-                    {storageError ? (
-                        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
-                            {storageError.trim()}
-                        </div>
-                    ) : null}
-
-                    {loadingStorages ? (
-                        <div className="flex min-h-64 items-center justify-center rounded-md border border-border bg-card">
-                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : storages.length === 0 ? (
-                        <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border p-8 text-center">
-                            <Cloud className="mb-3 h-10 w-10 text-muted-foreground/40" />
-                            <p className="text-sm font-medium text-foreground">No storage destinations configured</p>
-                            <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                                Add an S3 bucket, Cloudflare R2 bucket, Google Drive folder, or OneDrive destination to manage remote backups.
-                            </p>
-                            <Button size="sm" className="mt-4 gap-2" onClick={openAddStorageModal}>
-                                <Plus className="h-4 w-4" />
-                                Add Storage Destination
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {storages.map((st) => (
-                                <div key={st.id} className="relative flex flex-col justify-between rounded-md border border-border bg-card p-4">
-                                    <div>
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="rounded bg-primary/10 p-2 text-primary">
-                                                    <Cloud className="h-4 w-4" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                        {st.name}
-                                                        {st.isDefault && (
-                                                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                                                                Default
-                                                            </span>
-                                                        )}
-                                                    </h4>
-                                                    <p className="text-xs text-muted-foreground capitalize">
-                                                        {st.provider === "s3"
-                                                            ? "Amazon S3 / Compatible"
-                                                            : st.provider === "r2"
-                                                            ? "Cloudflare R2"
-                                                            : st.provider === "gdrive"
-                                                            ? "Google Drive"
-                                                            : "Microsoft OneDrive"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-7 w-7"
-                                                    onClick={() => openEditStorageModal(st)}
-                                                    title="Edit storage"
-                                                >
-                                                    <Edit2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                    onClick={() => setDeleteStorageModal(st)}
-                                                    title="Delete storage"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-3 space-y-1 rounded bg-muted/40 p-2.5 text-xs">
-                                            {st.bucket && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Bucket:</span>
-                                                    <span className="font-mono font-medium text-foreground">{st.bucket}</span>
-                                                </div>
-                                            )}
-                                            {st.pathPrefix && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Path / Prefix:</span>
-                                                    <span className="font-mono text-foreground">{st.pathPrefix}</span>
-                                                </div>
-                                            )}
-                                            {st.config?.region && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Region:</span>
-                                                    <span className="font-mono text-foreground">{st.config.region}</span>
-                                                </div>
-                                            )}
-                                            {st.config?.endpoint && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Endpoint:</span>
-                                                    <span className="truncate max-w-[200px] font-mono text-foreground" title={st.config.endpoint}>{st.config.endpoint}</span>
-                                                </div>
-                                            )}
-                                            {st.config?.folder_id && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Folder ID:</span>
-                                                    <span className="font-mono text-foreground">{st.config.folder_id}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 pt-2 border-t border-border flex justify-between items-center text-[11px] text-muted-foreground">
-                                        <span>Configured {formatDate(st.createdAt)}</span>
-                                        {!embedded && st.owner && (
-                                            <span className="font-mono font-medium">Owner: {st.owner}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -826,7 +825,7 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                                             }`}
                                         >
                                             <span className="font-semibold text-foreground">{p.name}</span>
-                                            <span className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">{p.desc}</span>
+                                            <span className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{p.desc}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -1154,44 +1153,45 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
             wide
             actions={
                 <div className="flex items-center gap-2">
-                    {activeTab === "backups" ? (
-                        <>
-                            <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loadingBackups}>
-                                <RefreshCw className={`h-4 w-4 ${loadingBackups ? "animate-spin" : ""}`} />
-                                Refresh
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => {
-                                    if (activeUser) {
-                                        handleCreateBackup();
-                                    } else {
-                                        setCreateModalOpen(true);
-                                    }
-                                }}
-                                disabled={actionLoading !== null}
-                            >
-                                {actionLoading === "create" ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Plus className="h-4 w-4" />
-                                )}
-                                Create Backup
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button variant="outline" size="sm" className="gap-2" onClick={fetchStorages} disabled={loadingStorages}>
-                                <RefreshCw className={`h-4 w-4 ${loadingStorages ? "animate-spin" : ""}`} />
-                                Refresh
-                            </Button>
-                            <Button size="sm" className="gap-2" onClick={openAddStorageModal}>
-                                <Plus className="h-4 w-4" />
-                                Add Storage
-                            </Button>
-                        </>
-                    )}
+                    <Button variant="outline" size="sm" className="gap-2" onClick={fetchBackups} disabled={loadingBackups}>
+                        <RefreshCw className={`h-4 w-4 ${loadingBackups ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                            fetchStorages();
+                            setStorageSettingsOpen(true);
+                        }}
+                    >
+                        <Settings2 className="h-4 w-4" />
+                        Settings
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={openAddStorageModal}>
+                        <Plus className="h-4 w-4" />
+                        Add Storage
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                            if (activeUser) {
+                                handleCreateBackup();
+                            } else {
+                                setCreateModalOpen(true);
+                            }
+                        }}
+                        disabled={actionLoading !== null}
+                    >
+                        {actionLoading === "create" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4" />
+                        )}
+                        Create Backup
+                    </Button>
                 </div>
             }
         >
