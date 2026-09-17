@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
     CalendarClock,
     Check,
     CheckCircle2,
+    ChevronDown,
+    ChevronRight,
     Copy,
     Edit2,
     Info,
@@ -11,10 +14,11 @@ import {
     Plus,
     RefreshCw,
     Search,
+    Shield,
     Trash2,
+    User,
     X,
     XCircle,
-    User,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -41,6 +45,12 @@ export interface UserLimits {
     maxContainers: number;
     currentTasks?: number;
     currentContainers?: number;
+}
+
+export interface LinuxUser {
+    username: string;
+    uid: number;
+    home?: string;
 }
 
 interface TaskingRouteProps {
@@ -97,15 +107,253 @@ function formatDate(iso?: string): string {
     }
 }
 
-export default function TaskingRoute({ embedded = false, username }: TaskingRouteProps) {
-    const [tasks, setTasks] = useState<CronTask[]>([]);
+// ─── Entry Point ─────────────────────────────────────────────────────────────
+
+export default function TaskingRoute({ embedded = false, username }: TaskingRouteProps = {}) {
+    if (embedded) {
+        return <TaskingContent activeOwner={username} embedded />;
+    }
+    if (!runtime.isRoot) {
+        return <TaskingUserStandalone />;
+    }
+    return <TaskingStandalone />;
+}
+
+// ─── Regular User Standalone (No subsidebar, single standard layout) ─────────
+
+function TaskingUserStandalone() {
+    return (
+        <DashboardLayout
+            title="Tasking"
+            description="Manage your scheduled cron jobs, automated tasks, and execution history."
+        >
+            <div className="space-y-6">
+                <TaskingContent />
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Root Standalone with 220px Subsidebar ───────────────────────────────────
+
+function TaskingStandalone() {
+    const { owner: ownerParam } = useParams<{ owner?: string }>();
+    const activeOwner = ownerParam || "all";
+
+    const [users, setUsers] = useState<LinuxUser[]>([]);
+    const [usersOpen, setUsersOpen] = useState(true);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+
+    const [allTasks, setAllTasks] = useState<CronTask[]>([]);
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [taskError, setTaskError] = useState("");
-    const [query, setQuery] = useState("");
-    const [ownerFilter, setOwnerFilter] = useState(username || "all");
-    const [usersList, setUsersList] = useState<Array<{ username: string }>>([]);
 
-    // User limits
+    const fetchAllTasks = useCallback(async () => {
+        setLoadingTasks(true);
+        setTaskError("");
+        try {
+            const res = await fetch("/post/tasking/list", { cache: "no-store" });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to load tasks");
+            }
+            const data = await res.json();
+            setAllTasks(data.tasks || []);
+        } catch (err) {
+            setTaskError(err instanceof Error ? err.message : "Failed to load tasks");
+        } finally {
+            setLoadingTasks(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAllTasks();
+    }, [fetchAllTasks]);
+
+    useEffect(() => {
+        setLoadingUsers(true);
+        fetch("/post/user/list", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                const list: LinuxUser[] = (data?.users ?? []).filter(
+                    (u: LinuxUser) => u.uid !== 0
+                );
+                setUsers(list);
+            })
+            .catch(() => setUsers([]))
+            .finally(() => setLoadingUsers(false));
+    }, []);
+
+    const rootTasksCount = useMemo(
+        () => allTasks.filter((t) => t.owner === "root").length,
+        [allTasks]
+    );
+
+    const taskCountsByOwner = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const t of allTasks) {
+            map[t.owner] = (map[t.owner] || 0) + 1;
+        }
+        return map;
+    }, [allTasks]);
+
+    return (
+        <DashboardLayout title="Tasking" fullWidth>
+            <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[220px_1fr]">
+                {/* Subsidebar */}
+                <aside className="flex h-full flex-col overflow-y-auto border-r border-border bg-card/60">
+                    {/* All Tasks Link */}
+                    <Link
+                        to="/tasking"
+                        className={`flex items-center justify-between border-b border-border px-3 py-3 text-xs font-semibold transition-colors ${
+                            activeOwner === "all"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            <CalendarClock className="h-4 w-4 shrink-0" />
+                            All Tasks
+                        </span>
+                        <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                activeOwner === "all"
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-muted text-muted-foreground"
+                            }`}
+                        >
+                            {allTasks.length}
+                        </span>
+                    </Link>
+
+                    {/* root (System) Link */}
+                    <Link
+                        to="/tasking/root"
+                        className={`flex items-center justify-between border-b border-border px-3 py-2.5 text-xs font-semibold transition-colors ${
+                            activeOwner === "root"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 shrink-0 text-amber-500" />
+                            root (System)
+                        </span>
+                        <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                activeOwner === "root"
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-muted text-muted-foreground"
+                            }`}
+                        >
+                            {rootTasksCount}
+                        </span>
+                    </Link>
+
+                    {/* Users Section */}
+                    <div className="flex flex-col">
+                        <button
+                            type="button"
+                            onClick={() => setUsersOpen((v) => !v)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                            {usersOpen ? (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                            ) : (
+                                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                            )}
+                            <span>Users</span>
+                            <span className="ml-auto text-xs text-muted-foreground font-normal">
+                                {users.length}
+                            </span>
+                        </button>
+
+                        {usersOpen && (
+                            <nav className="flex flex-col gap-0.5 pb-2 pl-3 pr-2">
+                                {loadingUsers ? (
+                                    <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Loading…
+                                    </div>
+                                ) : users.length === 0 ? (
+                                    <p className="px-2 py-1 text-xs text-muted-foreground">No users found</p>
+                                ) : (
+                                    users.map((u) => {
+                                        const count = taskCountsByOwner[u.username] || 0;
+                                        const isSelected = activeOwner === u.username;
+                                        return (
+                                            <Link
+                                                key={u.username}
+                                                to={`/tasking/${encodeURIComponent(u.username)}`}
+                                                className={`flex items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
+                                                    isSelected
+                                                        ? "font-semibold text-primary bg-primary/10"
+                                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                }`}
+                                            >
+                                                <span className="flex items-center gap-2 truncate">
+                                                    <User className="h-3.5 w-3.5 shrink-0" />
+                                                    <span className="truncate">{u.username}</span>
+                                                </span>
+                                                {count > 0 ? (
+                                                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                                                        {count}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
+                                        );
+                                    })
+                                )}
+                            </nav>
+                        )}
+                    </div>
+                </aside>
+
+                {/* Main Content Area */}
+                <main className="overflow-y-auto p-6">
+                    <TaskingContent
+                        activeOwner={activeOwner}
+                        usersList={users}
+                        allTasks={allTasks}
+                        loadingTasks={loadingTasks}
+                        taskError={taskError}
+                        onRefreshTasks={fetchAllTasks}
+                    />
+                </main>
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Tasking Content (Core Table & Modals) ───────────────────────────────────
+
+interface TaskingContentProps {
+    activeOwner?: string;
+    embedded?: boolean;
+    usersList?: LinuxUser[];
+    allTasks?: CronTask[];
+    loadingTasks?: boolean;
+    taskError?: string;
+    onRefreshTasks?: () => void;
+}
+
+export function TaskingContent({
+    activeOwner,
+    embedded = false,
+    usersList = [],
+    allTasks,
+    loadingTasks: externalLoading,
+    taskError: externalError,
+    onRefreshTasks,
+}: TaskingContentProps) {
+    // If not provided externally (e.g. regular user or embedded), manage locally
+    const isControlled = Array.isArray(allTasks);
+    const [localTasks, setLocalTasks] = useState<CronTask[]>([]);
+    const [localLoading, setLocalLoading] = useState(!isControlled);
+    const [localError, setLocalError] = useState("");
+    const [actionError, setActionError] = useState("");
+
+    const [query, setQuery] = useState("");
     const [userLimits, setUserLimits] = useState<UserLimits | null>(null);
 
     // Modals
@@ -121,26 +369,27 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
 
     // Form fields
     const [formName, setFormName] = useState("");
-    const [formOwner, setFormOwner] = useState(username || "root");
+    const [formOwner, setFormOwner] = useState(
+        activeOwner && activeOwner !== "all" ? activeOwner : "root"
+    );
     const [formSchedule, setFormSchedule] = useState("*/5 * * * *");
     const [formCommand, setFormCommand] = useState("");
     const [formEnabled, setFormEnabled] = useState(true);
     const [formSaving, setFormSaving] = useState(false);
     const [formError, setFormError] = useState("");
 
-    // Copied feedback state
+    // Copied feedback
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    const activeUser = username || (ownerFilter !== "all" ? ownerFilter : "");
-
-    const fetchTasks = useCallback(async () => {
-        setLoadingTasks(true);
-        setTaskError("");
+    const fetchLocalTasks = useCallback(async () => {
+        if (isControlled) return;
+        setLocalLoading(true);
+        setLocalError("");
         try {
             let ep: string;
             if (runtime.isRoot) {
-                ep = activeUser
-                    ? `/post/tasking/list?owner=${encodeURIComponent(activeUser)}`
+                ep = activeOwner && activeOwner !== "all"
+                    ? `/post/tasking/list?owner=${encodeURIComponent(activeOwner)}`
                     : "/post/tasking/list";
             } else {
                 ep = "/api/tasking/list";
@@ -151,25 +400,30 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 throw new Error(text || "Failed to load tasks");
             }
             const data = await response.json();
-            setTasks(data.tasks || []);
+            setLocalTasks(data.tasks || []);
         } catch (err) {
-            setTaskError(err instanceof Error ? err.message : "Failed to load tasks");
+            setLocalError(err instanceof Error ? err.message : "Failed to load tasks");
         } finally {
-            setLoadingTasks(false);
+            setLocalLoading(false);
         }
-    }, [activeUser]);
+    }, [isControlled, activeOwner]);
 
     const fetchLimits = useCallback(async () => {
         try {
             if (runtime.isRoot) {
-                if (username) {
-                    const response = await fetch(`/post/user/limits?user=${encodeURIComponent(username)}`, {
+                const targetUser = activeOwner && activeOwner !== "all" && activeOwner !== "root" ? activeOwner : null;
+                if (targetUser) {
+                    const response = await fetch(`/post/user/limits?user=${encodeURIComponent(targetUser)}`, {
                         cache: "no-store",
                     });
                     if (response.ok) {
                         const data = await response.json();
                         setUserLimits(data);
+                    } else {
+                        setUserLimits(null);
                     }
+                } else {
+                    setUserLimits(null);
                 }
             } else {
                 const response = await fetch("/api/user/limits", { cache: "no-store" });
@@ -179,32 +433,61 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 }
             }
         } catch {
-            // Non-critical
+            setUserLimits(null);
         }
-    }, [username]);
+    }, [activeOwner]);
 
     useEffect(() => {
-        fetchTasks();
+        if (!isControlled) {
+            fetchLocalTasks();
+        }
         fetchLimits();
-    }, [fetchTasks, fetchLimits]);
+    }, [isControlled, fetchLocalTasks, fetchLimits]);
 
-    useEffect(() => {
-        if (runtime.isRoot && !username) {
-            fetch("/post/user/list", { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((data) => {
-                    if (data && Array.isArray(data.users)) {
-                        setUsersList(data.users);
-                    }
-                })
-                .catch(() => {});
+    const handleRefresh = () => {
+        setActionError("");
+        if (isControlled && onRefreshTasks) {
+            onRefreshTasks();
+        } else {
+            fetchLocalTasks();
         }
-    }, [username]);
+        fetchLimits();
+    };
+
+    const isLoading = isControlled ? !!externalLoading : localLoading;
+    const currentError = (isControlled ? externalError : localError) || actionError;
+
+    // Filter tasks based on selected owner (if activeOwner is set and not "all")
+    const scopedTasks = useMemo(() => {
+        const raw = isControlled ? (allTasks || []) : localTasks;
+        if (!activeOwner || activeOwner === "all") {
+            return raw;
+        }
+        return raw.filter((t) => t.owner === activeOwner);
+    }, [isControlled, allTasks, localTasks, activeOwner]);
+
+    // Search filter
+    const filteredTasks = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return scopedTasks;
+        return scopedTasks.filter((t) =>
+            t.name.toLowerCase().includes(q) ||
+            t.command.toLowerCase().includes(q) ||
+            t.schedule.toLowerCase().includes(q) ||
+            t.owner.toLowerCase().includes(q)
+        );
+    }, [scopedTasks, query]);
+
+    const isTaskLimitReached = Boolean(
+        userLimits &&
+        userLimits.maxTasks > 0 &&
+        scopedTasks.length >= userLimits.maxTasks
+    );
 
     const handleOpenCreate = () => {
         setEditingTask(null);
         setFormName("");
-        setFormOwner(username || "root");
+        setFormOwner(activeOwner && activeOwner !== "all" ? activeOwner : "root");
         setFormSchedule("*/5 * * * *");
         setFormCommand("");
         setFormEnabled(true);
@@ -282,8 +565,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
             }
 
             setFormModalOpen(false);
-            fetchTasks();
-            fetchLimits();
+            handleRefresh();
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Failed to save task");
         } finally {
@@ -293,10 +575,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
 
     const handleToggleEnabled = async (task: CronTask) => {
         const nextEnabled = !task.enabled;
-        // Optimistic update
-        setTasks((prev) =>
-            prev.map((t) => (t.id === task.id ? { ...t, enabled: nextEnabled } : t))
-        );
+        setActionError("");
 
         try {
             const ep = runtime.isRoot ? "/post/tasking/toggle" : "/api/tasking/toggle";
@@ -307,19 +586,17 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
             });
             if (!res.ok) {
                 const text = await res.text();
-                throw new Error(text || "Failed to toggle status");
+                throw new Error(text || "Failed to toggle task status");
             }
+            handleRefresh();
         } catch (err) {
-            // Revert
-            setTasks((prev) =>
-                prev.map((t) => (t.id === task.id ? { ...t, enabled: task.enabled } : t))
-            );
-            alert(err instanceof Error ? err.message : "Failed to toggle status");
+            setActionError(err instanceof Error ? err.message : "Failed to toggle status");
         }
     };
 
     const handleDeleteTask = async () => {
         if (!deleteModal) return;
+        setActionError("");
         try {
             const ep = runtime.isRoot ? "/post/tasking/delete" : "/api/tasking/delete";
             const res = await fetch(ep, {
@@ -332,10 +609,10 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 throw new Error(text || "Failed to delete task");
             }
             setDeleteModal(null);
-            fetchTasks();
-            fetchLimits();
+            handleRefresh();
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to delete task");
+            setActionError(err instanceof Error ? err.message : "Failed to delete task");
+            setDeleteModal(null);
         }
     };
 
@@ -362,7 +639,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 output: data.output || "(no output produced)",
                 isRunning: false,
             });
-            fetchTasks();
+            handleRefresh();
         } catch (err) {
             setRunOutputModal({
                 task,
@@ -370,7 +647,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 isRunning: false,
                 error: err instanceof Error ? err.message : "Execution failed",
             });
-            fetchTasks();
+            handleRefresh();
         }
     };
 
@@ -380,30 +657,55 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    const filteredTasks = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return tasks.filter((t) => {
-            const matchesQuery =
-                !q ||
-                t.name.toLowerCase().includes(q) ||
-                t.command.toLowerCase().includes(q) ||
-                t.schedule.toLowerCase().includes(q) ||
-                t.owner.toLowerCase().includes(q);
-            return matchesQuery;
-        });
-    }, [tasks, query]);
+    return (
+        <div className="space-y-5">
+            {/* Header info for root in subsidebar view */}
+            {runtime.isRoot && !embedded && (
+                <div className="flex flex-col gap-1 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-base font-semibold text-foreground">
+                                {activeOwner === "all"
+                                    ? "All Scheduled Tasks"
+                                    : activeOwner === "root"
+                                    ? "System Tasks (root)"
+                                    : `Tasks: ${activeOwner}`}
+                            </h2>
+                            {userLimits && userLimits.maxTasks > 0 && activeOwner && activeOwner !== "all" && activeOwner !== "root" ? (
+                                <span
+                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        isTaskLimitReached
+                                            ? "bg-destructive/15 text-destructive"
+                                            : "bg-muted text-muted-foreground"
+                                    }`}
+                                >
+                                    Quota: {scopedTasks.length} / {userLimits.maxTasks}
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {filteredTasks.length} of {scopedTasks.length} task{scopedTasks.length !== 1 ? "s" : ""}
+                            {activeOwner === "all" ? " across all accounts" : ` for ${activeOwner}`}
+                        </p>
+                    </div>
 
-    const isTaskLimitReached = Boolean(
-        !runtime.isRoot &&
-        userLimits &&
-        userLimits.maxTasks > 0 &&
-        (userLimits.currentTasks ?? tasks.length) >= userLimits.maxTasks
-    );
+                    <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                        <Button
+                            size="sm"
+                            onClick={handleOpenCreate}
+                            disabled={isTaskLimitReached}
+                            title={isTaskLimitReached ? "Task quota reached" : "Create new scheduled task"}
+                            className="h-8 text-xs font-medium"
+                        >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            New Task
+                        </Button>
+                    </div>
+                </div>
+            )}
 
-    const content = (
-        <div className="space-y-6">
             {/* Top Toolbar */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-1 flex-wrap items-center gap-3">
                     {/* Search bar */}
                     <div className="relative min-w-[240px] max-w-sm flex-1">
@@ -417,64 +719,46 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                         />
                     </div>
 
-                    {/* Owner filter for root */}
-                    {runtime.isRoot && !username && (
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground">Owner:</span>
-                            <select
-                                value={ownerFilter}
-                                onChange={(e) => setOwnerFilter(e.target.value)}
-                                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="all">All Users</option>
-                                <option value="root">root</option>
-                                {usersList.map((u) => (
-                                    <option key={u.username} value={u.username}>
-                                        {u.username}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={fetchTasks}
-                        disabled={loadingTasks}
+                        onClick={handleRefresh}
+                        disabled={isLoading}
                         className="h-8 text-xs"
                     >
-                        <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loadingTasks ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
                         Refresh
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    {/* Quota indicator for user */}
-                    {!runtime.isRoot && userLimits && (
-                        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs">
-                            <span className="text-muted-foreground">Task Quota:</span>
-                            <span
-                                className={`font-semibold ${
-                                    isTaskLimitReached ? "text-destructive" : "text-foreground"
-                                }`}
-                            >
-                                {userLimits.currentTasks ?? tasks.length} / {userLimits.maxTasks}
-                            </span>
-                        </div>
-                    )}
+                {/* For non-root or embedded, show quota & Create Task button here */}
+                {(!runtime.isRoot || embedded) && (
+                    <div className="flex items-center gap-3">
+                        {!runtime.isRoot && userLimits && (
+                            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs">
+                                <span className="text-muted-foreground">Task Quota:</span>
+                                <span
+                                    className={`font-semibold ${
+                                        isTaskLimitReached ? "text-destructive" : "text-foreground"
+                                    }`}
+                                >
+                                    {userLimits.currentTasks ?? scopedTasks.length} / {userLimits.maxTasks}
+                                </span>
+                            </div>
+                        )}
 
-                    <Button
-                        size="sm"
-                        onClick={handleOpenCreate}
-                        disabled={isTaskLimitReached}
-                        title={isTaskLimitReached ? "Task quota reached" : "Create new scheduled task"}
-                        className="h-8 text-xs font-medium"
-                    >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        New Task
-                    </Button>
-                </div>
+                        <Button
+                            size="sm"
+                            onClick={handleOpenCreate}
+                            disabled={isTaskLimitReached}
+                            title={isTaskLimitReached ? "Task quota reached" : "Create new scheduled task"}
+                            className="h-8 text-xs font-medium"
+                        >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            New Task
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Quota Banner when max reached */}
@@ -482,16 +766,22 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 <div className="flex items-center gap-2.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-400">
                     <Info className="h-4 w-4 shrink-0" />
                     <span>
-                        You have reached your maximum task limit ({userLimits?.maxTasks} tasks). Delete existing tasks
-                        or contact your administrator to increase your quota.
+                        The maximum task limit ({userLimits?.maxTasks} tasks) has been reached. Delete existing tasks
+                        or increase the quota in user settings to schedule more.
                     </span>
                 </div>
             )}
 
             {/* Error banner */}
-            {taskError && (
-                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-xs text-destructive">
-                    {taskError}
+            {currentError && (
+                <div className="flex items-center justify-between rounded-md border border-destructive/20 bg-destructive/10 p-3.5 text-xs text-destructive">
+                    <span>{currentError}</span>
+                    <button
+                        onClick={() => setActionError("")}
+                        className="p-1 hover:opacity-75"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
                 </div>
             )}
 
@@ -503,7 +793,9 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                             <tr>
                                 <th className="px-4 py-3 w-16 text-center">Status</th>
                                 <th className="px-4 py-3 min-w-[160px]">Task Name</th>
-                                {runtime.isRoot && <th className="px-4 py-3 w-28">Owner</th>}
+                                {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
+                                    <th className="px-4 py-3 w-28">Owner</th>
+                                )}
                                 <th className="px-4 py-3 min-w-[180px]">Schedule</th>
                                 <th className="px-4 py-3 min-w-[240px]">Command</th>
                                 <th className="px-4 py-3 min-w-[150px]">Last Run</th>
@@ -512,9 +804,12 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {loadingTasks && tasks.length === 0 ? (
+                            {isLoading && scopedTasks.length === 0 ? (
                                 <tr>
-                                    <td colSpan={runtime.isRoot ? 8 : 7} className="p-8 text-center">
+                                    <td
+                                        colSpan={runtime.isRoot && (!activeOwner || activeOwner === "all") ? 8 : 7}
+                                        className="p-8 text-center"
+                                    >
                                         <div className="flex items-center justify-center gap-2 text-muted-foreground">
                                             <Loader2 className="h-5 w-5 animate-spin" />
                                             <span>Loading scheduled tasks...</span>
@@ -524,7 +819,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                             ) : filteredTasks.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan={runtime.isRoot ? 8 : 7}
+                                        colSpan={runtime.isRoot && (!activeOwner || activeOwner === "all") ? 8 : 7}
                                         className="p-8 text-center text-muted-foreground"
                                     >
                                         {query
@@ -561,8 +856,8 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                                             </div>
                                         </td>
 
-                                        {/* Owner */}
-                                        {runtime.isRoot && (
+                                        {/* Owner (shown when viewing all users) */}
+                                        {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
                                             <td className="px-4 py-3">
                                                 <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 font-mono text-xs font-medium text-foreground">
                                                     <User className="h-3 w-3 text-muted-foreground" />
@@ -739,7 +1034,7 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                                         onChange={(e) => setFormOwner(e.target.value)}
                                         className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                     >
-                                        <option value="root">root</option>
+                                        <option value="root">root (System)</option>
                                         {usersList.map((u) => (
                                             <option key={u.username} value={u.username}>
                                                 {u.username}
@@ -995,25 +1290,5 @@ export default function TaskingRoute({ embedded = false, username }: TaskingRout
                 </div>
             )}
         </div>
-    );
-
-    if (embedded) {
-        return content;
-    }
-
-    return (
-        <DashboardLayout title="Tasking">
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Tasking</h1>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Manage Linux cron jobs, scheduled tasks, and execution history.
-                        </p>
-                    </div>
-                </div>
-                {content}
-            </div>
-        </DashboardLayout>
     );
 }
