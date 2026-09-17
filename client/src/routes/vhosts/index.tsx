@@ -55,10 +55,31 @@ export default function VHostsRoute({
     if (embedded) {
         return <VHostsContent ownerFilter={ownerFilter} embedded />;
     }
+    if (!runtime.isRoot) {
+        return <VHostsUserStandalone />;
+    }
     return <VHostsStandalone />;
 }
 
-// ─── Standalone with subsidebar ───────────────────────────────────────────────
+// ─── Standalone for user session (no Caddyfile, user's vhosts list only) ───────
+
+function VHostsUserStandalone() {
+    return (
+        <DashboardLayout title="Virtual Hosts">
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Virtual Hosts</h1>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Virtual hosts and domains configured for your account.
+                    </p>
+                </div>
+                <VHostsContent />
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Standalone with subsidebar (Root only) ───────────────────────────────────
 
 function VHostsStandalone() {
     const { owner: ownerParam } = useParams<{ owner?: string }>();
@@ -291,11 +312,11 @@ function VHostsContent({
         try {
             const response = await fetch(endpoint, { cache: "no-store" });
             if (!response.ok)
-                throw new Error((await response.text()) || "Failed to load Caddy virtual hosts");
+                throw new Error((await response.text()) || "Failed to load virtual hosts");
             const data: { vhosts?: CaddyVHost[] } = await response.json();
             setVhosts((data.vhosts ?? []).filter((v) => v.server === "caddy"));
         } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : "Failed to load Caddy virtual hosts");
+            setError(loadError instanceof Error ? loadError.message : "Failed to load virtual hosts");
         } finally {
             setLoading(false);
         }
@@ -351,10 +372,10 @@ function VHostsContent({
                         <>
                             <h3 className="text-sm font-semibold text-foreground">Virtual Hosts</h3>
                             <p className="text-xs text-muted-foreground">
-                                Caddy virtual hosts owned by {ownerFilter || "this user"}.
+                                Virtual hosts owned by {ownerFilter || "this user"}.
                             </p>
                         </>
-                    ) : (
+                    ) : pageTitle ? (
                         <>
                             <h2 className="text-base font-semibold text-foreground">{pageTitle}</h2>
                             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -362,6 +383,11 @@ function VHostsContent({
                                 {baseVHosts.length !== 1 ? "s" : ""}
                             </p>
                         </>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            {filtered.length} of {baseVHosts.length} virtual host
+                            {baseVHosts.length !== 1 ? "s" : ""}
+                        </p>
                     )}
                 </div>
 
@@ -427,11 +453,13 @@ function VHostsContent({
             ) : filtered.length === 0 ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border text-center">
                     <Globe className="mb-3 h-9 w-9 text-muted-foreground/40" />
-                    <p className="text-sm font-medium text-foreground">No Caddy virtual hosts found</p>
+                    <p className="text-sm font-medium text-foreground">No virtual hosts found</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        {ownerFilter
-                            ? `Add a host block to ${ownerFilter}.caddy, then reload Caddy.`
-                            : "Add a host block to /etc/caddy/Caddyfile or a user's .caddy file, then reload Caddy."}
+                        {runtime.isRoot
+                            ? (ownerFilter
+                                ? `Add a host block to ${ownerFilter}.caddy, then reload Caddy.`
+                                : "Add a host block to /etc/caddy/Caddyfile or a user's .caddy file, then reload Caddy.")
+                            : "No virtual hosts have been configured for your account yet."}
                     </p>
                 </div>
             ) : (
@@ -441,7 +469,7 @@ function VHostsContent({
                             <thead className="border-b border-border bg-muted/40 text-muted-foreground">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Hostname</th>
-                                    <th className="px-4 py-3 font-medium">Owner</th>
+                                    {runtime.isRoot && <th className="px-4 py-3 font-medium">Owner</th>}
                                     <th className="px-4 py-3 font-medium">Aliases</th>
                                     <th className="px-4 py-3 font-medium">Listen</th>
                                     <th className="px-4 py-3 font-medium">TLS</th>
@@ -457,11 +485,13 @@ function VHostsContent({
                                                 {vhost.hostname}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
-                                                {vhost.owner || "system"}
-                                            </span>
-                                        </td>
+                                        {runtime.isRoot && (
+                                            <td className="px-4 py-3">
+                                                <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+                                                    {vhost.owner || "system"}
+                                                </span>
+                                            </td>
+                                        )}
                                         <td className="px-4 py-3 text-muted-foreground">
                                             {vhost.aliases.length ? vhost.aliases.join(", ") : "—"}
                                         </td>
@@ -552,7 +582,7 @@ function VHostsContent({
                         </div>
                         <div className="space-y-3 p-5">
                             <p className="text-sm text-muted-foreground">
-                                Remove this virtual host from the Caddy configuration?
+                                Remove this virtual host from the configuration?
                             </p>
                             <div className="border border-destructive/20 bg-destructive/5 px-3 py-2.5">
                                 <p className="font-mono text-sm font-semibold text-destructive">{deleteTarget}</p>
