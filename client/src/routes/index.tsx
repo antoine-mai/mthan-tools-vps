@@ -15,6 +15,7 @@ import SettingsRoute from "./settings";
 import UserRoutes from "./user";
 import VHostsRoute from "./vhosts";
 import BackupRoute from "./backup";
+import TaskingRoute from "./tasking";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
     const { isLoggedIn, isCheckingSession } = useUser();
@@ -38,6 +39,7 @@ export default function AppRoutes() {
             <Route path="/vhosts" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
             <Route path="/vhosts/:owner" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
             <Route path="/containers" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
+            <Route path="/tasking" element={<ProtectedRoute><TaskingRoute /></ProtectedRoute>} />
             <Route path="/backup" element={<ProtectedRoute><BackupRoute /></ProtectedRoute>} />
             <Route path="/agent" element={<ProtectedRoute><AgentRoute /></ProtectedRoute>} />
             {runtime.isRoot ? (

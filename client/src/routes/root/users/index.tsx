@@ -22,6 +22,8 @@ import {
     Globe,
     Container as ContainerIcon,
     Archive,
+    CalendarClock,
+    Sliders,
 } from "lucide-react";
 
 import DashboardLayout from "_layouts/dashboard";
@@ -32,6 +34,7 @@ import FilesRoute from "../../files";
 import VHostsRoute from "../../vhosts";
 import ContainersRoute from "../../containers";
 import BackupRoute from "../../backup";
+import TaskingRoute from "../../tasking";
 
 interface LinuxUser {
     cpanelEnabled: boolean;
@@ -125,6 +128,14 @@ export default function UsersRoute() {
     const [modalError, setModalError] = useState<string | null>(null);
     const [username, setUsername] = useState("");
     const [createdUser, setCreatedUser] = useState<{ username: string; password: string } | null>(null);
+
+    // User Resource Limits state
+    const [userLimits, setUserLimits] = useState<{ username: string; maxTasks: number; maxContainers: number } | null>(null);
+    const [limitsModalOpen, setLimitsModalOpen] = useState(false);
+    const [editMaxTasks, setEditMaxTasks] = useState(10);
+    const [editMaxContainers, setEditMaxContainers] = useState(5);
+    const [limitsSaving, setLimitsSaving] = useState(false);
+    const [limitsError, setLimitsError] = useState("");
 
     const generateRandomPassword = () => {
         const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=";
@@ -279,6 +290,54 @@ export default function UsersRoute() {
         return () => controller.abort();
     }, [activeSection, selectedUser?.username]);
 
+    useEffect(() => {
+        if (!selectedUser) {
+            setUserLimits(null);
+            return;
+        }
+        fetch(`/post/user/limits?user=${encodeURIComponent(selectedUser.username)}`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data) {
+                    setUserLimits(data);
+                    setEditMaxTasks(data.maxTasks ?? 10);
+                    setEditMaxContainers(data.maxContainers ?? 5);
+                }
+            })
+            .catch(() => {});
+    }, [selectedUser?.username]);
+
+    const handleSaveLimits = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!selectedUser) return;
+        setLimitsSaving(true);
+        setLimitsError("");
+        try {
+            const res = await fetch("/post/user/limits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: selectedUser.username,
+                    maxTasks: Number(editMaxTasks),
+                    maxContainers: Number(editMaxContainers),
+                }),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to update resource limits");
+            }
+            setUserLimits({
+                username: selectedUser.username,
+                maxTasks: Number(editMaxTasks),
+                maxContainers: Number(editMaxContainers),
+            });
+            setLimitsModalOpen(false);
+        } catch (err) {
+            setLimitsError(err instanceof Error ? err.message : "Failed to update resource limits");
+        } finally {
+            setLimitsSaving(false);
+        }
+    };
 
     const handleCreateUser = async (e: FormEvent) => {
         e.preventDefault();
@@ -477,6 +536,7 @@ export default function UsersRoute() {
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
                                             <UserSubItem username={u.username} section="containers" active={activeSection === "containers"} icon={ContainerIcon} label="Containers" />
                                             <UserSubItem username={u.username} section="vhosts" active={activeSection === "vhosts"} icon={Globe} label="VHosts" />
+                                            <UserSubItem username={u.username} section="tasking" active={activeSection === "tasking"} icon={CalendarClock} label="Tasking" />
                                             <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
                                             <UserSubItem username={u.username} section="backup" active={activeSection === "backup"} icon={Archive} label="Backup" />
                                         </nav>
@@ -514,6 +574,21 @@ export default function UsersRoute() {
                                     >
                                         {selectedUser.cpanelEnabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                                         {selectedUser.cpanelEnabled ? "CPanel Enabled" : "CPanel Disabled"}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 gap-1.5 px-2 text-xs"
+                                        onClick={() => {
+                                            setLimitsError("");
+                                            setEditMaxTasks(userLimits?.maxTasks ?? 10);
+                                            setEditMaxContainers(userLimits?.maxContainers ?? 5);
+                                            setLimitsModalOpen(true);
+                                        }}
+                                        title="Configure task and container limits for this user"
+                                    >
+                                        <Sliders className="h-3.5 w-3.5 text-primary" />
+                                        <span>Limits: {userLimits?.maxTasks ?? 10} Tasks / {userLimits?.maxContainers ?? 5} Containers</span>
                                     </Button>
                                     {!selectedUser.cpanelEnabled ? (
                                         <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
@@ -572,8 +647,8 @@ export default function UsersRoute() {
                                                 </div>
                                             ) : overviewData ? (
                                                 <div className="space-y-6">
-                                                    {/* 3 Metric Summary Cards */}
-                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                    {/* 4 Metric Summary Cards */}
+                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                                         {/* Card 1: Containers */}
                                                         <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
                                                             <div>
@@ -589,7 +664,7 @@ export default function UsersRoute() {
                                                                     <span className="text-3xl font-bold tracking-tight text-foreground">
                                                                         {overviewData.containers.total}
                                                                     </span>
-                                                                    <span className="text-xs text-muted-foreground">total</span>
+                                                                    <span className="text-xs text-muted-foreground">/ {userLimits?.maxContainers ?? 5} max</span>
                                                                 </div>
                                                                 <p className="mt-1 text-xs text-muted-foreground">
                                                                     {overviewData.containers.running} running · {overviewData.containers.stopped} stopped
@@ -663,6 +738,49 @@ export default function UsersRoute() {
                                                                     className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
                                                                 >
                                                                     Browse files →
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Card 4: Resource Limits */}
+                                                        <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                                        Resource Limits
+                                                                    </span>
+                                                                    <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                                                        <Sliders className="h-4 w-4" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-3 flex items-baseline gap-2">
+                                                                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                                                                        {userLimits?.maxTasks ?? 10}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground">max tasks</span>
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                                    Max containers: {userLimits?.maxContainers ?? 5}
+                                                                </p>
+                                                            </div>
+                                                            <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setLimitsError("");
+                                                                        setEditMaxTasks(userLimits?.maxTasks ?? 10);
+                                                                        setEditMaxContainers(userLimits?.maxContainers ?? 5);
+                                                                        setLimitsModalOpen(true);
+                                                                    }}
+                                                                    className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                                                                >
+                                                                    Edit limits →
+                                                                </button>
+                                                                <Link
+                                                                    to={`/users/${encodeURIComponent(selectedUser.username)}/tasking`}
+                                                                    className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                                                                >
+                                                                    Tasks →
                                                                 </Link>
                                                             </div>
                                                         </div>
@@ -828,6 +946,10 @@ export default function UsersRoute() {
                                 ) : activeSection === "backup" ? (
                                     <div className="space-y-4">
                                         <BackupRoute embedded={true} username={selectedUser.username} key={selectedUser.username} />
+                                    </div>
+                                ) : activeSection === "tasking" ? (
+                                    <div className="space-y-4">
+                                        <TaskingRoute embedded={true} username={selectedUser.username} key={selectedUser.username} />
                                     </div>
                                 ) : null}
                                 </div>
@@ -1123,6 +1245,98 @@ export default function UsersRoute() {
                     </div>
                 </div>
             )}
+
+            {/* User Limits Modal */}
+            {limitsModalOpen && selectedUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-border pb-3">
+                            <div className="flex items-center gap-2">
+                                <Sliders className="h-5 w-5 text-primary" />
+                                <h3 className="text-sm font-semibold text-foreground">
+                                    Resource Limits: {selectedUser.username}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setLimitsModalOpen(false)}
+                                className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Configure resource quotas for this user. These limits restrict how many scheduled tasks and containers the user can create.
+                        </p>
+
+                        {limitsError && (
+                            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                                {limitsError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSaveLimits} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-foreground mb-1">
+                                    Max Tasks (Cron Jobs)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="1000"
+                                    required
+                                    value={editMaxTasks}
+                                    onChange={(e) => setEditMaxTasks(parseInt(e.target.value, 10) || 0)}
+                                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Maximum number of scheduled cron tasks allowed (default: 10).
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-foreground mb-1">
+                                    Max Containers
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="1000"
+                                    required
+                                    value={editMaxContainers}
+                                    onChange={(e) => setEditMaxContainers(parseInt(e.target.value, 10) || 0)}
+                                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Maximum number of Podman containers allowed (default: 5).
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setLimitsModalOpen(false)}
+                                    disabled={limitsSaving}
+                                    className="text-xs"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={limitsSaving}
+                                    className="text-xs font-medium"
+                                >
+                                    {limitsSaving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                                    Save Limits
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
@@ -1134,10 +1348,10 @@ function AlertCircle({ className }: { className?: string }) {
     );
 }
 
-type UserSection = "overview" | "files" | "containers" | "vhosts" | "terminal" | "backup";
+type UserSection = "overview" | "files" | "containers" | "vhosts" | "terminal" | "backup" | "tasking";
 
 function userSection(section?: string): UserSection {
-    return section === "files" || section === "containers" || section === "vhosts" || section === "terminal" || section === "backup" ? section : "overview";
+    return section === "files" || section === "containers" || section === "vhosts" || section === "terminal" || section === "backup" || section === "tasking" ? section : "overview";
 }
 
 function UserSubItem({ username, section, active, icon: Icon, label }: {

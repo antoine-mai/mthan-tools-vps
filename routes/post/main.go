@@ -17,10 +17,12 @@ import (
 	"mthan/vps/routes/post/ping"
 	"mthan/vps/routes/post/session"
 	settingsroute "mthan/vps/routes/post/settings"
+	posttasking "mthan/vps/routes/post/tasking"
 	"mthan/vps/routes/post/terminal"
 	"mthan/vps/routes/post/update"
 	useradd "mthan/vps/routes/post/user/add"
 	userdelete "mthan/vps/routes/post/user/delete"
+	postlimits "mthan/vps/routes/post/user/limits"
 	userlist "mthan/vps/routes/post/user/list"
 	userlogin "mthan/vps/routes/post/user/login"
 	useroverview "mthan/vps/routes/post/user/overview"
@@ -56,13 +58,34 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("POST /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
 	mux.Handle("PATCH /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
 	mux.Handle("DELETE /post/files", postOnly(deps.Startup, deps.Sessions, postfiles.Handler(deps.Sessions)))
+	userLimitsSvc, _ := services.NewUserLimitsService(deps.Settings.DB())
+	cronTaskSvc, _ := services.NewCronTaskService(deps.Settings.DB(), userLimitsSvc)
+	containerSvc := services.NewContainerService()
+	if userLimitsSvc != nil {
+		containerSvc.SetLimitsService(userLimitsSvc)
+	}
+
 	mux.Handle("GET /post/apps", postOnly(deps.Startup, deps.Sessions, postapps.Handler(deps.Sessions)))
-	mux.Handle("GET /post/containers", postOnly(deps.Startup, deps.Sessions, postcontainers.Handler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("POST /post/containers/create", postOnly(deps.Startup, deps.Sessions, postcontainers.CreateHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("POST /post/containers/action", postOnly(deps.Startup, deps.Sessions, postcontainers.ActionHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, deps.Sessions, postcontainers.LogsHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
-	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, services.NewContainerService())))
+	mux.Handle("GET /post/containers", postOnly(deps.Startup, deps.Sessions, postcontainers.Handler(deps.Sessions, containerSvc)))
+	mux.Handle("POST /post/containers/create", postOnly(deps.Startup, deps.Sessions, postcontainers.CreateHandler(deps.Sessions, containerSvc)))
+	mux.Handle("POST /post/containers/action", postOnly(deps.Startup, deps.Sessions, postcontainers.ActionHandler(deps.Sessions, containerSvc)))
+	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, deps.Sessions, postcontainers.LogsHandler(deps.Sessions, containerSvc)))
+	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, containerSvc)))
+	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, containerSvc)))
+	if cronTaskSvc != nil {
+		mux.Handle("GET /post/tasking", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("GET /post/tasking/list", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking/create", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking/update", postOnly(deps.Startup, deps.Sessions, posttasking.UpdateHandler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking/toggle", postOnly(deps.Startup, deps.Sessions, posttasking.ToggleHandler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking/delete", postOnly(deps.Startup, deps.Sessions, posttasking.DeleteHandler(deps.Sessions, cronTaskSvc)))
+		mux.Handle("POST /post/tasking/run", postOnly(deps.Startup, deps.Sessions, posttasking.RunHandler(deps.Sessions, cronTaskSvc)))
+	}
+	if userLimitsSvc != nil {
+		mux.Handle("GET /post/user/limits", postOnly(deps.Startup, deps.Sessions, postlimits.Handler(deps.Sessions, userLimitsSvc)))
+		mux.Handle("POST /post/user/limits", postOnly(deps.Startup, deps.Sessions, postlimits.Handler(deps.Sessions, userLimitsSvc)))
+	}
 	mux.Handle("POST /post/apps", postOnly(deps.Startup, deps.Sessions, postapps.Handler(deps.Sessions)))
 	mux.Handle("GET /post/apps/config", postOnly(deps.Startup, deps.Sessions, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))
 	mux.Handle("PUT /post/apps/config", postOnly(deps.Startup, deps.Sessions, appconfig.Handler(deps.Sessions, services.NewAppConfigService())))

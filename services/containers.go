@@ -68,10 +68,15 @@ func (timedContainerCommandRunner) RunWithTimeout(timeout time.Duration, name st
 
 type ContainerService struct {
 	runner containerCommandRunner
+	limits *UserLimitsService
 }
 
 func NewContainerService() *ContainerService {
 	return &ContainerService{runner: timedContainerCommandRunner{}}
+}
+
+func (s *ContainerService) SetLimitsService(limits *UserLimitsService) {
+	s.limits = limits
 }
 
 func (s *ContainerService) ListAll() []Container {
@@ -110,6 +115,16 @@ func (s *ContainerService) ListCurrentUser(username string) []Container {
 		return []Container{}
 	}
 	result := parsePodmanContainers(output, username)
+	sortContainers(result)
+	return result
+}
+
+func (s *ContainerService) ListForOwner(owner string) []Container {
+	output, err := s.runForOwner("podman", owner, "ps", "-a", "--format", "json")
+	if err != nil {
+		return []Container{}
+	}
+	result := parsePodmanContainers(output, owner)
 	sortContainers(result)
 	return result
 }
@@ -426,6 +441,12 @@ func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, 
 		input.Owner = "root"
 	}
 	if input.Owner != "root" && input.Owner != "system" {
+		if s.limits != nil {
+			userContainers := s.ListForOwner(input.Owner)
+			if err := s.limits.CheckContainerLimit(input.Owner, len(userContainers)); err != nil {
+				return "", err
+			}
+		}
 		linuxUser, exists, err := HomeUser(input.Owner)
 		if err != nil || !exists || linuxUser.UID < 0 {
 			return "", errors.New("invalid container owner")

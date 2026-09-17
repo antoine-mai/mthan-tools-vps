@@ -58,3 +58,34 @@ CREATE TABLE IF NOT EXISTS backup_storages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_backup_storages_owner ON backup_storages(owner);
+
+-- ---------------------------------------------------------------------
+-- Table: user_limits
+-- Purpose: Quota limits per Linux user configured by root (max tasks, max containers)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_limits (
+    username        TEXT PRIMARY KEY,                     -- Linux username (e.g. 'alice')
+    max_tasks       INTEGER NOT NULL DEFAULT 10,          -- Max cron tasks allowed (-1 or 0 for unlimited)
+    max_containers  INTEGER NOT NULL DEFAULT 5,           -- Max Podman containers allowed (-1 or 0 for unlimited)
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------
+-- Table: cron_tasks
+-- Purpose: Scheduled cron jobs managed by root and users, synced with system crontab
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cron_tasks (
+    id              TEXT PRIMARY KEY,                     -- Unique identifier
+    owner           TEXT NOT NULL,                        -- Linux username of owner ('root', 'alice')
+    name            TEXT NOT NULL,                        -- Human-readable task name
+    schedule        TEXT NOT NULL,                        -- Standard 5-field cron expression ('0 * * * *')
+    command         TEXT NOT NULL,                        -- Command or script to execute
+    enabled         INTEGER NOT NULL DEFAULT 1,           -- 1 = active, 0 = disabled
+    last_run_at     DATETIME,                             -- Last execution timestamp
+    last_status     TEXT NOT NULL DEFAULT '',             -- 'success', 'failed', 'running', ''
+    last_output     TEXT NOT NULL DEFAULT '',             -- Truncated output of last run
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cron_tasks_owner ON cron_tasks(owner);
