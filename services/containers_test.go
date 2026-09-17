@@ -68,3 +68,34 @@ func TestContainerActionArgs(t *testing.T) {
 		t.Fatal("expected error for invalid action")
 	}
 }
+
+func TestBuildCreateContainerArgs(t *testing.T) {
+	input := CreateContainerInput{
+		Name:          "my-nginx",
+		Image:         "nginx:alpine",
+		RestartPolicy: "unless-stopped",
+		Ports:         []string{"8080:80"},
+		Volumes:       []string{"/home/user/html:/usr/share/nginx/html:ro"},
+		Env:           map[string]string{"ENV_VAR": "production"},
+		Command:       "nginx -g 'daemon off;'",
+	}
+	args, err := buildCreateContainerArgs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedPrefix := []string{"run", "-d", "--name", "my-nginx", "--restart", "unless-stopped", "-p", "8080:80", "-v", "/home/user/html:/usr/share/nginx/html:ro", "-e", "ENV_VAR=production", "nginx:alpine"}
+	if len(args) < len(expectedPrefix) {
+		t.Fatalf("expected at least %d args, got %d: %v", len(expectedPrefix), len(args), args)
+	}
+
+	// Test missing image
+	if _, err := buildCreateContainerArgs(CreateContainerInput{}); err == nil {
+		t.Fatal("expected error for empty image")
+	}
+
+	// Test invalid container name
+	if _, err := buildCreateContainerArgs(CreateContainerInput{Image: "alpine", Name: "invalid name with space"}); err == nil {
+		t.Fatal("expected error for invalid container name")
+	}
+}
+

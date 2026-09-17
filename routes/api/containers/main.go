@@ -92,6 +92,32 @@ func UserLogsHandler(sessions *services.SessionService, containers *services.Con
 	})
 }
 
+func UserCreateHandler(sessions *services.SessionService, containers *services.ContainerService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := requestSession(r, sessions)
+		if !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var input services.CreateContainerInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		input.Owner = session.Username
+		id, err := containers.CreateCurrentUser(session.Username, input)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]string{"status": "ok", "id": id})
+	})
+}
+
 func requestSession(r *http.Request, sessions *services.SessionService) (services.Session, bool) {
 	return sessions.GetUserSession(r)
 }

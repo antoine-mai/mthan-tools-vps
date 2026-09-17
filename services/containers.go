@@ -45,10 +45,23 @@ type containerCommandRunner interface {
 	Run(name string, args ...string) ([]byte, error)
 }
 
+type containerTimeoutRunner interface {
+	RunWithTimeout(timeout time.Duration, name string, args ...string) ([]byte, error)
+}
+
 type timedContainerCommandRunner struct{}
 
 func (timedContainerCommandRunner) Run(name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).CombinedOutput()
+}
+
+func (timedContainerCommandRunner) RunWithTimeout(timeout time.Duration, name string, args ...string) ([]byte, error) {
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return exec.CommandContext(ctx, name, args...).CombinedOutput()
 }
@@ -287,6 +300,27 @@ func pathWithin(path, root string) bool {
 	return cleanPath == cleanRoot || strings.HasPrefix(cleanPath, cleanRoot+string(filepath.Separator))
 }
 
+func (s *ContainerService) runForOwnerWithTimeout(timeout time.Duration, engine, owner string, args ...string) ([]byte, error) {
+	if engine != "" && engine != "podman" {
+		return nil, errors.New("invalid container engine")
+	}
+	if tr, ok := s.runner.(containerTimeoutRunner); ok {
+		if owner == "root" || owner == "system" {
+			return tr.RunWithTimeout(timeout, "podman", args...)
+		}
+		linuxUser, exists, err := HomeUser(owner)
+		if err != nil || !exists || linuxUser.UID < 0 {
+			return nil, errors.New("invalid Podman owner")
+		}
+		command := []string{
+			"--user", linuxUser.Username, "--", "env", "HOME=" + linuxUser.Home,
+			fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%d", linuxUser.UID), "podman",
+		}
+		return tr.RunWithTimeout(timeout, "runuser", append(command, args...)...)
+	}
+	return s.runForOwner(engine, owner, args...)
+}
+
 func (s *ContainerService) runForOwner(engine, owner string, args ...string) ([]byte, error) {
 	if engine != "" && engine != "podman" {
 		return nil, errors.New("invalid container engine")
@@ -303,6 +337,146 @@ func (s *ContainerService) runForOwner(engine, owner string, args ...string) ([]
 		fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%d", linuxUser.UID), "podman",
 	}
 	return s.runner.Run("runuser", append(command, args...)...)
+}
+
+type CreateContainerInput struct {
+	Name          string            `json:"name"`
+	Image         string            `json:"image"`
+	Owner         string            `json:"owner"`
+	Command       string            `json:"command,omitempty"`
+	RestartPolicy string            `json:"restartPolicy,omitempty"`
+	Ports         []string          `json:"ports,omitempty"`
+	Volumes       []string          `json:"volumes,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+}
+
+func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
+	input.Image = strings.TrimSpace(input.Image)
+	if input.Image == "" {
+		return nil, errors.New("container image is required")
+	}
+	if strings.ContainsAny(input.Image, " \t\r\n;&|`$><\"'") {
+		return nil, errors.New("invalid image name")
+	}
+
+	args := []string{"run", "-d"}
+
+	input.Name = strings.TrimSpace(input.Name)
+	if input.Name != "" {
+		if !allowedContainerID.MatchString(input.Name) {
+			return nil, errors.New("invalid container name: alphanumeric, hyphen, underscore, and dot only")
+		}
+		args = append(args, "--name", input.Name)
+	}
+
+	if input.RestartPolicy != "" {
+		switch input.RestartPolicy {
+		case "no", "always", "on-failure", "unless-stopped":
+			args = append(args, "--restart", input.RestartPolicy)
+		default:
+			return nil, errors.New("invalid restart policy")
+		}
+	}
+
+	for _, p := range input.Ports {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.ContainsAny(p, " \t\r\n;&|`$><\"'") {
+			return nil, fmt.Errorf("invalid port mapping: %s", p)
+		}
+		args = append(args, "-p", p)
+	}
+
+	for _, v := range input.Volumes {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if strings.ContainsAny(v, " \t\r\n;&|`$><\"'") {
+			return nil, fmt.Errorf("invalid volume mapping: %s", v)
+		}
+		args = append(args, "-v", v)
+	}
+
+	for k, val := range input.Env {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		if strings.ContainsAny(k, "= \t\r\n;&|`$><\"'") {
+			return nil, fmt.Errorf("invalid environment variable key: %s", k)
+		}
+		args = append(args, "-e", fmt.Sprintf("%s=%s", k, val))
+	}
+
+	args = append(args, input.Image)
+
+	if cmd := strings.TrimSpace(input.Command); cmd != "" {
+		args = append(args, strings.Fields(cmd)...)
+	}
+
+	return args, nil
+}
+
+func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, error) {
+	input.Owner = strings.TrimSpace(input.Owner)
+	if input.Owner == "" {
+		input.Owner = "root"
+	}
+	if input.Owner != "root" && input.Owner != "system" {
+		linuxUser, exists, err := HomeUser(input.Owner)
+		if err != nil || !exists || linuxUser.UID < 0 {
+			return "", errors.New("invalid container owner")
+		}
+		for i, v := range input.Volumes {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			parts := strings.Split(v, ":")
+			if len(parts) >= 2 {
+				hostPath := parts[0]
+				if !filepath.IsAbs(hostPath) {
+					hostPath = filepath.Join(linuxUser.Home, hostPath)
+					parts[0] = hostPath
+					input.Volumes[i] = strings.Join(parts, ":")
+				}
+				if !pathWithin(hostPath, linuxUser.Home) {
+					return "", fmt.Errorf("volume host path must be within %s", linuxUser.Home)
+				}
+				_ = os.MkdirAll(hostPath, 0755)
+			}
+		}
+	}
+
+	args, err := buildCreateContainerArgs(input)
+	if err != nil {
+		return "", err
+	}
+
+	output, err := s.runForOwnerWithTimeout(3*time.Minute, "podman", input.Owner, args...)
+	if err != nil {
+		outStr := strings.TrimSpace(string(output))
+		if outStr != "" {
+			return "", fmt.Errorf("%s", outStr)
+		}
+		return "", err
+	}
+	containerID := strings.TrimSpace(string(output))
+	if len(containerID) > 12 {
+		containerID = containerID[:12]
+	}
+	return containerID, nil
+}
+
+func (s *ContainerService) CreateCurrentUser(username string, input CreateContainerInput) (string, error) {
+	if !isCurrentUser(username) {
+		return "", errors.New("container owner unavailable")
+	}
+	input.Owner = username
+	return s.CreateContainer(input)
 }
 
 func containerActionArgs(id, action string) ([]string, error) {
