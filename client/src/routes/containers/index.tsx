@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+    Box,
     Container as ContainerIcon,
     FileCode2,
     FileText,
+    Layers,
     Loader2,
     Play,
     Plus,
@@ -12,6 +14,7 @@ import {
     Search,
     Square,
     Trash2,
+    Wrench,
     X,
 } from "lucide-react";
 
@@ -38,14 +41,193 @@ type LinuxUser = {
     uid?: number;
 };
 
-const IMAGE_SUGGESTIONS = [
-    { label: "Nginx", image: "nginx:alpine" },
-    { label: "Redis", image: "redis:alpine" },
-    { label: "Node.js", image: "node:20-alpine" },
-    { label: "Python", image: "python:3.12-alpine" },
-    { label: "PostgreSQL", image: "postgres:16-alpine" },
-    { label: "MariaDB", image: "mariadb:11" },
-    { label: "Ubuntu", image: "ubuntu:latest" },
+type LibraryImage = {
+    id: string;
+    name: string;
+    image: string;
+    category: "web" | "database" | "cache" | "runtime" | "tools";
+    description: string;
+    defaultPorts?: Array<{ host: string; container: string }>;
+    defaultEnv?: Array<{ key: string; value: string }>;
+    defaultVolumes?: Array<{ host: string; container: string }>;
+    tags: string[];
+};
+
+const LIB_CATEGORIES = [
+    { id: "all", label: "All" },
+    { id: "web", label: "Web & Proxy" },
+    { id: "database", label: "Databases" },
+    { id: "cache", label: "Cache & Queue" },
+    { id: "runtime", label: "Runtimes" },
+    { id: "tools", label: "Tools" },
+];
+
+const LIBRARY_IMAGES: LibraryImage[] = [
+    {
+        id: "nginx",
+        name: "Nginx",
+        image: "nginx:alpine",
+        category: "web",
+        description: "High-performance HTTP server, reverse proxy, and load balancer.",
+        defaultPorts: [{ host: "8080", container: "80" }],
+        tags: ["alpine", "latest", "mainline-alpine"],
+    },
+    {
+        id: "caddy",
+        name: "Caddy",
+        image: "caddy:alpine",
+        category: "web",
+        description: "Fast, powerful open-source web server with automatic HTTPS.",
+        defaultPorts: [{ host: "8080", container: "80" }],
+        tags: ["alpine", "latest"],
+    },
+    {
+        id: "httpd",
+        name: "Apache HTTP Server",
+        image: "httpd:alpine",
+        category: "web",
+        description: "Robust, commercial-grade open-source HTTP server.",
+        defaultPorts: [{ host: "8080", container: "80" }],
+        tags: ["alpine", "latest"],
+    },
+    {
+        id: "redis",
+        name: "Redis",
+        image: "redis:alpine",
+        category: "cache",
+        description: "In-memory key-value data store, cache, and message broker.",
+        defaultPorts: [{ host: "6379", container: "6379" }],
+        tags: ["alpine", "7-alpine", "latest"],
+    },
+    {
+        id: "memcached",
+        name: "Memcached",
+        image: "memcached:alpine",
+        category: "cache",
+        description: "High-performance, distributed memory object caching system.",
+        defaultPorts: [{ host: "11211", container: "11211" }],
+        tags: ["alpine", "latest"],
+    },
+    {
+        id: "postgres",
+        name: "PostgreSQL",
+        image: "postgres:16-alpine",
+        category: "database",
+        description: "World's most advanced open source relational database.",
+        defaultPorts: [{ host: "5432", container: "5432" }],
+        defaultEnv: [{ key: "POSTGRES_PASSWORD", value: "" }],
+        tags: ["16-alpine", "15-alpine", "latest"],
+    },
+    {
+        id: "mariadb",
+        name: "MariaDB",
+        image: "mariadb:11",
+        category: "database",
+        description: "Fast, scalable open source relational database by MySQL creators.",
+        defaultPorts: [{ host: "3306", container: "3306" }],
+        defaultEnv: [{ key: "MARIADB_ROOT_PASSWORD", value: "" }],
+        tags: ["11", "latest"],
+    },
+    {
+        id: "mysql",
+        name: "MySQL",
+        image: "mysql:8",
+        category: "database",
+        description: "Widely used open source relational database management system.",
+        defaultPorts: [{ host: "3306", container: "3306" }],
+        defaultEnv: [{ key: "MYSQL_ROOT_PASSWORD", value: "" }],
+        tags: ["8", "latest"],
+    },
+    {
+        id: "mongo",
+        name: "MongoDB",
+        image: "mongo:7",
+        category: "database",
+        description: "Modern, document-oriented NoSQL general purpose database.",
+        defaultPorts: [{ host: "27017", container: "27017" }],
+        tags: ["7", "latest"],
+    },
+    {
+        id: "node",
+        name: "Node.js",
+        image: "node:20-alpine",
+        category: "runtime",
+        description: "JavaScript runtime built on Chrome's V8 JavaScript engine.",
+        defaultPorts: [{ host: "3000", container: "3000" }],
+        tags: ["20-alpine", "22-alpine", "latest"],
+    },
+    {
+        id: "python",
+        name: "Python",
+        image: "python:3.12-alpine",
+        category: "runtime",
+        description: "Powerful dynamic programming language runtime.",
+        defaultPorts: [{ host: "8000", container: "8000" }],
+        tags: ["3.12-alpine", "3.11-alpine", "latest"],
+    },
+    {
+        id: "golang",
+        name: "Golang",
+        image: "golang:1.22-alpine",
+        category: "runtime",
+        description: "Open source programming language making software fast and reliable.",
+        tags: ["1.22-alpine", "latest"],
+    },
+    {
+        id: "php",
+        name: "PHP FPM",
+        image: "php:8.3-fpm-alpine",
+        category: "runtime",
+        description: "FastCGI Process Manager implementation for PHP.",
+        defaultPorts: [{ host: "9000", container: "9000" }],
+        tags: ["8.3-fpm-alpine", "8.2-fpm-alpine"],
+    },
+    {
+        id: "rabbitmq",
+        name: "RabbitMQ",
+        image: "rabbitmq:3-management-alpine",
+        category: "cache",
+        description: "Robust open source message broker with web management interface.",
+        defaultPorts: [
+            { host: "5672", container: "5672" },
+            { host: "15672", container: "15672" },
+        ],
+        tags: ["3-management-alpine", "latest"],
+    },
+    {
+        id: "adminer",
+        name: "Adminer",
+        image: "adminer:latest",
+        category: "tools",
+        description: "Database management in a single PHP file supporting MySQL, Postgres, SQLite.",
+        defaultPorts: [{ host: "8080", container: "8080" }],
+        tags: ["latest"],
+    },
+    {
+        id: "wordpress",
+        name: "WordPress",
+        image: "wordpress:php8.2-apache",
+        category: "tools",
+        description: "Web publishing platform and content management system.",
+        defaultPorts: [{ host: "8080", container: "80" }],
+        tags: ["php8.2-apache", "latest"],
+    },
+    {
+        id: "alpine",
+        name: "Alpine Linux",
+        image: "alpine:latest",
+        category: "runtime",
+        description: "Lightweight, security-oriented Linux distribution (~5MB).",
+        tags: ["latest", "3.20"],
+    },
+    {
+        id: "ubuntu",
+        name: "Ubuntu",
+        image: "ubuntu:latest",
+        category: "runtime",
+        description: "Clean Ubuntu Linux official base container environment.",
+        tags: ["latest", "24.04", "22.04"],
+    },
 ];
 
 export default function ContainersRoute({
@@ -75,6 +257,11 @@ export default function ContainersRoute({
     // Create container modal state
     const defaultOwner = ownerFilter || (runtime.isRoot ? "root" : runtime.username || "root");
     const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [createTab, setCreateTab] = useState<"library" | "custom">("library");
+    const [libSearch, setLibSearch] = useState("");
+    const [libCategory, setLibCategory] = useState("all");
+    const [selectedLibImage, setSelectedLibImage] = useState<LibraryImage | null>(LIBRARY_IMAGES[0]);
+
     const [createName, setCreateName] = useState("");
     const [createImage, setCreateImage] = useState("");
     const [createOwner, setCreateOwner] = useState(defaultOwner);
@@ -139,15 +326,35 @@ export default function ContainersRoute({
         }
     };
 
+    const selectLibraryImage = (item: LibraryImage) => {
+        setSelectedLibImage(item);
+        setCreateImage(item.image);
+        setCreatePorts(item.defaultPorts ? item.defaultPorts.map((p) => ({ ...p })) : []);
+        setCreateVolumes(item.defaultVolumes ? item.defaultVolumes.map((v) => ({ ...v })) : []);
+        setCreateEnv(item.defaultEnv ? item.defaultEnv.map((e) => ({ ...e })) : []);
+        setCreateName(`${item.id}-1`);
+    };
+
+    const selectTag = (tag: string) => {
+        if (!selectedLibImage) return;
+        const base = selectedLibImage.image.split(":")[0];
+        setCreateImage(`${base}:${tag}`);
+    };
+
     const openCreateModal = () => {
-        setCreateName("");
-        setCreateImage("");
+        setCreateTab("library");
+        const initial = LIBRARY_IMAGES[0];
+        setSelectedLibImage(initial);
+        setLibSearch("");
+        setLibCategory("all");
+        setCreateName(`${initial.id}-1`);
+        setCreateImage(initial.image);
         setCreateOwner(defaultOwner);
         setCreateCommand("");
         setCreateRestartPolicy("unless-stopped");
-        setCreatePorts([]);
-        setCreateVolumes([]);
-        setCreateEnv([]);
+        setCreatePorts(initial.defaultPorts ? initial.defaultPorts.map((p) => ({ ...p })) : []);
+        setCreateVolumes(initial.defaultVolumes ? initial.defaultVolumes.map((v) => ({ ...v })) : []);
+        setCreateEnv(initial.defaultEnv ? initial.defaultEnv.map((e) => ({ ...e })) : []);
         setCreateError("");
         setCreateModalOpen(true);
     };
@@ -288,6 +495,269 @@ export default function ContainersRoute({
             );
         })
         : baseContainers;
+
+    const filteredLibImages = LIBRARY_IMAGES.filter((img) => {
+        const matchesCat = libCategory === "all" || img.category === libCategory;
+        const matchesSearch =
+            !libSearch.trim() ||
+            img.name.toLowerCase().includes(libSearch.toLowerCase()) ||
+            img.image.toLowerCase().includes(libSearch.toLowerCase()) ||
+            img.description.toLowerCase().includes(libSearch.toLowerCase());
+        return matchesCat && matchesSearch;
+    });
+
+    const renderCommonConfig = () => (
+        <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground">Container Name</label>
+                    <input
+                        type="text"
+                        value={createName}
+                        onChange={(e) => setCreateName(e.target.value)}
+                        placeholder="e.g. my-app (optional)"
+                        className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
+                    />
+                </div>
+
+                {runtime.isRoot && !ownerFilter ? (
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">Owner</label>
+                        <select
+                            value={createOwner}
+                            onChange={(e) => setCreateOwner(e.target.value)}
+                            className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
+                        >
+                            <option value="root">root (System Root)</option>
+                            {users.map((u) => (
+                                <option key={u.username} value={u.username}>
+                                    {u.username}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">Owner</label>
+                        <input
+                            type="text"
+                            value={createOwner || defaultOwner}
+                            disabled
+                            className="h-8 w-full rounded border border-input bg-muted px-3 text-xs text-muted-foreground"
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground">Restart Policy</label>
+                    <select
+                        value={createRestartPolicy}
+                        onChange={(e) => setCreateRestartPolicy(e.target.value)}
+                        className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
+                    >
+                        <option value="unless-stopped">Unless Stopped (default)</option>
+                        <option value="always">Always</option>
+                        <option value="on-failure">On Failure</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground">Command (optional)</label>
+                    <input
+                        type="text"
+                        value={createCommand}
+                        onChange={(e) => setCreateCommand(e.target.value)}
+                        placeholder="e.g. sh -c 'npm start'"
+                        className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                    />
+                </div>
+            </div>
+        </>
+    );
+
+    const renderPortsSection = () => (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">Port Mappings</label>
+                <button
+                    type="button"
+                    onClick={() => setCreatePorts([...createPorts, { host: "", container: "" }])}
+                    className="text-xs text-primary hover:underline"
+                >
+                    + Add Port
+                </button>
+            </div>
+            {createPorts.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No port mappings added.</p>
+            ) : (
+                <div className="space-y-2">
+                    {createPorts.map((p, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={p.host}
+                                onChange={(e) => {
+                                    const next = [...createPorts];
+                                    next[index] = { ...next[index], host: e.target.value };
+                                    setCreatePorts(next);
+                                }}
+                                placeholder="Host (e.g. 8080)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <span className="text-xs text-muted-foreground">:</span>
+                            <input
+                                type="text"
+                                value={p.container}
+                                onChange={(e) => {
+                                    const next = [...createPorts];
+                                    next[index] = { ...next[index], container: e.target.value };
+                                    setCreatePorts(next);
+                                }}
+                                placeholder="Container (e.g. 80)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setCreatePorts(createPorts.filter((_, i) => i !== index))}
+                                aria-label="Remove port mapping"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const renderVolumesSection = () => (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <div>
+                    <label className="text-xs font-medium text-foreground">Volume Mounts</label>
+                    <p className="text-xs text-muted-foreground">
+                        {runtime.isRoot && createOwner === "root"
+                            ? "Host Directory : Container Mount Path"
+                            : "Directory relative to user home : Container Path"}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setCreateVolumes([...createVolumes, { host: "", container: "" }])}
+                    className="text-xs text-primary hover:underline"
+                >
+                    + Add Volume
+                </button>
+            </div>
+            {createVolumes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No volume mounts added.</p>
+            ) : (
+                <div className="space-y-2">
+                    {createVolumes.map((v, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={v.host}
+                                onChange={(e) => {
+                                    const next = [...createVolumes];
+                                    next[index] = { ...next[index], host: e.target.value };
+                                    setCreateVolumes(next);
+                                }}
+                                placeholder="Host Path (e.g. /data or appdata)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <span className="text-xs text-muted-foreground">:</span>
+                            <input
+                                type="text"
+                                value={v.container}
+                                onChange={(e) => {
+                                    const next = [...createVolumes];
+                                    next[index] = { ...next[index], container: e.target.value };
+                                    setCreateVolumes(next);
+                                }}
+                                placeholder="Container Path (e.g. /data)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setCreateVolumes(createVolumes.filter((_, i) => i !== index))}
+                                aria-label="Remove volume mount"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const renderEnvSection = () => (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">Environment Variables</label>
+                <button
+                    type="button"
+                    onClick={() => setCreateEnv([...createEnv, { key: "", value: "" }])}
+                    className="text-xs text-primary hover:underline"
+                >
+                    + Add Variable
+                </button>
+            </div>
+            {createEnv.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No environment variables added.</p>
+            ) : (
+                <div className="space-y-2">
+                    {createEnv.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={item.key}
+                                onChange={(e) => {
+                                    const next = [...createEnv];
+                                    next[index] = { ...next[index], key: e.target.value };
+                                    setCreateEnv(next);
+                                }}
+                                placeholder="KEY (e.g. PORT)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <span className="text-xs text-muted-foreground">=</span>
+                            <input
+                                type="text"
+                                value={item.value}
+                                onChange={(e) => {
+                                    const next = [...createEnv];
+                                    next[index] = { ...next[index], value: e.target.value };
+                                    setCreateEnv(next);
+                                }}
+                                placeholder="Value (e.g. 3000)"
+                                className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            />
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setCreateEnv(createEnv.filter((_, i) => i !== index))}
+                                aria-label="Remove environment variable"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 
     const content = (
         <div className="space-y-4">
@@ -434,7 +904,8 @@ export default function ContainersRoute({
             {/* Create Container Modal */}
             {createModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-                    <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden border border-border bg-card shadow-xl">
+                    <div className="flex h-[min(840px,92vh)] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card shadow-2xl">
+                        {/* Header */}
                         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
                             <div className="flex items-center gap-2">
                                 <ContainerIcon className="h-4 w-4 text-primary" />
@@ -445,306 +916,219 @@ export default function ContainersRoute({
                             </button>
                         </div>
 
+                        {/* Tabs */}
+                        <div className="flex shrink-0 border-b border-border bg-muted/20 px-5">
+                            <button
+                                type="button"
+                                onClick={() => setCreateTab("library")}
+                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                    createTab === "library"
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Layers className="h-4 w-4" />
+                                Library (Docker Hub)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCreateTab("custom")}
+                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                    createTab === "custom"
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Wrench className="h-4 w-4" />
+                                Custom Image / Build
+                            </button>
+                        </div>
+
                         <form onSubmit={handleCreateContainer} className="flex min-h-0 flex-1 flex-col">
-                            <div className="flex-1 space-y-4 overflow-y-auto p-5">
-                                {createError ? (
-                                    <div className="rounded border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                                        {createError}
-                                    </div>
-                                ) : null}
-
-                                {/* Container Image */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Container Image <span className="text-destructive">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={createImage}
-                                        onChange={(e) => setCreateImage(e.target.value)}
-                                        placeholder="e.g. nginx:alpine or docker.io/library/redis:alpine"
-                                        required
-                                        className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                    />
-                                    {/* Image Suggestion Chips */}
-                                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                                        <span className="text-xs text-muted-foreground">Quick images:</span>
-                                        {IMAGE_SUGGESTIONS.map((item) => (
-                                            <button
-                                                key={item.image}
-                                                type="button"
-                                                onClick={() => setCreateImage(item.image)}
-                                                className={`rounded border px-2 py-0.5 text-xs transition-colors ${
-                                                    createImage === item.image
-                                                        ? "border-primary bg-primary/10 font-medium text-primary"
-                                                        : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                }`}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    {/* Container Name */}
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-medium text-foreground">Container Name</label>
-                                        <input
-                                            type="text"
-                                            value={createName}
-                                            onChange={(e) => setCreateName(e.target.value)}
-                                            placeholder="e.g. my-app (optional)"
-                                            className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-                                        />
-                                    </div>
-
-                                    {/* Owner Selection */}
-                                    {runtime.isRoot && !ownerFilter ? (
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-foreground">Owner</label>
-                                            <select
-                                                value={createOwner}
-                                                onChange={(e) => setCreateOwner(e.target.value)}
-                                                className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-                                            >
-                                                <option value="root">root (System Root)</option>
-                                                {users.map((u) => (
-                                                    <option key={u.username} value={u.username}>
-                                                        {u.username}
-                                                    </option>
+                            {/* Tab 1: Library */}
+                            {createTab === "library" && (
+                                <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+                                    {/* Left catalog list */}
+                                    <div className="flex w-full flex-col border-b border-border md:w-5/12 md:border-b-0 md:border-r">
+                                        {/* Search & Category filter */}
+                                        <div className="border-b border-border p-3 space-y-2">
+                                            <div className="relative">
+                                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                                <input
+                                                    type="text"
+                                                    value={libSearch}
+                                                    onChange={(e) => setLibSearch(e.target.value)}
+                                                    placeholder="Search Docker Hub library..."
+                                                    className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {LIB_CATEGORIES.map((cat) => (
+                                                    <button
+                                                        key={cat.id}
+                                                        type="button"
+                                                        onClick={() => setLibCategory(cat.id)}
+                                                        className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                                                            libCategory === cat.id
+                                                                ? "bg-primary font-medium text-primary-foreground"
+                                                                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                                        }`}
+                                                    >
+                                                        {cat.label}
+                                                    </button>
                                                 ))}
-                                            </select>
+                                            </div>
                                         </div>
-                                    ) : (
+
+                                        {/* List of library images */}
+                                        <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
+                                            {filteredLibImages.map((item) => {
+                                                const isSelected = selectedLibImage?.id === item.id;
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => selectLibraryImage(item)}
+                                                        className={`flex cursor-pointer items-start gap-3 rounded border p-2.5 transition-colors ${
+                                                            isSelected
+                                                                ? "border-primary bg-primary/5 text-foreground"
+                                                                : "border-border bg-card text-foreground hover:bg-muted/40"
+                                                        }`}
+                                                    >
+                                                        <div className={`mt-0.5 rounded p-2 ${isSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                                                            <Box className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center justify-between gap-1">
+                                                                <span className="truncate font-semibold text-xs text-foreground">{item.name}</span>
+                                                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                                                                    {item.image}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {filteredLibImages.length === 0 && (
+                                                <div className="p-6 text-center text-xs text-muted-foreground">
+                                                    No library images match your filter.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Right configuration pane */}
+                                    <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                                        {/* Selected Image Banner */}
+                                        <div className="space-y-2 rounded border border-border bg-muted/20 p-3.5">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <span className="text-xs font-semibold text-foreground">{selectedLibImage?.name || "Select an Image"}</span>
+                                                    <span className="ml-2 font-mono text-xs text-muted-foreground">{createImage}</span>
+                                                </div>
+                                                <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-primary">
+                                                    Docker Hub
+                                                </span>
+                                            </div>
+                                            {selectedLibImage?.description && (
+                                                <p className="text-xs text-muted-foreground">{selectedLibImage.description}</p>
+                                            )}
+                                            {/* Tag selection chips */}
+                                            {selectedLibImage?.tags && selectedLibImage.tags.length > 0 && (
+                                                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                                    <span className="text-xs text-muted-foreground">Tags:</span>
+                                                    {selectedLibImage.tags.map((tag) => {
+                                                        const isCurTag = createImage.endsWith(`:${tag}`);
+                                                        return (
+                                                            <button
+                                                                key={tag}
+                                                                type="button"
+                                                                onClick={() => selectTag(tag)}
+                                                                className={`rounded border px-2 py-0.5 font-mono text-xs transition-colors ${
+                                                                    isCurTag
+                                                                        ? "border-primary bg-primary font-semibold text-primary-foreground"
+                                                                        : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                                                                }`}
+                                                            >
+                                                                {tag}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Image URI override */}
                                         <div className="space-y-1">
-                                            <label className="text-xs font-medium text-foreground">Owner</label>
+                                            <label className="text-xs font-medium text-foreground">
+                                                Image URI <span className="text-destructive">*</span>
+                                            </label>
                                             <input
                                                 type="text"
-                                                value={createOwner || defaultOwner}
-                                                disabled
-                                                className="h-8 w-full rounded border border-input bg-muted px-3 text-xs text-muted-foreground"
+                                                value={createImage}
+                                                onChange={(e) => setCreateImage(e.target.value)}
+                                                required
+                                                className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                                             />
                                         </div>
-                                    )}
-                                </div>
 
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    {/* Restart Policy */}
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-medium text-foreground">Restart Policy</label>
-                                        <select
-                                            value={createRestartPolicy}
-                                            onChange={(e) => setCreateRestartPolicy(e.target.value)}
-                                            className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-                                        >
-                                            <option value="unless-stopped">Unless Stopped (default)</option>
-                                            <option value="always">Always</option>
-                                            <option value="on-failure">On Failure</option>
-                                            <option value="no">No</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Command */}
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-medium text-foreground">Command (optional)</label>
-                                        <input
-                                            type="text"
-                                            value={createCommand}
-                                            onChange={(e) => setCreateCommand(e.target.value)}
-                                            placeholder="e.g. sh -c 'npm start'"
-                                            className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                        />
+                                        {renderCommonConfig()}
+                                        {renderPortsSection()}
+                                        {renderVolumesSection()}
+                                        {renderEnvSection()}
                                     </div>
                                 </div>
+                            )}
 
-                                {/* Port Mappings */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-medium text-foreground">Port Mappings</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCreatePorts([...createPorts, { host: "", container: "" }])}
-                                            className="text-xs text-primary hover:underline"
-                                        >
-                                            + Add Port
-                                        </button>
-                                    </div>
-                                    {createPorts.length === 0 ? (
-                                        <p className="text-xs text-muted-foreground">No port mappings added.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {createPorts.map((p, index) => (
-                                                <div key={index} className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={p.host}
-                                                        onChange={(e) => {
-                                                            const next = [...createPorts];
-                                                            next[index] = { ...next[index], host: e.target.value };
-                                                            setCreatePorts(next);
-                                                        }}
-                                                        placeholder="Host (e.g. 8080)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">:</span>
-                                                    <input
-                                                        type="text"
-                                                        value={p.container}
-                                                        onChange={(e) => {
-                                                            const next = [...createPorts];
-                                                            next[index] = { ...next[index], container: e.target.value };
-                                                            setCreatePorts(next);
-                                                        }}
-                                                        placeholder="Container (e.g. 80)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => setCreatePorts(createPorts.filter((_, i) => i !== index))}
-                                                        aria-label="Remove port mapping"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Volume Mounts */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <label className="text-xs font-medium text-foreground">Volume Mounts</label>
+                            {/* Tab 2: Custom */}
+                            {createTab === "custom" && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <div className="mx-auto max-w-2xl space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-foreground">
+                                                Container Image / Registry URI <span className="text-destructive">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={createImage}
+                                                onChange={(e) => setCreateImage(e.target.value)}
+                                                placeholder="e.g. docker.io/library/nginx:alpine, ghcr.io/org/repo:tag, or my-app:latest"
+                                                required
+                                                className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                            />
                                             <p className="text-xs text-muted-foreground">
-                                                {runtime.isRoot && createOwner === "root"
-                                                    ? "Host Directory : Container Mount Path"
-                                                    : "Directory relative to user home : Container Path"}
+                                                Enter any image tag from Docker Hub, GitHub Container Registry (ghcr.io), Quay, or local build.
                                             </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCreateVolumes([...createVolumes, { host: "", container: "" }])}
-                                            className="text-xs text-primary hover:underline"
-                                        >
-                                            + Add Volume
-                                        </button>
+
+                                        {renderCommonConfig()}
+                                        {renderPortsSection()}
+                                        {renderVolumesSection()}
+                                        {renderEnvSection()}
                                     </div>
-                                    {createVolumes.length === 0 ? (
-                                        <p className="text-xs text-muted-foreground">No volume mounts added.</p>
+                                </div>
+                            )}
+
+                            {/* Footer */}
+                            <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
+                                <div className="min-w-0 flex-1 pr-4">
+                                    {createError ? (
+                                        <p className="truncate text-xs font-medium text-destructive">{createError}</p>
                                     ) : (
-                                        <div className="space-y-2">
-                                            {createVolumes.map((v, index) => (
-                                                <div key={index} className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={v.host}
-                                                        onChange={(e) => {
-                                                            const next = [...createVolumes];
-                                                            next[index] = { ...next[index], host: e.target.value };
-                                                            setCreateVolumes(next);
-                                                        }}
-                                                        placeholder="Host Path (e.g. /data or appdata)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">:</span>
-                                                    <input
-                                                        type="text"
-                                                        value={v.container}
-                                                        onChange={(e) => {
-                                                            const next = [...createVolumes];
-                                                            next[index] = { ...next[index], container: e.target.value };
-                                                            setCreateVolumes(next);
-                                                        }}
-                                                        placeholder="Container Path (e.g. /data)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => setCreateVolumes(createVolumes.filter((_, i) => i !== index))}
-                                                        aria-label="Remove volume mount"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        <span className="font-mono text-xs text-muted-foreground truncate block">
+                                            {createImage ? `Target: ${createImage}` : ""}
+                                        </span>
                                     )}
                                 </div>
-
-                                {/* Environment Variables */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-medium text-foreground">Environment Variables</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCreateEnv([...createEnv, { key: "", value: "" }])}
-                                            className="text-xs text-primary hover:underline"
-                                        >
-                                            + Add Variable
-                                        </button>
-                                    </div>
-                                    {createEnv.length === 0 ? (
-                                        <p className="text-xs text-muted-foreground">No environment variables added.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {createEnv.map((item, index) => (
-                                                <div key={index} className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={item.key}
-                                                        onChange={(e) => {
-                                                            const next = [...createEnv];
-                                                            next[index] = { ...next[index], key: e.target.value };
-                                                            setCreateEnv(next);
-                                                        }}
-                                                        placeholder="KEY (e.g. PORT)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">=</span>
-                                                    <input
-                                                        type="text"
-                                                        value={item.value}
-                                                        onChange={(e) => {
-                                                            const next = [...createEnv];
-                                                            next[index] = { ...next[index], value: e.target.value };
-                                                            setCreateEnv(next);
-                                                        }}
-                                                        placeholder="Value (e.g. 3000)"
-                                                        className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => setCreateEnv(createEnv.filter((_, i) => i !== index))}
-                                                        aria-label="Remove environment variable"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setCreateModalOpen(false)} disabled={createLoading}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" size="sm" className="gap-2" disabled={createLoading}>
+                                        {createLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                        {createLoading ? "Creating..." : "Create Container"}
+                                    </Button>
                                 </div>
-                            </div>
-
-                            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
-                                <Button type="button" variant="outline" size="sm" onClick={() => setCreateModalOpen(false)} disabled={createLoading}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit" size="sm" className="gap-2" disabled={createLoading}>
-                                    {createLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                    {createLoading ? "Creating..." : "Create Container"}
-                                </Button>
                             </div>
                         </form>
                     </div>
