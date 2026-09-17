@@ -510,12 +510,7 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                         <div className="flex items-center justify-between border-b border-border px-5 py-4">
                             <div className="flex items-center gap-2.5">
                                 <Settings2 className="h-5 w-5 text-primary" />
-                                <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Backup Settings</h3>
-                                    <p className="text-xs text-muted-foreground">
-                                        Configure remote cloud storage, retention policies, and general backup options.
-                                    </p>
-                                </div>
+                                <h3 className="text-sm font-semibold text-foreground">Backup Settings</h3>
                             </div>
                             <button
                                 type="button"
@@ -561,13 +556,8 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                         <div className="flex-1 overflow-y-auto p-5 space-y-4">
                             {settingsTab === "storage" && (
                                 <div className="space-y-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div>
-                                            <h4 className="text-sm font-semibold text-foreground">Storage Locations</h4>
-                                            <p className="text-xs text-muted-foreground">
-                                                Configure remote cloud storage destinations (Amazon S3, Cloudflare R2, Google Drive, Microsoft OneDrive).
-                                            </p>
-                                        </div>
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-semibold text-foreground">Storage Locations</h4>
                                         <Button size="sm" className="gap-1.5" onClick={openAddStorageModal}>
                                             <Plus className="h-4 w-4" />
                                             Add Storage
@@ -698,9 +688,6 @@ export default function BackupRoute({ embedded = false, username }: BackupRouteP
                                 <div className="space-y-4">
                                     <div>
                                         <h4 className="text-sm font-semibold text-foreground">General Preferences</h4>
-                                        <p className="text-xs text-muted-foreground">
-                                            Overview of local storage directories, default destination, and archive formats.
-                                        </p>
                                     </div>
 
                                     <div className="space-y-3">
