@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"mthan/vps/services"
 )
@@ -16,7 +17,14 @@ func Handler(sessions *services.SessionService, containers *services.ContainerSe
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{"containers": containers.ListAll()}); err != nil {
+		owner := strings.TrimSpace(r.URL.Query().Get("owner"))
+		var list []services.Container
+		if owner != "" && owner != "all" {
+			list = containers.ListForOwner(owner)
+		} else {
+			list = containers.ListAll()
+		}
+		if err := json.NewEncoder(w).Encode(map[string]any{"containers": list}); err != nil {
 			http.Error(w, "could not read containers", http.StatusInternalServerError)
 		}
 	})

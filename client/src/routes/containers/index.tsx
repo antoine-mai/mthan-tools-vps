@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
     Box,
+    ChevronDown,
+    ChevronRight,
     Container as ContainerIcon,
     FileCode2,
     FileText,
@@ -14,10 +17,12 @@ import {
     RotateCw,
     Save,
     Search,
+    Server,
     ShieldCheck,
     Sliders,
     Square,
     Trash2,
+    User,
     Wrench,
     X,
 } from "lucide-react";
@@ -57,6 +62,14 @@ export type LibraryImage = {
     tags: string[];
     enabled?: boolean;
     isCustom?: boolean;
+};
+
+export type UserLimits = {
+    username: string;
+    maxTasks: number;
+    maxContainers: number;
+    currentTasks?: number;
+    currentContainers?: number;
 };
 
 const LIB_CATEGORIES = [
@@ -426,21 +439,236 @@ const DEFAULT_LIBRARY_IMAGES: LibraryImage[] = [
     },
 ];
 
+interface ContainersRouteProps {
+    embedded?: boolean;
+    ownerFilter?: string;
+}
+
+// ─── Entry Point ─────────────────────────────────────────────────────────────
+
 export default function ContainersRoute({
     embedded = false,
     ownerFilter,
-}: {
+}: ContainersRouteProps = {}) {
+    if (embedded) {
+        return <ContainersContent activeOwner={ownerFilter} embedded />;
+    }
+    if (!runtime.isRoot) {
+        return <ContainersUserStandalone />;
+    }
+    return <ContainersStandalone />;
+}
+
+// ─── Non-root User Standalone (Single column, no subsidebar) ─────────────────
+
+function ContainersUserStandalone() {
+    return (
+        <DashboardLayout
+            title="Containers"
+            description="View and manage your rootless Podman containers."
+        >
+            <div className="space-y-6">
+                <ContainersContent />
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Root Standalone with 220px Subsidebar ───────────────────────────────────
+
+function ContainersStandalone() {
+    const { owner: ownerParam } = useParams<{ owner?: string }>();
+    const activeOwner = ownerParam || "all";
+
+    const [users, setUsers] = useState<LinuxUser[]>([]);
+    const [usersOpen, setUsersOpen] = useState(true);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+
+    const [allContainers, setAllContainers] = useState<ContainerRecord[]>([]);
+    const [loadingContainers, setLoadingContainers] = useState(true);
+    const [containerError, setContainerError] = useState("");
+
+    const fetchAllContainers = useCallback(async () => {
+        setLoadingContainers(true);
+        setContainerError("");
+        try {
+            const res = await fetch("/post/containers", { cache: "no-store" });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to load containers");
+            }
+            const data = await res.json();
+            setAllContainers(data.containers || []);
+        } catch (err) {
+            setContainerError(err instanceof Error ? err.message : "Failed to load containers");
+        } finally {
+            setLoadingContainers(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAllContainers();
+    }, [fetchAllContainers]);
+
+    useEffect(() => {
+        setLoadingUsers(true);
+        fetch("/post/user/list", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                // Filter out root (uid 0) - containers always run under non-root users!
+                const list: LinuxUser[] = (data?.users ?? []).filter(
+                    (u: LinuxUser) => u.uid !== 0
+                );
+                setUsers(list);
+            })
+            .catch(() => setUsers([]))
+            .finally(() => setLoadingUsers(false));
+    }, []);
+
+    const containersByOwner = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const c of allContainers) {
+            map[c.owner] = (map[c.owner] || 0) + 1;
+        }
+        return map;
+    }, [allContainers]);
+
+    return (
+        <DashboardLayout title="Containers" fullWidth>
+            <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[220px_1fr]">
+                {/* Subsidebar */}
+                <aside className="flex h-full flex-col overflow-y-auto border-r border-border bg-card/60">
+                    {/* All Containers Link */}
+                    <Link
+                        to="/containers"
+                        className={`flex items-center justify-between border-b border-border px-3 py-3 text-xs font-semibold transition-colors ${
+                            activeOwner === "all"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            <ContainerIcon className="h-4 w-4 shrink-0" />
+                            All Containers
+                        </span>
+                        <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                activeOwner === "all"
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-muted text-muted-foreground"
+                            }`}
+                        >
+                            {allContainers.length}
+                        </span>
+                    </Link>
+
+                    {/* Users Section */}
+                    <div className="flex flex-col">
+                        <button
+                            type="button"
+                            onClick={() => setUsersOpen((v) => !v)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                            {usersOpen ? (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                            ) : (
+                                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                            )}
+                            <span>Users</span>
+                            <span className="ml-auto text-xs text-muted-foreground font-normal">
+                                {users.length}
+                            </span>
+                        </button>
+
+                        {usersOpen && (
+                            <nav className="flex flex-col gap-0.5 pb-2 pl-3 pr-2">
+                                {loadingUsers ? (
+                                    <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Loading…
+                                    </div>
+                                ) : users.length === 0 ? (
+                                    <p className="px-2 py-1 text-xs text-muted-foreground">No non-root users</p>
+                                ) : (
+                                    users.map((u) => {
+                                        const count = containersByOwner[u.username] || 0;
+                                        const isSelected = activeOwner === u.username;
+                                        return (
+                                            <Link
+                                                key={u.username}
+                                                to={`/containers/${encodeURIComponent(u.username)}`}
+                                                className={`flex items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
+                                                    isSelected
+                                                        ? "font-semibold text-primary bg-primary/10"
+                                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                }`}
+                                            >
+                                                <span className="flex items-center gap-2 truncate">
+                                                    <User className="h-3.5 w-3.5 shrink-0" />
+                                                    <span className="truncate">{u.username}</span>
+                                                </span>
+                                                {count > 0 ? (
+                                                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                                                        {count}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
+                                        );
+                                    })
+                                )}
+                            </nav>
+                        )}
+                    </div>
+                </aside>
+
+                {/* Main Content Area */}
+                <main className="overflow-y-auto p-6">
+                    <ContainersContent
+                        activeOwner={activeOwner}
+                        usersList={users}
+                        allContainers={allContainers}
+                        loadingContainers={loadingContainers}
+                        containerError={containerError}
+                        onRefreshContainers={fetchAllContainers}
+                    />
+                </main>
+            </div>
+        </DashboardLayout>
+    );
+}
+
+// ─── Containers Content (Core Table & Modals) ────────────────────────────────
+
+interface ContainersContentProps {
+    activeOwner?: string;
     embedded?: boolean;
-    ownerFilter?: string;
-} = {}) {
-    const [containers, setContainers] = useState<ContainerRecord[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    usersList?: LinuxUser[];
+    allContainers?: ContainerRecord[];
+    loadingContainers?: boolean;
+    containerError?: string;
+    onRefreshContainers?: () => void;
+}
+
+export function ContainersContent({
+    activeOwner,
+    embedded = false,
+    usersList = [],
+    allContainers,
+    loadingContainers: externalLoading,
+    containerError: externalError,
+    onRefreshContainers,
+}: ContainersContentProps) {
+    const isControlled = Array.isArray(allContainers);
+    const [localContainers, setLocalContainers] = useState<ContainerRecord[]>([]);
+    const [localLoading, setLocalLoading] = useState(!isControlled);
+    const [localError, setLocalError] = useState("");
     const [actionLoading, setActionLoading] = useState("");
+
     const [logsContainer, setLogsContainer] = useState<ContainerRecord | null>(null);
     const [logs, setLogs] = useState("");
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState("");
+
     const [dockerfileContainer, setDockerfileContainer] = useState<ContainerRecord | null>(null);
     const [dockerfileContent, setDockerfileContent] = useState("");
     const [dockerfilePath, setDockerfilePath] = useState("");
@@ -449,8 +677,13 @@ export default function ContainersRoute({
     const [dockerfileError, setDockerfileError] = useState("");
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [userLimits, setUserLimits] = useState<UserLimits | null>(null);
 
-    // Templates and Settings state
+    // Non-root users list fallback for embedded / local mode
+    const [localUsers, setLocalUsers] = useState<LinuxUser[]>([]);
+    const users = usersList.length > 0 ? usersList : localUsers;
+
+    // Allowed Templates and Settings state
     const [templates, setTemplates] = useState<LibraryImage[]>(DEFAULT_LIBRARY_IMAGES);
     const [libraryOnly, setLibraryOnly] = useState<boolean>(false);
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -480,16 +713,26 @@ export default function ContainersRoute({
     const [resetModalOpen, setResetModalOpen] = useState(false);
 
     // Create container modal state
-    const defaultOwner = ownerFilter || (runtime.isRoot ? "root" : runtime.username || "root");
+    // Note: Container MUST run under non-root user!
+    const effectiveDefaultOwner = useMemo(() => {
+        if (!runtime.isRoot) {
+            return runtime.username || "";
+        }
+        if (activeOwner && activeOwner !== "all") {
+            return activeOwner;
+        }
+        return users[0]?.username || "";
+    }, [activeOwner, users]);
+
     const [createModalOpen, setCreateModalOpen] = useState(false);
-    const [createTab, setCreateTab] = useState<"library" | "custom">("library");
+    const [createTab, setCreateTab] = useState<"system" | "support" | "custom">("system");
     const [libSearch, setLibSearch] = useState("");
     const [libCategory, setLibCategory] = useState("all");
     const [selectedLibImage, setSelectedLibImage] = useState<LibraryImage | null>(null);
 
     const [createName, setCreateName] = useState("");
     const [createImage, setCreateImage] = useState("");
-    const [createOwner, setCreateOwner] = useState(defaultOwner);
+    const [createOwner, setCreateOwner] = useState(effectiveDefaultOwner);
     const [createCommand, setCreateCommand] = useState("");
     const [createRestartPolicy, setCreateRestartPolicy] = useState("unless-stopped");
     const [createPorts, setCreatePorts] = useState<Array<{ host: string; container: string }>>([]);
@@ -497,24 +740,23 @@ export default function ContainersRoute({
     const [createEnv, setCreateEnv] = useState<Array<{ key: string; value: string }>>([]);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState("");
-    const [users, setUsers] = useState<LinuxUser[]>([]);
 
     // Delete container modal state
     const [deleteModal, setDeleteModal] = useState<ContainerRecord | null>(null);
 
-    // Fetch users (root only)
+    // Load users if not provided and runtime is root
     useEffect(() => {
-        if (!runtime.isRoot || ownerFilter) return;
+        if (!runtime.isRoot || usersList.length > 0) return;
         fetch("/post/user/list", { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
                 const list: LinuxUser[] = (data?.users ?? []).filter((u: LinuxUser) => u.uid !== 0);
-                setUsers(list);
+                setLocalUsers(list);
             })
-            .catch(() => setUsers([]));
-    }, [ownerFilter]);
+            .catch(() => setLocalUsers([]));
+    }, [usersList.length]);
 
-    // Fetch allowed templates
+    // Fetch allowed templates from server
     const fetchTemplates = useCallback(async () => {
         try {
             const response = await fetch(`${Api.current.containers}/templates`, { cache: "no-store" });
@@ -536,35 +778,122 @@ export default function ContainersRoute({
         fetchTemplates();
     }, [fetchTemplates]);
 
-    // Load containers list
-    const loadContainers = useCallback(async () => {
-        setLoading(true);
-        setError("");
+    // Local container fetch (if not controlled)
+    const fetchLocalContainers = useCallback(async () => {
+        if (isControlled) return;
+        setLocalLoading(true);
+        setLocalError("");
         try {
-            const response = await fetch(Api.current.containers, { cache: "no-store" });
-            if (!response.ok) throw new Error((await response.text()) || "Failed to load containers");
-            const data: { containers?: ContainerRecord[] } = await response.json();
-            setContainers(data.containers ?? []);
-        } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : "Failed to load containers");
+            let ep: string;
+            if (runtime.isRoot) {
+                ep = activeOwner && activeOwner !== "all"
+                    ? `/post/containers?owner=${encodeURIComponent(activeOwner)}`
+                    : "/post/containers";
+            } else {
+                ep = "/api/containers";
+            }
+            const res = await fetch(ep, { cache: "no-store" });
+            if (!res.ok) throw new Error((await res.text()) || "Failed to load containers");
+            const data = await res.json();
+            setLocalContainers(data.containers ?? []);
+        } catch (err) {
+            setLocalError(err instanceof Error ? err.message : "Failed to load containers");
         } finally {
-            setLoading(false);
+            setLocalLoading(false);
         }
-    }, []);
+    }, [isControlled, activeOwner]);
+
+    // Fetch limits for target user
+    const fetchLimits = useCallback(async () => {
+        try {
+            if (runtime.isRoot) {
+                const targetUser = activeOwner && activeOwner !== "all" ? activeOwner : null;
+                if (targetUser) {
+                    const res = await fetch(`/post/user/limits?user=${encodeURIComponent(targetUser)}`, {
+                        cache: "no-store",
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setUserLimits(data);
+                    } else {
+                        setUserLimits(null);
+                    }
+                } else {
+                    setUserLimits(null);
+                }
+            } else {
+                const res = await fetch("/api/user/limits", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    setUserLimits(data);
+                }
+            }
+        } catch {
+            setUserLimits(null);
+        }
+    }, [activeOwner]);
 
     useEffect(() => {
-        loadContainers();
-    }, [loadContainers]);
+        if (!isControlled) {
+            fetchLocalContainers();
+        }
+        fetchLimits();
+    }, [isControlled, fetchLocalContainers, fetchLimits]);
 
-    // Allowed templates for creation (only enabled ones)
+    const handleRefresh = () => {
+        if (isControlled && onRefreshContainers) {
+            onRefreshContainers();
+        } else {
+            fetchLocalContainers();
+        }
+        fetchLimits();
+    };
+
+    const isLoading = isControlled ? !!externalLoading : localLoading;
+    const currentError = (isControlled ? externalError : localError);
+
+    // Filter containers based on selected owner
+    const scopedContainers = useMemo(() => {
+        const raw = isControlled ? (allContainers || []) : localContainers;
+        if (!activeOwner || activeOwner === "all") {
+            return raw;
+        }
+        return raw.filter((c) => c.owner === activeOwner);
+    }, [isControlled, allContainers, localContainers, activeOwner]);
+
+    // Search filter
+    const displayedContainers = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return scopedContainers;
+        return scopedContainers.filter((c) =>
+            (c.name && c.name.toLowerCase().includes(term)) ||
+            (c.owner && c.owner.toLowerCase().includes(term)) ||
+            (c.image && c.image.toLowerCase().includes(term)) ||
+            (c.id && c.id.toLowerCase().includes(term))
+        );
+    }, [scopedContainers, searchTerm]);
+
+    // Allowed templates (only enabled ones)
     const allowedTemplates = useMemo(() => {
         return templates.filter((t) => t.enabled !== false);
     }, [templates]);
 
+    // Filter library tab in Create Container modal
+    const filteredLibImages = useMemo(() => {
+        return allowedTemplates.filter((item) => {
+            const matchCat = libCategory === "all" || item.category === libCategory;
+            const matchSearch =
+                !libSearch.trim() ||
+                item.name.toLowerCase().includes(libSearch.toLowerCase()) ||
+                item.description.toLowerCase().includes(libSearch.toLowerCase()) ||
+                item.image.toLowerCase().includes(libSearch.toLowerCase());
+            return matchCat && matchSearch;
+        });
+    }, [allowedTemplates, libCategory, libSearch]);
+
     const runAction = async (container: ContainerRecord, action: "start" | "stop" | "restart" | "rm") => {
         const key = `${container.engine}:${container.owner}:${container.id}:${action}`;
         setActionLoading(key);
-        setError("");
         try {
             const response = await fetch(`${Api.current.containers}/action`, {
                 method: "POST",
@@ -572,9 +901,9 @@ export default function ContainersRoute({
                 body: JSON.stringify({ action, engine: container.engine, id: container.id, owner: container.owner }),
             });
             if (!response.ok) throw new Error((await response.text()) || `Failed to ${action} container`);
-            await loadContainers();
+            handleRefresh();
         } catch (actionError) {
-            setError(actionError instanceof Error ? actionError.message : `Failed to ${action} container`);
+            alert(actionError instanceof Error ? actionError.message : `Failed to ${action} container`);
         } finally {
             setActionLoading("");
         }
@@ -596,7 +925,7 @@ export default function ContainersRoute({
     };
 
     const openCreateModal = () => {
-        setCreateTab("library");
+        setCreateTab("system");
         const initial = allowedTemplates[0] || templates[0];
         if (initial) {
             setSelectedLibImage(initial);
@@ -615,7 +944,8 @@ export default function ContainersRoute({
         }
         setLibSearch("");
         setLibCategory("all");
-        setCreateOwner(defaultOwner);
+        // Always set owner to a valid non-root user!
+        setCreateOwner(effectiveDefaultOwner);
         setCreateCommand("");
         setCreateRestartPolicy("unless-stopped");
         setCreateError("");
@@ -624,14 +954,25 @@ export default function ContainersRoute({
 
     const handleCreateContainer = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (createTab === "system") {
+            setCreateError("System templates are coming soon. Please select a template from the Support tab.");
+            return;
+        }
+
         const trimmedImage = createImage.trim();
         if (!trimmedImage) {
             setCreateError("Container image is required.");
             return;
         }
 
+        const selectedOwner = runtime.isRoot ? createOwner : (runtime.username || "");
+        if (!selectedOwner || selectedOwner === "root") {
+            setCreateError("A non-root user must be selected as the container owner.");
+            return;
+        }
+
         if (libraryOnly && !runtime.isRoot && createTab === "custom") {
-            setCreateError("Custom image builds are restricted. Please select an approved template from the Library.");
+            setCreateError("Custom image builds are restricted. Please select a template from the Support tab.");
             return;
         }
 
@@ -658,7 +999,7 @@ export default function ContainersRoute({
             const payload = {
                 name: createName.trim(),
                 image: trimmedImage,
-                owner: createOwner || defaultOwner,
+                owner: selectedOwner,
                 command: createCommand.trim(),
                 restartPolicy: createRestartPolicy,
                 ports,
@@ -678,7 +1019,7 @@ export default function ContainersRoute({
             }
 
             setCreateModalOpen(false);
-            await loadContainers();
+            handleRefresh();
         } catch (err) {
             setCreateError(err instanceof Error ? err.message : "Failed to create container");
         } finally {
@@ -863,7 +1204,6 @@ export default function ContainersRoute({
 
         let nextList: LibraryImage[];
         if (isCreatingTemplate) {
-            // Check for duplicate ID
             if (templates.some((t) => t.id === trimmedId)) {
                 setEditTplError(`A template with ID "${trimmedId}" already exists.`);
                 return;
@@ -915,36 +1255,6 @@ export default function ContainersRoute({
         });
     }, [templates, settingsCategory, settingsSearch]);
 
-    // Filter container table
-    const baseContainers = ownerFilter
-        ? containers.filter((c) => c.owner === ownerFilter)
-        : containers;
-
-    const displayedContainers = searchTerm.trim()
-        ? baseContainers.filter((c) => {
-            const term = searchTerm.toLowerCase();
-            return (
-                c.name.toLowerCase().includes(term) ||
-                c.owner.toLowerCase().includes(term) ||
-                c.image.toLowerCase().includes(term) ||
-                (c.id && c.id.toLowerCase().includes(term))
-            );
-        })
-        : baseContainers;
-
-    // Filter library tab in Create Container modal
-    const filteredLibImages = useMemo(() => {
-        return allowedTemplates.filter((item) => {
-            const matchCat = libCategory === "all" || item.category === libCategory;
-            const matchSearch =
-                !libSearch.trim() ||
-                item.name.toLowerCase().includes(libSearch.toLowerCase()) ||
-                item.description.toLowerCase().includes(libSearch.toLowerCase()) ||
-                item.image.toLowerCase().includes(libSearch.toLowerCase());
-            return matchCat && matchSearch;
-        });
-    }, [allowedTemplates, libCategory, libSearch]);
-
     const renderCommonConfig = () => (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
@@ -961,21 +1271,33 @@ export default function ContainersRoute({
                 />
             </div>
 
+            {/* Container Owner (Non-root users only) */}
             {runtime.isRoot && (
                 <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">Container Owner</label>
-                    <select
-                        value={createOwner}
-                        onChange={(e) => setCreateOwner(e.target.value)}
-                        className="h-8 w-full rounded border border-input bg-background px-2.5 font-mono text-xs outline-none focus:border-primary"
-                    >
-                        <option value="root">root (system)</option>
-                        {users.map((u) => (
-                            <option key={u.username} value={u.username}>
-                                {u.username}
-                            </option>
-                        ))}
-                    </select>
+                    <label className="text-xs font-medium text-foreground">
+                        Container Owner (Non-root User) <span className="text-destructive">*</span>
+                    </label>
+                    {users.length === 0 ? (
+                        <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                            No non-root users found. Containers must run under a user account. Please create a user first.
+                        </div>
+                    ) : (
+                        <select
+                            value={createOwner}
+                            onChange={(e) => setCreateOwner(e.target.value)}
+                            required
+                            className="h-8 w-full rounded border border-input bg-background px-2.5 font-mono text-xs outline-none focus:border-primary"
+                        >
+                            {users.map((u) => (
+                                <option key={u.username} value={u.username}>
+                                    {u.username}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        Container runs rootless under this user with isolated storage and permissions.
+                    </p>
                 </div>
             )}
 
@@ -1073,9 +1395,7 @@ export default function ContainersRoute({
                 <div>
                     <label className="text-xs font-medium text-foreground">Volume Mounts</label>
                     <p className="text-xs text-muted-foreground">
-                        {runtime.isRoot && createOwner === "root"
-                            ? "Host Directory : Container Mount Path"
-                            : "Directory relative to user home : Container Path"}
+                        Directory relative to user home : Container Mount Path
                     </p>
                 </div>
                 <button
@@ -1100,7 +1420,7 @@ export default function ContainersRoute({
                                     next[index] = { ...next[index], host: e.target.value };
                                     setCreateVolumes(next);
                                 }}
-                                placeholder="Host Path (e.g. /data or appdata)"
+                                placeholder="Host Path (e.g. appdata/data)"
                                 className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                             />
                             <span className="text-xs text-muted-foreground">:</span>
@@ -1190,75 +1510,116 @@ export default function ContainersRoute({
         </div>
     );
 
-    const content = (
-        <div className="space-y-4">
-            {embedded ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
+    return (
+        <div className="space-y-5">
+            {/* Header info for root in subsidebar view */}
+            {runtime.isRoot && !embedded && (
+                <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h3 className="text-sm font-semibold text-foreground">Containers</h3>
-                        <p className="text-xs text-muted-foreground">Podman containers owned by {ownerFilter || "this user"}.</p>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-base font-semibold text-foreground">
+                                {activeOwner === "all"
+                                    ? "All Containers"
+                                    : `Containers: ${activeOwner}`}
+                            </h2>
+                            {userLimits && userLimits.maxContainers > 0 && activeOwner && activeOwner !== "all" ? (
+                                <span
+                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        scopedContainers.length >= userLimits.maxContainers
+                                            ? "bg-destructive/15 text-destructive"
+                                            : "bg-muted text-muted-foreground"
+                                    }`}
+                                >
+                                    Quota: {scopedContainers.length} / {userLimits.maxContainers} containers
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {displayedContainers.length} of {scopedContainers.length} container{scopedContainers.length !== 1 ? "s" : ""}
+                            {activeOwner === "all" ? " across all users" : ` owned by ${activeOwner}`}
+                        </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
+
+                    <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 h-8 text-xs"
+                            onClick={() => setSettingsModalOpen(true)}
+                            title="Container Library & Policy Settings"
+                        >
+                            <Sliders className="h-3.5 w-3.5" />
+                            Settings
+                        </Button>
+                        <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Create Container
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2 h-8 text-xs" onClick={handleRefresh} disabled={isLoading}>
+                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Toolbar for non-root / embedded */}
+            {(!runtime.isRoot || embedded) && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-1 flex-wrap items-center gap-3">
+                        <div className="relative min-w-[240px] max-w-sm flex-1">
                             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Filter containers..."
-                                className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                                placeholder="Search containers..."
+                                className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                             />
                         </div>
-                        {runtime.isRoot && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => setSettingsModalOpen(true)}
-                                title="Container Library & Policy Settings"
-                            >
-                                <Sliders className="h-4 w-4" />
-                                Settings
-                            </Button>
-                        )}
-                        <Button size="sm" className="gap-2" onClick={openCreateModal}>
-                            <Plus className="h-4 w-4" />
-                            Create Container
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
-                            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+
+                        <Button variant="outline" size="sm" className="gap-2 h-8 text-xs" onClick={handleRefresh} disabled={isLoading}>
+                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
                             Refresh
                         </Button>
                     </div>
-                </div>
-            ) : (
-                <div className="flex items-center justify-between gap-3">
-                    <div className="relative w-80">
-                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search by name, owner, image..."
-                            className="h-9 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
-                        />
+
+                    <div className="flex items-center gap-2">
+                        {userLimits && userLimits.maxContainers > 0 && (
+                            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs">
+                                <span className="text-muted-foreground">Quota:</span>
+                                <span
+                                    className={`font-semibold ${
+                                        scopedContainers.length >= userLimits.maxContainers
+                                            ? "text-destructive"
+                                            : "text-foreground"
+                                    }`}
+                                >
+                                    {scopedContainers.length} / {userLimits.maxContainers}
+                                </span>
+                            </div>
+                        )}
+
+                        <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Create Container
+                        </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        {displayedContainers.length} of {baseContainers.length} containers
-                    </p>
                 </div>
             )}
 
-            {error ? (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    {error}
+            {/* Error banner */}
+            {currentError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+                    {currentError}
                 </div>
             ) : null}
 
-            {loading ? (
+            {/* Table */}
+            {isLoading && scopedContainers.length === 0 ? (
                 <div className="flex items-center justify-center py-16 text-muted-foreground">
                     <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
-                    <span>Loading containers...</span>
+                    <span className="text-xs">Loading containers...</span>
                 </div>
             ) : displayedContainers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 text-center">
@@ -1267,12 +1628,12 @@ export default function ContainersRoute({
                     <p className="mt-1 text-xs text-muted-foreground">
                         {searchTerm
                             ? "No containers match your search filter."
-                            : ownerFilter
-                                ? `No Podman containers found for user "${ownerFilter}".`
-                                : "Podman containers created by system or users will appear here."}
+                            : activeOwner && activeOwner !== "all"
+                                ? `No Podman containers found for user "${activeOwner}".`
+                                : "Rootless Podman containers created under user accounts will appear here."}
                     </p>
-                    <Button size="sm" className="mt-4 gap-2" onClick={openCreateModal}>
-                        <Plus className="h-4 w-4" />
+                    <Button size="sm" className="mt-4 gap-2 text-xs" onClick={openCreateModal}>
+                        <Plus className="h-3.5 w-3.5" />
                         Create Container
                     </Button>
                 </div>
@@ -1280,60 +1641,67 @@ export default function ContainersRoute({
                 <div className="overflow-hidden rounded-lg border border-border bg-card">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                            <thead className="border-b border-border bg-muted/50 text-muted-foreground">
+                            <thead className="border-b border-border bg-muted/50 text-muted-foreground font-medium">
                                 <tr>
-                                    <th className="px-4 py-3 font-medium">Container</th>
-                                    <th className="px-4 py-3 font-medium">Owner</th>
-                                    <th className="px-4 py-3 font-medium">Image</th>
-                                    <th className="px-4 py-3 font-medium">State</th>
-                                    <th className="px-4 py-3 font-medium">Ports</th>
-                                    <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                    <th className="px-4 py-3">Container</th>
+                                    {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
+                                        <th className="px-4 py-3 w-28">Owner</th>
+                                    )}
+                                    <th className="px-4 py-3 min-w-[160px]">Image</th>
+                                    <th className="px-4 py-3 w-32">State</th>
+                                    <th className="px-4 py-3 min-w-[140px]">Ports</th>
+                                    <th className="px-4 py-3 text-right w-36">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {displayedContainers.map((container) => (
-                                    <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30">
+                                    <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30 transition-colors">
                                         <td className="px-4 py-3">
-                                            <p className="font-medium text-foreground">{container.name || container.id.slice(0, 12)}</p>
-                                            <code className="mt-0.5 block text-xs text-muted-foreground">{container.id.slice(0, 12)}</code>
+                                            <p className="font-semibold text-foreground">{container.name || container.id.slice(0, 12)}</p>
+                                            <code className="mt-0.5 block text-xs text-muted-foreground font-mono">{container.id.slice(0, 12)}</code>
                                         </td>
-                                        <td className="px-4 py-3 font-medium text-foreground">
-                                            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
-                                                {container.owner}
-                                            </span>
+                                        {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
+                                            <td className="px-4 py-3 font-medium text-foreground">
+                                                <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+                                                    <User className="h-3 w-3 text-muted-foreground" />
+                                                    {container.owner}
+                                                </span>
+                                            </td>
+                                        )}
+                                        <td className="max-w-64 truncate px-4 py-3 text-foreground font-mono" title={container.image}>
+                                            {container.image || "—"}
                                         </td>
-                                        <td className="max-w-64 truncate px-4 py-3 text-foreground" title={container.image}>{container.image || "—"}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <span className={`h-2 w-2 rounded-full ${container.state.toLowerCase() === "running" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                                                <span className="text-foreground">{container.status || container.state || "Unknown"}</span>
+                                                <span className="text-foreground capitalize">{container.status || container.state || "Unknown"}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
+                                        <td className="px-4 py-3 text-muted-foreground font-mono">
                                             {container.ports?.length ? container.ports.join(", ") : "—"}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 {container.state.toLowerCase() === "running" ? (
-                                                    <Button size="icon" variant="outline" className="h-8 w-8" title="Stop" aria-label={`Stop ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "stop")}>
-                                                        {actionLoading.endsWith(":stop") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+                                                    <Button size="icon" variant="outline" className="h-7 w-7" title="Stop" aria-label={`Stop ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "stop")}>
+                                                        {actionLoading.endsWith(":stop") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
                                                     </Button>
                                                 ) : (
-                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-emerald-600" title="Start" aria-label={`Start ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "start")}>
-                                                        {actionLoading.endsWith(":start") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                                                    <Button size="icon" variant="outline" className="h-7 w-7 text-emerald-600" title="Start" aria-label={`Start ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "start")}>
+                                                        {actionLoading.endsWith(":start") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                                                     </Button>
                                                 )}
-                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
-                                                    {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
+                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
+                                                    {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
                                                 </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
-                                                    <FileText className="h-3.5 w-3.5" />
+                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
+                                                    <FileText className="h-3 w-3" />
                                                 </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8" title="Edit Containerfile" aria-label={`Edit Containerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
-                                                    <FileCode2 className="h-3.5 w-3.5" />
+                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Edit Containerfile" aria-label={`Edit Containerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
+                                                    <FileCode2 className="h-3 w-3" />
                                                 </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Remove" aria-label={`Remove ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => setDeleteModal(container)}>
-                                                    {actionLoading.endsWith(":rm") && actionLoading.includes(container.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                                <Button size="icon" variant="outline" className="h-7 w-7 text-destructive hover:bg-destructive/10" title="Remove" aria-label={`Remove ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => setDeleteModal(container)}>
+                                                    {actionLoading.endsWith(":rm") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                                                 </Button>
                                             </div>
                                         </td>
@@ -1364,15 +1732,27 @@ export default function ContainersRoute({
                         <div className="flex shrink-0 border-b border-border bg-muted/20 px-5">
                             <button
                                 type="button"
-                                onClick={() => setCreateTab("library")}
+                                onClick={() => setCreateTab("system")}
                                 className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
-                                    createTab === "library"
+                                    createTab === "system"
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Server className="h-4 w-4" />
+                                System
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCreateTab("support")}
+                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                    createTab === "support"
                                         ? "border-primary text-primary"
                                         : "border-transparent text-muted-foreground hover:text-foreground"
                                 }`}
                             >
                                 <Layers className="h-4 w-4" />
-                                Allowed Library
+                                Support
                                 <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-xs font-normal text-primary">
                                     {allowedTemplates.length}
                                 </span>
@@ -1391,7 +1771,7 @@ export default function ContainersRoute({
                                 ) : (
                                     <Wrench className="h-4 w-4" />
                                 )}
-                                Custom Image / Build
+                                Custom
                                 {libraryOnly && !runtime.isRoot && (
                                     <span className="rounded bg-muted px-1.5 py-0.2 text-xs text-muted-foreground">
                                         Restricted
@@ -1401,8 +1781,44 @@ export default function ContainersRoute({
                         </div>
 
                         <form onSubmit={handleCreateContainer} className="flex min-h-0 flex-1 flex-col">
-                            {/* Tab 1: Allowed Library */}
-                            {createTab === "library" && (
+                            {/* Tab 1: System */}
+                            {createTab === "system" && (
+                                <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8 text-center">
+                                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted/40 text-muted-foreground">
+                                        <Server className="h-8 w-8" />
+                                    </div>
+                                    <h3 className="mt-4 text-sm font-semibold text-foreground">Coming Soon</h3>
+                                    <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                                        System container templates will be available here soon.
+                                    </p>
+                                    <div className="mt-5 flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => setCreateTab("support")}
+                                            className="text-xs"
+                                        >
+                                            <Layers className="mr-1.5 h-3.5 w-3.5" />
+                                            Go to Support Templates
+                                        </Button>
+                                        {(!libraryOnly || runtime.isRoot) && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setCreateTab("custom")}
+                                                className="text-xs"
+                                            >
+                                                <Wrench className="mr-1.5 h-3.5 w-3.5" />
+                                                Custom Image
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tab 2: Support */}
+                            {createTab === "support" && (
                                 <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                                     {/* Left catalog list */}
                                     <div className="flex w-full flex-col border-b border-border md:w-5/12 md:border-b-0 md:border-r">
@@ -1414,7 +1830,7 @@ export default function ContainersRoute({
                                                     type="text"
                                                     value={libSearch}
                                                     onChange={(e) => setLibSearch(e.target.value)}
-                                                    placeholder="Search allowed templates..."
+                                                    placeholder="Search support templates..."
                                                     className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                                                 />
                                             </div>
@@ -1467,7 +1883,7 @@ export default function ContainersRoute({
                                             })}
                                             {filteredLibImages.length === 0 && (
                                                 <div className="p-6 text-center text-xs text-muted-foreground">
-                                                    No allowed templates match your filter.
+                                                    No support templates match your filter.
                                                 </div>
                                             )}
                                         </div>
@@ -1483,7 +1899,7 @@ export default function ContainersRoute({
                                                     <span className="ml-2 font-mono text-xs text-muted-foreground">{createImage}</span>
                                                 </div>
                                                 <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                                                    Allowed
+                                                    Supported
                                                 </span>
                                             </div>
                                             {selectedLibImage?.description && (
@@ -1502,8 +1918,8 @@ export default function ContainersRoute({
                                                                 onClick={() => selectTag(tag)}
                                                                 className={`rounded border px-2 py-0.5 font-mono text-xs transition-colors ${
                                                                     isCurTag
-                                                                        ? "border-primary bg-primary font-semibold text-primary-foreground"
-                                                                        : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                                                                        ? "border-primary bg-primary text-primary-foreground font-semibold"
+                                                                        : "border-border bg-background text-muted-foreground hover:bg-muted"
                                                                 }`}
                                                             >
                                                                 {tag}
@@ -1514,11 +1930,9 @@ export default function ContainersRoute({
                                             )}
                                         </div>
 
-                                        {/* Image URI override */}
+                                        {/* Image override input if needed */}
                                         <div className="space-y-1">
-                                            <label className="text-xs font-medium text-foreground">
-                                                Image URI <span className="text-destructive">*</span>
-                                            </label>
+                                            <label className="text-xs font-medium text-foreground">Selected Image</label>
                                             <input
                                                 type="text"
                                                 value={createImage}
@@ -1536,7 +1950,7 @@ export default function ContainersRoute({
                                 </div>
                             )}
 
-                            {/* Tab 2: Custom */}
+                            {/* Tab 3: Custom */}
                             {createTab === "custom" && (
                                 <div className="flex-1 overflow-y-auto p-6">
                                     <div className="mx-auto max-w-2xl space-y-4">
@@ -1546,17 +1960,17 @@ export default function ContainersRoute({
                                                 <div className="space-y-1">
                                                     <p className="font-semibold">Custom container creation is restricted</p>
                                                     <p className="text-muted-foreground">
-                                                        The administrator has restricted container deployments to approved library templates only.
-                                                        Please switch to the <strong>Allowed Library</strong> tab to select an approved container.
+                                                        The administrator has restricted container deployments to supported templates only.
+                                                        Please switch to the <strong>Support</strong> tab to select an approved container.
                                                     </p>
                                                     <Button
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setCreateTab("library")}
+                                                        onClick={() => setCreateTab("support")}
                                                         className="mt-2 text-xs"
                                                     >
-                                                        Go to Allowed Library
+                                                        Go to Support
                                                     </Button>
                                                 </div>
                                             </div>
@@ -1601,10 +2015,21 @@ export default function ContainersRoute({
                                     <Button
                                         type="submit"
                                         size="sm"
-                                        disabled={createLoading || (libraryOnly && !runtime.isRoot && createTab === "custom")}
+                                        disabled={
+                                            createLoading ||
+                                            createTab === "system" ||
+                                            (runtime.isRoot && users.length === 0) ||
+                                            (libraryOnly && !runtime.isRoot && createTab === "custom")
+                                        }
                                     >
-                                        {createLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                                        Deploy Container
+                                        {createLoading ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : createTab === "system" ? (
+                                            <Server className="mr-2 h-4 w-4" />
+                                        ) : (
+                                            <Plus className="mr-2 h-4 w-4" />
+                                        )}
+                                        {createTab === "system" ? "Coming Soon" : "Deploy Container"}
                                     </Button>
                                 </div>
                             </div>
@@ -1622,7 +2047,7 @@ export default function ContainersRoute({
                             <div className="flex items-center gap-2">
                                 <Sliders className="h-5 w-5 text-primary" />
                                 <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Container Settings & Allowed Library</h3>
+                                    <h3 className="text-sm font-semibold text-foreground">Container Settings & Supported Templates</h3>
                                     <p className="text-xs text-muted-foreground">
                                         Configure approved container templates and user deployment policies.
                                     </p>
@@ -1661,10 +2086,10 @@ export default function ContainersRoute({
                                 <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 p-3">
                                     <div>
                                         <p className="text-xs font-semibold text-foreground">
-                                            Restrict non-root users to allowed library only
+                                            Restrict non-root users to supported templates only
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-0.5">
-                                            When enabled, non-root users can only deploy containers from the approved catalog below and cannot enter arbitrary custom images.
+                                            When enabled, non-root users can only deploy containers from the Support catalog and cannot enter arbitrary custom images.
                                         </p>
                                     </div>
                                     <button
@@ -1690,12 +2115,12 @@ export default function ContainersRoute({
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                                                Allowed Container Templates ({templates.length} total, {allowedTemplates.length} enabled)
+                                                Supported Container Templates ({templates.length} total, {allowedTemplates.length} enabled)
                                             </h4>
                                             {settingsSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-0.5">
-                                            Templates enabled here will appear in the library selection for users when creating containers.
+                                            Templates enabled here will appear in the Support tab for users when creating containers.
                                         </p>
                                     </div>
 
@@ -1881,7 +2306,7 @@ export default function ContainersRoute({
                     <div className="relative w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
                         <div className="flex items-center justify-between border-b border-border pb-3">
                             <h3 className="text-sm font-semibold text-foreground">
-                                {isCreatingTemplate ? "Add Allowed Container Template" : `Edit Template: ${templateEditModal.name}`}
+                                {isCreatingTemplate ? "Add Container Template" : `Edit Template: ${templateEditModal.name}`}
                             </h3>
                             <button
                                 onClick={() => setTemplateEditModal(null)}
@@ -2084,7 +2509,7 @@ export default function ContainersRoute({
                         </div>
 
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Are you sure you want to remove <strong className="text-foreground">{templateDeleteTarget.name}</strong> ({templateDeleteTarget.image}) from the allowed templates library?
+                            Are you sure you want to remove <strong className="text-foreground">{templateDeleteTarget.name}</strong> ({templateDeleteTarget.image}) from the supported templates catalog?
                         </p>
 
                         <div className="flex items-center justify-end gap-2 pt-2">
@@ -2115,7 +2540,7 @@ export default function ContainersRoute({
                             <div className="rounded-full bg-amber-500/10 p-2">
                                 <RotateCw className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-semibold text-foreground">Reset Allowed Templates to Defaults</h3>
+                            <h3 className="text-sm font-semibold text-foreground">Reset Supported Templates to Defaults</h3>
                         </div>
 
                         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -2247,43 +2672,5 @@ export default function ContainersRoute({
                 </div>
             ) : null}
         </div>
-    );
-
-    if (embedded) {
-        return content;
-    }
-
-    return (
-        <DashboardLayout
-            title="Containers"
-            description="View system and isolated rootless Podman containers."
-            wide
-            actions={
-                <div className="flex items-center gap-2">
-                    {runtime.isRoot && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => setSettingsModalOpen(true)}
-                            title="Container Library & Policy Settings"
-                        >
-                            <Sliders className="h-4 w-4" />
-                            Settings
-                        </Button>
-                    )}
-                    <Button size="sm" className="gap-2" onClick={openCreateModal}>
-                        <Plus className="h-4 w-4" />
-                        Create Container
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={loadContainers} disabled={loading}>
-                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                        Refresh
-                    </Button>
-                </div>
-            }
-        >
-            {content}
-        </DashboardLayout>
     );
 }

@@ -437,38 +437,36 @@ func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
 
 func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, error) {
 	input.Owner = strings.TrimSpace(input.Owner)
-	if input.Owner == "" {
-		input.Owner = "root"
+	if input.Owner == "" || input.Owner == "root" || input.Owner == "system" {
+		return "", errors.New("containers must run under a non-root user")
 	}
-	if input.Owner != "root" && input.Owner != "system" {
-		if s.limits != nil {
-			userContainers := s.ListForOwner(input.Owner)
-			if err := s.limits.CheckContainerLimit(input.Owner, len(userContainers)); err != nil {
-				return "", err
-			}
+	if s.limits != nil {
+		userContainers := s.ListForOwner(input.Owner)
+		if err := s.limits.CheckContainerLimit(input.Owner, len(userContainers)); err != nil {
+			return "", err
 		}
-		linuxUser, exists, err := HomeUser(input.Owner)
-		if err != nil || !exists || linuxUser.UID < 0 {
-			return "", errors.New("invalid container owner")
+	}
+	linuxUser, exists, err := HomeUser(input.Owner)
+	if err != nil || !exists || linuxUser.UID <= 0 {
+		return "", errors.New("invalid container owner: user must exist and be non-root")
+	}
+	for i, v := range input.Volumes {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
 		}
-		for i, v := range input.Volumes {
-			v = strings.TrimSpace(v)
-			if v == "" {
-				continue
+		parts := strings.Split(v, ":")
+		if len(parts) >= 2 {
+			hostPath := parts[0]
+			if !filepath.IsAbs(hostPath) {
+				hostPath = filepath.Join(linuxUser.Home, hostPath)
+				parts[0] = hostPath
+				input.Volumes[i] = strings.Join(parts, ":")
 			}
-			parts := strings.Split(v, ":")
-			if len(parts) >= 2 {
-				hostPath := parts[0]
-				if !filepath.IsAbs(hostPath) {
-					hostPath = filepath.Join(linuxUser.Home, hostPath)
-					parts[0] = hostPath
-					input.Volumes[i] = strings.Join(parts, ":")
-				}
-				if !pathWithin(hostPath, linuxUser.Home) {
-					return "", fmt.Errorf("volume host path must be within %s", linuxUser.Home)
-				}
-				_ = os.MkdirAll(hostPath, 0755)
+			if !pathWithin(hostPath, linuxUser.Home) {
+				return "", fmt.Errorf("volume host path must be within %s", linuxUser.Home)
 			}
+			_ = os.MkdirAll(hostPath, 0755)
 		}
 	}
 

@@ -109,7 +109,7 @@ func UserCreateHandler(sessions *services.SessionService, containers *services.C
 			return
 		}
 		if !services.IsImageAllowed(settings, input.Image) {
-			http.Error(w, "custom container images are restricted by administrator. Please select from the allowed library", http.StatusForbidden)
+			http.Error(w, "custom container images are restricted by administrator. Please select from supported templates", http.StatusForbidden)
 			return
 		}
 		input.Owner = session.Username

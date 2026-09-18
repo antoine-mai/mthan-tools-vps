@@ -44,6 +44,7 @@ export default function AppRoutes() {
             {runtime.isRoot ? (
                 <>
                     <Route path="/vhosts/:owner" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
+                    <Route path="/containers/:owner" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
                     <Route path="/tasking/:owner" element={<ProtectedRoute><TaskingRoute /></ProtectedRoute>} />
                     <Route path="/apis" element={<ProtectedRoute><APIsRoute /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><SettingsRoute /></ProtectedRoute>} />
