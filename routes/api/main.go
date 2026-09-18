@@ -121,7 +121,8 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	}
 
 	mux.Handle("GET /api/containers", public(containersroute.UserHandler(deps.Sessions, containerSvc)))
-	mux.Handle("POST /api/containers/create", public(containersroute.UserCreateHandler(deps.Sessions, containerSvc)))
+	mux.Handle("GET /api/containers/templates", public(containersroute.UserTemplatesHandler(deps.Sessions, deps.Settings)))
+	mux.Handle("POST /api/containers/create", public(containersroute.UserCreateHandler(deps.Sessions, containerSvc, deps.Settings)))
 	mux.Handle("POST /api/containers/action", public(containersroute.UserActionHandler(deps.Sessions, containerSvc)))
 	mux.Handle("GET /api/containers/logs", public(containersroute.UserLogsHandler(deps.Sessions, containerSvc)))
 	mux.Handle("GET /api/containers/dockerfile", public(containersroute.UserDockerfileHandler(deps.Sessions, containerSvc)))

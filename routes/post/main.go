@@ -72,6 +72,9 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	mux.Handle("GET /post/containers/logs", postOnly(deps.Startup, deps.Sessions, postcontainers.LogsHandler(deps.Sessions, containerSvc)))
 	mux.Handle("GET /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, containerSvc)))
 	mux.Handle("PUT /post/containers/dockerfile", postOnly(deps.Startup, deps.Sessions, postcontainers.DockerfileHandler(deps.Sessions, containerSvc)))
+	mux.Handle("GET /post/containers/templates", postOnly(deps.Startup, deps.Sessions, postcontainers.TemplatesHandler(deps.Sessions, deps.Settings)))
+	mux.Handle("PUT /post/containers/templates", postOnly(deps.Startup, deps.Sessions, postcontainers.TemplatesHandler(deps.Sessions, deps.Settings)))
+	mux.Handle("POST /post/containers/templates/reset", postOnly(deps.Startup, deps.Sessions, postcontainers.ResetTemplatesHandler(deps.Sessions, deps.Settings)))
 	if cronTaskSvc != nil {
 		mux.Handle("GET /post/tasking", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))
 		mux.Handle("GET /post/tasking/list", postOnly(deps.Startup, deps.Sessions, posttasking.Handler(deps.Sessions, cronTaskSvc)))

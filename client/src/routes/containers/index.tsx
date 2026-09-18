@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Box,
     Container as ContainerIcon,
@@ -6,12 +6,16 @@ import {
     FileText,
     Layers,
     Loader2,
+    Lock,
+    Pencil,
     Play,
     Plus,
     RefreshCw,
     RotateCw,
     Save,
     Search,
+    ShieldCheck,
+    Sliders,
     Square,
     Trash2,
     Wrench,
@@ -23,7 +27,7 @@ import { Button } from "_layouts/_components/ui/button";
 import Api from "_utils/api";
 import { runtime } from "../../runtime";
 
-type ContainerRecord = {
+export type ContainerRecord = {
     id: string;
     name: string;
     image: string;
@@ -36,21 +40,23 @@ type ContainerRecord = {
     ports: string[];
 };
 
-type LinuxUser = {
+export type LinuxUser = {
     username: string;
     uid?: number;
 };
 
-type LibraryImage = {
+export type LibraryImage = {
     id: string;
     name: string;
     image: string;
-    category: "ai" | "automation" | "runtime" | "database" | "cache" | "tools";
+    category: "ai" | "automation" | "runtime" | "database" | "cache" | "tools" | string;
     description: string;
     defaultPorts?: Array<{ host: string; container: string }>;
     defaultEnv?: Array<{ key: string; value: string }>;
     defaultVolumes?: Array<{ host: string; container: string }>;
     tags: string[];
+    enabled?: boolean;
+    isCustom?: boolean;
 };
 
 const LIB_CATEGORIES = [
@@ -63,7 +69,7 @@ const LIB_CATEGORIES = [
     { id: "tools", label: "Dev Tools" },
 ];
 
-const LIBRARY_IMAGES: LibraryImage[] = [
+const DEFAULT_LIBRARY_IMAGES: LibraryImage[] = [
     // ── Automation & Workflows ──
     {
         id: "n8n",
@@ -78,6 +84,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
             { key: "TZ", value: "Asia/Ho_Chi_Minh" },
         ],
         tags: ["latest", "next"],
+        enabled: true,
     },
     {
         id: "flowise",
@@ -88,6 +95,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "3000", container: "3000" }],
         defaultVolumes: [{ host: "flowise_data", container: "/root/.flowise" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "activepieces",
@@ -97,6 +105,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Open-source no-code business automation tool, self-hosted Zapier alternative.",
         defaultPorts: [{ host: "8080", container: "80" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "pocketbase",
@@ -107,6 +116,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "8090", container: "8090" }],
         defaultVolumes: [{ host: "pb_data", container: "/pb/pb_data" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "directus",
@@ -116,6 +126,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Composable data engine, instant REST/GraphQL API, and intuitive headless CMS.",
         defaultPorts: [{ host: "8055", container: "8055" }],
         tags: ["latest"],
+        enabled: true,
     },
 
     // ── AI & LLM ──
@@ -128,6 +139,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "11434", container: "11434" }],
         defaultVolumes: [{ host: "ollama", container: "/root/.ollama" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "open-webui",
@@ -139,6 +151,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultVolumes: [{ host: "open-webui", container: "/app/backend/data" }],
         defaultEnv: [{ key: "OLLAMA_BASE_URL", value: "http://host.containers.internal:11434" }],
         tags: ["main", "latest", "cuda"],
+        enabled: true,
     },
     {
         id: "localai",
@@ -149,6 +162,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "8080", container: "8080" }],
         defaultVolumes: [{ host: "localai-models", container: "/build/models" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "qdrant",
@@ -162,6 +176,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         ],
         defaultVolumes: [{ host: "qdrant_storage", container: "/qdrant/storage" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "chroma",
@@ -172,6 +187,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "8000", container: "8000" }],
         defaultVolumes: [{ host: "chroma_data", container: "/chroma/chroma" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "vllm",
@@ -181,6 +197,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "High-throughput, low-latency LLM serving engine with OpenAI-compatible API.",
         defaultPorts: [{ host: "8000", container: "8000" }],
         tags: ["latest"],
+        enabled: true,
     },
 
     // ── Runtimes ──
@@ -192,6 +209,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "JavaScript runtime built on Chrome's V8 engine for building fast web apps and APIs.",
         defaultPorts: [{ host: "3000", container: "3000" }],
         tags: ["20-alpine", "22-alpine", "latest", "lts-alpine"],
+        enabled: true,
     },
     {
         id: "python",
@@ -201,6 +219,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Modern Python programming language runtime with pip and virtual environment support.",
         defaultPorts: [{ host: "8000", container: "8000" }],
         tags: ["3.12-alpine", "3.11-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "bun",
@@ -210,6 +229,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Incredibly fast all-in-one JavaScript & TypeScript runtime, bundler, and package manager.",
         defaultPorts: [{ host: "3000", container: "3000" }],
         tags: ["alpine", "latest", "debian"],
+        enabled: true,
     },
     {
         id: "golang",
@@ -218,6 +238,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         category: "runtime",
         description: "Official Go compiler and runtime environment for building fast, concurrent systems.",
         tags: ["1.22-alpine", "1.23-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "deno",
@@ -227,6 +248,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Next-generation secure JavaScript, TypeScript, and WebAssembly runtime.",
         defaultPorts: [{ host: "8000", container: "8000" }],
         tags: ["alpine", "latest"],
+        enabled: true,
     },
     {
         id: "php",
@@ -236,6 +258,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "FastCGI Process Manager implementation for PHP web applications.",
         defaultPorts: [{ host: "9000", container: "9000" }],
         tags: ["8.3-fpm-alpine", "8.2-fpm-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "rust",
@@ -244,6 +267,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         category: "runtime",
         description: "Official Rust programming language compiler and Cargo toolchain.",
         tags: ["alpine", "latest"],
+        enabled: true,
     },
 
     // ── Databases ──
@@ -257,6 +281,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultEnv: [{ key: "POSTGRES_PASSWORD", value: "" }],
         defaultVolumes: [{ host: "postgres_data", container: "/var/lib/postgresql/data" }],
         tags: ["16-alpine", "15-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "mysql",
@@ -268,6 +293,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultEnv: [{ key: "MYSQL_ROOT_PASSWORD", value: "" }],
         defaultVolumes: [{ host: "mysql_data", container: "/var/lib/mysql" }],
         tags: ["8", "8.4", "latest"],
+        enabled: true,
     },
     {
         id: "mariadb",
@@ -279,6 +305,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultEnv: [{ key: "MARIADB_ROOT_PASSWORD", value: "" }],
         defaultVolumes: [{ host: "mariadb_data", container: "/var/lib/mysql" }],
         tags: ["11", "latest"],
+        enabled: true,
     },
     {
         id: "mongo",
@@ -289,6 +316,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "27017", container: "27017" }],
         defaultVolumes: [{ host: "mongo_data", container: "/data/db" }],
         tags: ["7", "6", "latest"],
+        enabled: true,
     },
 
     // ── Cache & Queue ──
@@ -301,6 +329,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "6379", container: "6379" }],
         defaultVolumes: [{ host: "redis_data", container: "/data" }],
         tags: ["alpine", "7-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "rabbitmq",
@@ -313,6 +342,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
             { host: "15672", container: "15672" },
         ],
         tags: ["3-management-alpine", "latest"],
+        enabled: true,
     },
     {
         id: "memcached",
@@ -322,6 +352,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "High-performance, distributed memory object caching system.",
         defaultPorts: [{ host: "11211", container: "11211" }],
         tags: ["alpine", "latest"],
+        enabled: true,
     },
 
     // ── Dev Tools ──
@@ -333,6 +364,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         description: "Database management in a single PHP file supporting MySQL, Postgres, SQLite.",
         defaultPorts: [{ host: "8080", container: "8080" }],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "meilisearch",
@@ -343,6 +375,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "7700", container: "7700" }],
         defaultVolumes: [{ host: "meili_data", container: "/meili_data" }],
         tags: ["v1.7", "latest"],
+        enabled: true,
     },
     {
         id: "minio",
@@ -360,6 +393,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
             { key: "MINIO_ROOT_PASSWORD", value: "password123" },
         ],
         tags: ["latest"],
+        enabled: true,
     },
     {
         id: "uptime-kuma",
@@ -370,6 +404,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         defaultPorts: [{ host: "3001", container: "3001" }],
         defaultVolumes: [{ host: "uptime_kuma", container: "/app/data" }],
         tags: ["1", "latest"],
+        enabled: true,
     },
     {
         id: "alpine",
@@ -378,6 +413,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         category: "tools",
         description: "Lightweight, security-oriented Linux distribution (~5MB).",
         tags: ["latest", "3.20"],
+        enabled: true,
     },
     {
         id: "ubuntu",
@@ -386,6 +422,7 @@ const LIBRARY_IMAGES: LibraryImage[] = [
         category: "tools",
         description: "Clean Ubuntu Linux official base container environment.",
         tags: ["latest", "24.04", "22.04"],
+        enabled: true,
     },
 ];
 
@@ -413,13 +450,42 @@ export default function ContainersRoute({
 
     const [searchTerm, setSearchTerm] = useState("");
 
+    // Templates and Settings state
+    const [templates, setTemplates] = useState<LibraryImage[]>(DEFAULT_LIBRARY_IMAGES);
+    const [libraryOnly, setLibraryOnly] = useState<boolean>(false);
+    const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [settingsSaving, setSettingsSaving] = useState(false);
+    const [settingsError, setSettingsError] = useState("");
+    const [settingsSearch, setSettingsSearch] = useState("");
+    const [settingsCategory, setSettingsCategory] = useState("all");
+
+    // Template Add / Edit state
+    const [templateEditModal, setTemplateEditModal] = useState<LibraryImage | null>(null);
+    const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+    const [editTplId, setEditTplId] = useState("");
+    const [editTplName, setEditTplName] = useState("");
+    const [editTplImage, setEditTplImage] = useState("");
+    const [editTplCategory, setEditTplCategory] = useState("automation");
+    const [editTplDescription, setEditTplDescription] = useState("");
+    const [editTplTags, setEditTplTags] = useState("");
+    const [editTplPorts, setEditTplPorts] = useState<Array<{ host: string; container: string }>>([]);
+    const [editTplVolumes, setEditTplVolumes] = useState<Array<{ host: string; container: string }>>([]);
+    const [editTplEnv, setEditTplEnv] = useState<Array<{ key: string; value: string }>>([]);
+    const [editTplEnabled, setEditTplEnabled] = useState(true);
+    const [editTplError, setEditTplError] = useState("");
+
+    // Delete template confirmation
+    const [templateDeleteTarget, setTemplateDeleteTarget] = useState<LibraryImage | null>(null);
+    // Reset confirmation
+    const [resetModalOpen, setResetModalOpen] = useState(false);
+
     // Create container modal state
     const defaultOwner = ownerFilter || (runtime.isRoot ? "root" : runtime.username || "root");
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [createTab, setCreateTab] = useState<"library" | "custom">("library");
     const [libSearch, setLibSearch] = useState("");
     const [libCategory, setLibCategory] = useState("all");
-    const [selectedLibImage, setSelectedLibImage] = useState<LibraryImage | null>(LIBRARY_IMAGES[0]);
+    const [selectedLibImage, setSelectedLibImage] = useState<LibraryImage | null>(null);
 
     const [createName, setCreateName] = useState("");
     const [createImage, setCreateImage] = useState("");
@@ -436,6 +502,7 @@ export default function ContainersRoute({
     // Delete container modal state
     const [deleteModal, setDeleteModal] = useState<ContainerRecord | null>(null);
 
+    // Fetch users (root only)
     useEffect(() => {
         if (!runtime.isRoot || ownerFilter) return;
         fetch("/post/user/list", { cache: "no-store" })
@@ -447,6 +514,29 @@ export default function ContainersRoute({
             .catch(() => setUsers([]));
     }, [ownerFilter]);
 
+    // Fetch allowed templates
+    const fetchTemplates = useCallback(async () => {
+        try {
+            const response = await fetch(`${Api.current.containers}/templates`, { cache: "no-store" });
+            if (response.ok) {
+                const data: { templates?: LibraryImage[]; libraryOnly?: boolean } = await response.json();
+                if (Array.isArray(data.templates) && data.templates.length > 0) {
+                    setTemplates(data.templates);
+                }
+                if (typeof data.libraryOnly === "boolean") {
+                    setLibraryOnly(data.libraryOnly);
+                }
+            }
+        } catch {
+            // Keep default fallback
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchTemplates();
+    }, [fetchTemplates]);
+
+    // Load containers list
     const loadContainers = useCallback(async () => {
         setLoading(true);
         setError("");
@@ -465,6 +555,11 @@ export default function ContainersRoute({
     useEffect(() => {
         loadContainers();
     }, [loadContainers]);
+
+    // Allowed templates for creation (only enabled ones)
+    const allowedTemplates = useMemo(() => {
+        return templates.filter((t) => t.enabled !== false);
+    }, [templates]);
 
     const runAction = async (container: ContainerRecord, action: "start" | "stop" | "restart" | "rm") => {
         const key = `${container.engine}:${container.owner}:${container.id}:${action}`;
@@ -502,18 +597,27 @@ export default function ContainersRoute({
 
     const openCreateModal = () => {
         setCreateTab("library");
-        const initial = LIBRARY_IMAGES[0];
-        setSelectedLibImage(initial);
+        const initial = allowedTemplates[0] || templates[0];
+        if (initial) {
+            setSelectedLibImage(initial);
+            setCreateName(`${initial.id}-1`);
+            setCreateImage(initial.image);
+            setCreatePorts(initial.defaultPorts ? initial.defaultPorts.map((p) => ({ ...p })) : []);
+            setCreateVolumes(initial.defaultVolumes ? initial.defaultVolumes.map((v) => ({ ...v })) : []);
+            setCreateEnv(initial.defaultEnv ? initial.defaultEnv.map((e) => ({ ...e })) : []);
+        } else {
+            setSelectedLibImage(null);
+            setCreateName("");
+            setCreateImage("");
+            setCreatePorts([]);
+            setCreateVolumes([]);
+            setCreateEnv([]);
+        }
         setLibSearch("");
         setLibCategory("all");
-        setCreateName(`${initial.id}-1`);
-        setCreateImage(initial.image);
         setCreateOwner(defaultOwner);
         setCreateCommand("");
         setCreateRestartPolicy("unless-stopped");
-        setCreatePorts(initial.defaultPorts ? initial.defaultPorts.map((p) => ({ ...p })) : []);
-        setCreateVolumes(initial.defaultVolumes ? initial.defaultVolumes.map((v) => ({ ...v })) : []);
-        setCreateEnv(initial.defaultEnv ? initial.defaultEnv.map((e) => ({ ...e })) : []);
         setCreateError("");
         setCreateModalOpen(true);
     };
@@ -523,6 +627,11 @@ export default function ContainersRoute({
         const trimmedImage = createImage.trim();
         if (!trimmedImage) {
             setCreateError("Container image is required.");
+            return;
+        }
+
+        if (libraryOnly && !runtime.isRoot && createTab === "custom") {
+            setCreateError("Custom image builds are restricted. Please select an approved template from the Library.");
             return;
         }
 
@@ -639,6 +748,174 @@ export default function ContainersRoute({
         }
     };
 
+    // ── Settings Handlers ───────────────────────────────────────────────────
+
+    const saveTemplatesConfig = async (nextTemplates: LibraryImage[], nextLibraryOnly: boolean) => {
+        setSettingsSaving(true);
+        setSettingsError("");
+        try {
+            const response = await fetch(`${Api.current.containers}/templates`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ templates: nextTemplates, libraryOnly: nextLibraryOnly }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Failed to save container settings");
+            }
+            setTemplates(nextTemplates);
+            setLibraryOnly(nextLibraryOnly);
+        } catch (err) {
+            setSettingsError(err instanceof Error ? err.message : "Failed to save container settings");
+        } finally {
+            setSettingsSaving(false);
+        }
+    };
+
+    const handleToggleTemplate = async (templateId: string) => {
+        const next = templates.map((t) =>
+            t.id === templateId ? { ...t, enabled: t.enabled === false ? true : false } : t
+        );
+        await saveTemplatesConfig(next, libraryOnly);
+    };
+
+    const handleTogglePolicy = async (newPolicy: boolean) => {
+        await saveTemplatesConfig(templates, newPolicy);
+    };
+
+    const handleOpenAddTemplate = () => {
+        setIsCreatingTemplate(true);
+        setEditTplId("");
+        setEditTplName("");
+        setEditTplImage("");
+        setEditTplCategory("automation");
+        setEditTplDescription("");
+        setEditTplTags("latest");
+        setEditTplPorts([]);
+        setEditTplVolumes([]);
+        setEditTplEnv([]);
+        setEditTplEnabled(true);
+        setEditTplError("");
+        setTemplateEditModal({
+            id: "",
+            name: "",
+            image: "",
+            category: "automation",
+            description: "",
+            tags: ["latest"],
+            enabled: true,
+            isCustom: true,
+        });
+    };
+
+    const handleOpenEditTemplate = (item: LibraryImage) => {
+        setIsCreatingTemplate(false);
+        setEditTplId(item.id);
+        setEditTplName(item.name);
+        setEditTplImage(item.image);
+        setEditTplCategory(item.category);
+        setEditTplDescription(item.description);
+        setEditTplTags((item.tags || []).join(", "));
+        setEditTplPorts(item.defaultPorts ? item.defaultPorts.map((p) => ({ ...p })) : []);
+        setEditTplVolumes(item.defaultVolumes ? item.defaultVolumes.map((v) => ({ ...v })) : []);
+        setEditTplEnv(item.defaultEnv ? item.defaultEnv.map((e) => ({ ...e })) : []);
+        setEditTplEnabled(item.enabled !== false);
+        setEditTplError("");
+        setTemplateEditModal(item);
+    };
+
+    const handleSaveTemplateModal = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmedName = editTplName.trim();
+        const trimmedImage = editTplImage.trim();
+        let trimmedId = editTplId.trim().toLowerCase().replace(/[^a-z0-9-_]/g, "");
+
+        if (!trimmedName) {
+            setEditTplError("Template name is required.");
+            return;
+        }
+        if (!trimmedImage) {
+            setEditTplError("Container image URI is required.");
+            return;
+        }
+        if (!trimmedId) {
+            trimmedId = trimmedName.toLowerCase().replace(/[^a-z0-9-_]/g, "");
+        }
+
+        const tags = editTplTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+
+        const updatedItem: LibraryImage = {
+            id: trimmedId,
+            name: trimmedName,
+            image: trimmedImage,
+            category: editTplCategory,
+            description: editTplDescription.trim(),
+            tags: tags.length > 0 ? tags : ["latest"],
+            defaultPorts: editTplPorts.filter((p) => p.container.trim()),
+            defaultVolumes: editTplVolumes.filter((v) => v.container.trim()),
+            defaultEnv: editTplEnv.filter((e) => e.key.trim()),
+            enabled: editTplEnabled,
+            isCustom: isCreatingTemplate ? true : templateEditModal?.isCustom,
+        };
+
+        let nextList: LibraryImage[];
+        if (isCreatingTemplate) {
+            // Check for duplicate ID
+            if (templates.some((t) => t.id === trimmedId)) {
+                setEditTplError(`A template with ID "${trimmedId}" already exists.`);
+                return;
+            }
+            nextList = [updatedItem, ...templates];
+        } else {
+            nextList = templates.map((t) => (t.id === templateEditModal?.id ? updatedItem : t));
+        }
+
+        await saveTemplatesConfig(nextList, libraryOnly);
+        setTemplateEditModal(null);
+    };
+
+    const handleDeleteTemplateConfirmed = async () => {
+        if (!templateDeleteTarget) return;
+        const next = templates.filter((t) => t.id !== templateDeleteTarget.id);
+        await saveTemplatesConfig(next, libraryOnly);
+        setTemplateDeleteTarget(null);
+    };
+
+    const handleResetTemplatesConfirmed = async () => {
+        setSettingsSaving(true);
+        setSettingsError("");
+        try {
+            const response = await fetch(`${Api.current.containers}/templates/reset`, {
+                method: "POST",
+            });
+            if (!response.ok) throw new Error("Failed to reset templates");
+            await fetchTemplates();
+            setResetModalOpen(false);
+        } catch (err) {
+            setSettingsError(err instanceof Error ? err.message : "Failed to reset templates");
+        } finally {
+            setSettingsSaving(false);
+        }
+    };
+
+    // Filter settings catalog
+    const filteredSettingsTemplates = useMemo(() => {
+        return templates.filter((item) => {
+            const matchCat = settingsCategory === "all" || item.category === settingsCategory;
+            const q = settingsSearch.trim().toLowerCase();
+            const matchSearch =
+                !q ||
+                item.name.toLowerCase().includes(q) ||
+                item.image.toLowerCase().includes(q) ||
+                item.description.toLowerCase().includes(q);
+            return matchCat && matchSearch;
+        });
+    }, [templates, settingsCategory, settingsSearch]);
+
+    // Filter container table
     const baseContainers = ownerFilter
         ? containers.filter((c) => c.owner === ownerFilter)
         : containers;
@@ -648,99 +925,94 @@ export default function ContainersRoute({
             const term = searchTerm.toLowerCase();
             return (
                 c.name.toLowerCase().includes(term) ||
-                c.id.toLowerCase().includes(term) ||
+                c.owner.toLowerCase().includes(term) ||
                 c.image.toLowerCase().includes(term) ||
-                c.owner.toLowerCase().includes(term)
+                (c.id && c.id.toLowerCase().includes(term))
             );
         })
         : baseContainers;
 
-    const filteredLibImages = LIBRARY_IMAGES.filter((img) => {
-        const matchesCat = libCategory === "all" || img.category === libCategory;
-        const matchesSearch =
-            !libSearch.trim() ||
-            img.name.toLowerCase().includes(libSearch.toLowerCase()) ||
-            img.image.toLowerCase().includes(libSearch.toLowerCase()) ||
-            img.description.toLowerCase().includes(libSearch.toLowerCase());
-        return matchesCat && matchesSearch;
-    });
+    // Filter library tab in Create Container modal
+    const filteredLibImages = useMemo(() => {
+        return allowedTemplates.filter((item) => {
+            const matchCat = libCategory === "all" || item.category === libCategory;
+            const matchSearch =
+                !libSearch.trim() ||
+                item.name.toLowerCase().includes(libSearch.toLowerCase()) ||
+                item.description.toLowerCase().includes(libSearch.toLowerCase()) ||
+                item.image.toLowerCase().includes(libSearch.toLowerCase());
+            return matchCat && matchSearch;
+        });
+    }, [allowedTemplates, libCategory, libSearch]);
 
     const renderCommonConfig = () => (
-        <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">Container Name</label>
-                    <input
-                        type="text"
-                        value={createName}
-                        onChange={(e) => setCreateName(e.target.value)}
-                        placeholder="e.g. my-app (optional)"
-                        className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-                    />
-                </div>
-
-                {runtime.isRoot && !ownerFilter ? (
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-foreground">Owner</label>
-                        <select
-                            value={createOwner}
-                            onChange={(e) => setCreateOwner(e.target.value)}
-                            className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
-                        >
-                            <option value="root">root (System Root)</option>
-                            {users.map((u) => (
-                                <option key={u.username} value={u.username}>
-                                    {u.username}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                ) : (
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-foreground">Owner</label>
-                        <input
-                            type="text"
-                            value={createOwner || defaultOwner}
-                            disabled
-                            className="h-8 w-full rounded border border-input bg-muted px-3 text-xs text-muted-foreground"
-                        />
-                    </div>
-                )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">
+                    Container Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                    type="text"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="my-container"
+                    required
+                    className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {runtime.isRoot && (
                 <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">Restart Policy</label>
+                    <label className="text-xs font-medium text-foreground">Container Owner</label>
                     <select
-                        value={createRestartPolicy}
-                        onChange={(e) => setCreateRestartPolicy(e.target.value)}
-                        className="h-8 w-full rounded border border-input bg-background px-3 text-xs outline-none focus:border-primary"
+                        value={createOwner}
+                        onChange={(e) => setCreateOwner(e.target.value)}
+                        className="h-8 w-full rounded border border-input bg-background px-2.5 font-mono text-xs outline-none focus:border-primary"
                     >
-                        <option value="unless-stopped">Unless Stopped (default)</option>
-                        <option value="always">Always</option>
-                        <option value="on-failure">On Failure</option>
-                        <option value="no">No</option>
+                        <option value="root">root (system)</option>
+                        {users.map((u) => (
+                            <option key={u.username} value={u.username}>
+                                {u.username}
+                            </option>
+                        ))}
                     </select>
                 </div>
+            )}
 
-                <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">Command (optional)</label>
-                    <input
-                        type="text"
-                        value={createCommand}
-                        onChange={(e) => setCreateCommand(e.target.value)}
-                        placeholder="e.g. sh -c 'npm start'"
-                        className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                    />
-                </div>
+            <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-medium text-foreground">Command (Optional)</label>
+                <input
+                    type="text"
+                    value={createCommand}
+                    onChange={(e) => setCreateCommand(e.target.value)}
+                    placeholder="e.g. sh -c 'sleep 3600'"
+                    className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                />
             </div>
-        </>
+
+            <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-medium text-foreground">Restart Policy</label>
+                <select
+                    value={createRestartPolicy}
+                    onChange={(e) => setCreateRestartPolicy(e.target.value)}
+                    className="h-8 w-full rounded border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
+                >
+                    <option value="unless-stopped">Unless Stopped (Recommended)</option>
+                    <option value="always">Always</option>
+                    <option value="on-failure">On Failure</option>
+                    <option value="no">Do not restart (No)</option>
+                </select>
+            </div>
+        </div>
     );
 
     const renderPortsSection = () => (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-foreground">Port Mappings</label>
+                <div>
+                    <label className="text-xs font-medium text-foreground">Port Bindings</label>
+                    <p className="text-xs text-muted-foreground">Map host ports to container service ports.</p>
+                </div>
                 <button
                     type="button"
                     onClick={() => setCreatePorts([...createPorts, { host: "", container: "" }])}
@@ -750,7 +1022,7 @@ export default function ContainersRoute({
                 </button>
             </div>
             {createPorts.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No port mappings added.</p>
+                <p className="text-xs text-muted-foreground">No port bindings configured.</p>
             ) : (
                 <div className="space-y-2">
                     {createPorts.map((p, index) => (
@@ -763,7 +1035,7 @@ export default function ContainersRoute({
                                     next[index] = { ...next[index], host: e.target.value };
                                     setCreatePorts(next);
                                 }}
-                                placeholder="Host (e.g. 8080)"
+                                placeholder="Host Port (e.g. 8080)"
                                 className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                             />
                             <span className="text-xs text-muted-foreground">:</span>
@@ -775,7 +1047,7 @@ export default function ContainersRoute({
                                     next[index] = { ...next[index], container: e.target.value };
                                     setCreatePorts(next);
                                 }}
-                                placeholder="Container (e.g. 80)"
+                                placeholder="Container Port (e.g. 80)"
                                 className="h-8 flex-1 rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                             />
                             <Button
@@ -937,6 +1209,18 @@ export default function ContainersRoute({
                                 className="h-8 w-44 rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                             />
                         </div>
+                        {runtime.isRoot && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => setSettingsModalOpen(true)}
+                                title="Container Library & Policy Settings"
+                            >
+                                <Sliders className="h-4 w-4" />
+                                Settings
+                            </Button>
+                        )}
                         <Button size="sm" className="gap-2" onClick={openCreateModal}>
                             <Plus className="h-4 w-4" />
                             Create Container
@@ -971,31 +1255,32 @@ export default function ContainersRoute({
                 </div>
             ) : null}
 
-            {!error && !loading && displayedContainers.length === 0 ? (
-                <div className="flex min-h-64 flex-col items-center justify-center rounded-md border border-dashed border-border p-6 text-center">
-                    <ContainerIcon className="mb-3 h-9 w-9 text-muted-foreground/40" />
-                    <p className="text-sm font-medium text-foreground">No containers found</p>
+            {loading ? (
+                <div className="flex items-center justify-center py-16 text-muted-foreground">
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
+                    <span>Loading containers...</span>
+                </div>
+            ) : displayedContainers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 text-center">
+                    <ContainerIcon className="h-10 w-10 text-muted-foreground/60" />
+                    <p className="mt-3 text-sm font-medium text-foreground">No containers found</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        {searchTerm.trim()
+                        {searchTerm
                             ? "No containers match your search filter."
                             : ownerFilter
                                 ? `No Podman containers found for user "${ownerFilter}".`
                                 : "Podman containers created by system or users will appear here."}
                     </p>
-                    {!searchTerm.trim() && (
-                        <Button size="sm" className="mt-4 gap-2" onClick={openCreateModal}>
-                            <Plus className="h-4 w-4" />
-                            Create Container
-                        </Button>
-                    )}
+                    <Button size="sm" className="mt-4 gap-2" onClick={openCreateModal}>
+                        <Plus className="h-4 w-4" />
+                        Create Container
+                    </Button>
                 </div>
-            ) : null}
-
-            {displayedContainers.length > 0 ? (
-                <div className="overflow-hidden rounded-md border border-border bg-card">
+            ) : (
+                <div className="overflow-hidden rounded-lg border border-border bg-card">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px] text-left text-xs">
-                            <thead className="border-b border-border bg-muted/40 text-muted-foreground">
+                        <table className="w-full text-left text-xs">
+                            <thead className="border-b border-border bg-muted/50 text-muted-foreground">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Container</th>
                                     <th className="px-4 py-3 font-medium">Owner</th>
@@ -1058,7 +1343,7 @@ export default function ContainersRoute({
                         </table>
                     </div>
                 </div>
-            ) : null}
+            )}
 
             {/* Create Container Modal */}
             {createModalOpen && (
@@ -1087,7 +1372,10 @@ export default function ContainersRoute({
                                 }`}
                             >
                                 <Layers className="h-4 w-4" />
-                                Library (Docker Hub)
+                                Allowed Library
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-xs font-normal text-primary">
+                                    {allowedTemplates.length}
+                                </span>
                             </button>
                             <button
                                 type="button"
@@ -1098,13 +1386,22 @@ export default function ContainersRoute({
                                         : "border-transparent text-muted-foreground hover:text-foreground"
                                 }`}
                             >
-                                <Wrench className="h-4 w-4" />
+                                {libraryOnly && !runtime.isRoot ? (
+                                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                                ) : (
+                                    <Wrench className="h-4 w-4" />
+                                )}
                                 Custom Image / Build
+                                {libraryOnly && !runtime.isRoot && (
+                                    <span className="rounded bg-muted px-1.5 py-0.2 text-xs text-muted-foreground">
+                                        Restricted
+                                    </span>
+                                )}
                             </button>
                         </div>
 
                         <form onSubmit={handleCreateContainer} className="flex min-h-0 flex-1 flex-col">
-                            {/* Tab 1: Library */}
+                            {/* Tab 1: Allowed Library */}
                             {createTab === "library" && (
                                 <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                                     {/* Left catalog list */}
@@ -1117,7 +1414,7 @@ export default function ContainersRoute({
                                                     type="text"
                                                     value={libSearch}
                                                     onChange={(e) => setLibSearch(e.target.value)}
-                                                    placeholder="Search Docker Hub library..."
+                                                    placeholder="Search allowed templates..."
                                                     className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                                                 />
                                             </div>
@@ -1159,7 +1456,7 @@ export default function ContainersRoute({
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center justify-between gap-1">
                                                                 <span className="truncate font-semibold text-xs text-foreground">{item.name}</span>
-                                                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                                                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground truncate max-w-36">
                                                                     {item.image}
                                                                 </span>
                                                             </div>
@@ -1170,7 +1467,7 @@ export default function ContainersRoute({
                                             })}
                                             {filteredLibImages.length === 0 && (
                                                 <div className="p-6 text-center text-xs text-muted-foreground">
-                                                    No library images match your filter.
+                                                    No allowed templates match your filter.
                                                 </div>
                                             )}
                                         </div>
@@ -1182,11 +1479,11 @@ export default function ContainersRoute({
                                         <div className="space-y-2 rounded border border-border bg-muted/20 p-3.5">
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <span className="text-xs font-semibold text-foreground">{selectedLibImage?.name || "Select an Image"}</span>
+                                                    <span className="text-xs font-semibold text-foreground">{selectedLibImage?.name || "Select a Template"}</span>
                                                     <span className="ml-2 font-mono text-xs text-muted-foreground">{createImage}</span>
                                                 </div>
-                                                <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-primary">
-                                                    Docker Hub
+                                                <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                                                    Allowed
                                                 </span>
                                             </div>
                                             {selectedLibImage?.description && (
@@ -1243,49 +1540,71 @@ export default function ContainersRoute({
                             {createTab === "custom" && (
                                 <div className="flex-1 overflow-y-auto p-6">
                                     <div className="mx-auto max-w-2xl space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-foreground">
-                                                Container Image / Registry URI <span className="text-destructive">*</span>
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={createImage}
-                                                onChange={(e) => setCreateImage(e.target.value)}
-                                                placeholder="e.g. docker.io/library/nginx:alpine, ghcr.io/org/repo:tag, or my-app:latest"
-                                                required
-                                                className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Enter any image tag from Docker Hub, GitHub Container Registry (ghcr.io), Quay, or local build.
-                                            </p>
-                                        </div>
+                                        {libraryOnly && !runtime.isRoot ? (
+                                            <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-3">
+                                                <Lock className="h-5 w-5 shrink-0 mt-0.5" />
+                                                <div className="space-y-1">
+                                                    <p className="font-semibold">Custom container creation is restricted</p>
+                                                    <p className="text-muted-foreground">
+                                                        The administrator has restricted container deployments to approved library templates only.
+                                                        Please switch to the <strong>Allowed Library</strong> tab to select an approved container.
+                                                    </p>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setCreateTab("library")}
+                                                        className="mt-2 text-xs"
+                                                    >
+                                                        Go to Allowed Library
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-foreground">
+                                                        Container Image / Registry URI <span className="text-destructive">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={createImage}
+                                                        onChange={(e) => setCreateImage(e.target.value)}
+                                                        placeholder="e.g. docker.io/library/nginx:alpine or ghcr.io/owner/repo:latest"
+                                                        required
+                                                        className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Supports standard image references from any reachable container registry.
+                                                    </p>
+                                                </div>
 
-                                        {renderCommonConfig()}
-                                        {renderPortsSection()}
-                                        {renderVolumesSection()}
-                                        {renderEnvSection()}
+                                                {renderCommonConfig()}
+                                                {renderPortsSection()}
+                                                {renderVolumesSection()}
+                                                {renderEnvSection()}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
                             {/* Footer */}
-                            <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
+                            <div className="flex shrink-0 items-center justify-between border-t border-border bg-muted/20 px-5 py-3">
                                 <div className="min-w-0 flex-1 pr-4">
-                                    {createError ? (
-                                        <p className="truncate text-xs font-medium text-destructive">{createError}</p>
-                                    ) : (
-                                        <span className="font-mono text-xs text-muted-foreground truncate block">
-                                            {createImage ? `Target: ${createImage}` : ""}
-                                        </span>
-                                    )}
+                                    {createError && <p className="truncate text-xs font-medium text-destructive">{createError}</p>}
                                 </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setCreateModalOpen(false)} disabled={createLoading}>
+                                <div className="flex items-center gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setCreateModalOpen(false)}>
                                         Cancel
                                     </Button>
-                                    <Button type="submit" size="sm" className="gap-2" disabled={createLoading}>
-                                        {createLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                        {createLoading ? "Creating..." : "Create Container"}
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={createLoading || (libraryOnly && !runtime.isRoot && createTab === "custom")}
+                                    >
+                                        {createLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                                        Deploy Container
                                     </Button>
                                 </div>
                             </div>
@@ -1294,109 +1613,631 @@ export default function ContainersRoute({
                 </div>
             )}
 
-            {/* Delete Container Confirmation Modal */}
-            {deleteModal && (
+            {/* Container Settings Modal (Root Only) */}
+            {settingsModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-sm border border-border bg-card shadow-lg">
-                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                    <div className="flex h-[min(840px,92vh)] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card shadow-2xl">
+                        {/* Header */}
+                        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
                             <div className="flex items-center gap-2">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                                <h3 className="text-sm font-semibold text-foreground">Remove Container</h3>
+                                <Sliders className="h-5 w-5 text-primary" />
+                                <div>
+                                    <h3 className="text-sm font-semibold text-foreground">Container Settings & Allowed Library</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        Configure approved container templates and user deployment policies.
+                                    </p>
+                                </div>
                             </div>
-                            <button type="button" onClick={() => setDeleteModal(null)} aria-label="Close modal">
+                            <button
+                                type="button"
+                                onClick={() => setSettingsModalOpen(false)}
+                                aria-label="Close settings modal"
+                                className="rounded p-1 hover:bg-muted"
+                            >
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
-                        <div className="space-y-3 p-5">
-                            <p className="text-xs text-muted-foreground">
-                                Are you sure you want to permanently remove this container? This action cannot be undone.
-                            </p>
-                            <div className="border border-destructive/20 bg-destructive/5 px-3 py-2">
-                                <p className="font-mono text-xs font-semibold text-destructive">{deleteModal.name || deleteModal.id.slice(0, 12)}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    Owner: {deleteModal.owner} · Image: {deleteModal.image || "unknown"}
-                                </p>
+
+                        {/* Error banner */}
+                        {settingsError && (
+                            <div className="flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-5 py-2.5 text-xs text-destructive">
+                                <span>{settingsError}</span>
+                                <button onClick={() => setSettingsError("")}>
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 space-y-6">
+                            {/* Policy Section */}
+                            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck className="h-4 w-4 text-primary" />
+                                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                        Deployment Access Policies
+                                    </h4>
+                                </div>
+
+                                <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 p-3">
+                                    <div>
+                                        <p className="text-xs font-semibold text-foreground">
+                                            Restrict non-root users to allowed library only
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            When enabled, non-root users can only deploy containers from the approved catalog below and cannot enter arbitrary custom images.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTogglePolicy(!libraryOnly)}
+                                        disabled={settingsSaving}
+                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                            libraryOnly ? "bg-primary" : "bg-muted"
+                                        }`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                                libraryOnly ? "translate-x-4" : "translate-x-0"
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Catalog Section */}
+                            <div className="rounded-lg border border-border bg-card p-4 space-y-4 flex-1 flex flex-col min-h-0">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                Allowed Container Templates ({templates.length} total, {allowedTemplates.length} enabled)
+                                            </h4>
+                                            {settingsSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            Templates enabled here will appear in the library selection for users when creating containers.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setResetModalOpen(true)}
+                                            className="h-8 text-xs"
+                                        >
+                                            Reset Defaults
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleOpenAddTemplate}
+                                            className="h-8 text-xs font-medium"
+                                        >
+                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                            Add Template
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Search and Filter Toolbar */}
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3">
+                                    <div className="relative flex-1 max-w-sm">
+                                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                        <input
+                                            type="text"
+                                            value={settingsSearch}
+                                            onChange={(e) => setSettingsSearch(e.target.value)}
+                                            placeholder="Search templates by name, image, description..."
+                                            className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-1">
+                                        {LIB_CATEGORIES.map((cat) => (
+                                            <button
+                                                key={cat.id}
+                                                type="button"
+                                                onClick={() => setSettingsCategory(cat.id)}
+                                                className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                                                    settingsCategory === cat.id
+                                                        ? "bg-primary font-medium text-primary-foreground"
+                                                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                                }`}
+                                            >
+                                                {cat.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Templates Table */}
+                                <div className="rounded border border-border overflow-hidden">
+                                    <div className="overflow-x-auto max-h-96">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="border-b border-border bg-muted/40 font-medium text-muted-foreground sticky top-0 bg-muted/90 backdrop-blur-sm">
+                                                <tr>
+                                                    <th className="px-3 py-2.5 w-16 text-center">Status</th>
+                                                    <th className="px-3 py-2.5 min-w-[150px]">Template Name</th>
+                                                    <th className="px-3 py-2.5 w-24">Category</th>
+                                                    <th className="px-3 py-2.5 min-w-[180px]">Image</th>
+                                                    <th className="px-3 py-2.5 min-w-[140px]">Defaults</th>
+                                                    <th className="px-3 py-2.5 w-24 text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {filteredSettingsTemplates.map((t) => {
+                                                    const isEnabled = t.enabled !== false;
+                                                    return (
+                                                        <tr key={t.id} className="hover:bg-muted/20 transition-colors">
+                                                            {/* Enable switch */}
+                                                            <td className="px-3 py-2 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleToggleTemplate(t.id)}
+                                                                    title={isEnabled ? "Disable template" : "Enable template"}
+                                                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
+                                                                        isEnabled ? "bg-primary" : "bg-muted"
+                                                                    }`}
+                                                                >
+                                                                    <span
+                                                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
+                                                                            isEnabled ? "translate-x-3" : "translate-x-0"
+                                                                        }`}
+                                                                    />
+                                                                </button>
+                                                            </td>
+
+                                                            {/* Name & ID */}
+                                                            <td className="px-3 py-2">
+                                                                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                                                    {t.name}
+                                                                    {t.isCustom && (
+                                                                        <span className="rounded bg-primary/10 px-1.5 py-0.2 text-xs text-primary font-normal">
+                                                                            Custom
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground line-clamp-1">
+                                                                    {t.description}
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Category */}
+                                                            <td className="px-3 py-2">
+                                                                <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-foreground capitalize">
+                                                                    {t.category}
+                                                                </span>
+                                                            </td>
+
+                                                            {/* Image */}
+                                                            <td className="px-3 py-2 font-mono text-xs text-foreground truncate max-w-xs" title={t.image}>
+                                                                {t.image}
+                                                            </td>
+
+                                                            {/* Defaults summary */}
+                                                            <td className="px-3 py-2 text-xs text-muted-foreground">
+                                                                {t.defaultPorts?.length ? (
+                                                                    <span className="font-mono">
+                                                                        {t.defaultPorts.map((p) => p.host || p.container).join(", ")}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>—</span>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Actions */}
+                                                            <td className="px-3 py-2 text-right">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => handleOpenEditTemplate(t)}
+                                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                        title="Edit template"
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => setTemplateDeleteTarget(t)}
+                                                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                                                        title="Delete template"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {filteredSettingsTemplates.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={6} className="p-6 text-center text-xs text-muted-foreground">
+                                                            No templates match your search filter.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
-                            <Button variant="outline" size="sm" onClick={() => setDeleteModal(null)} disabled={Boolean(actionLoading)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={async () => {
-                                    const target = deleteModal;
-                                    setDeleteModal(null);
-                                    await runAction(target, "rm");
-                                }}
-                                disabled={Boolean(actionLoading)}
-                            >
-                                {actionLoading.endsWith(":rm") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                Remove Container
+
+                        {/* Footer */}
+                        <div className="flex shrink-0 items-center justify-end border-t border-border bg-muted/20 px-5 py-3">
+                            <Button size="sm" onClick={() => setSettingsModalOpen(false)}>
+                                Done
                             </Button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* View Logs Modal */}
-            {logsContainer ? (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
-                    <div className="flex h-[min(720px,90vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
-                        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
-                            <div className="min-w-0">
-                                <h2 className="text-sm font-semibold text-foreground">{logsContainer.name || logsContainer.id} logs</h2>
-                                <p className="mt-1 text-xs text-muted-foreground">Last 200 lines · {logsContainer.engine} · {logsContainer.owner}</p>
-                            </div>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setLogsContainer(null)} aria-label="Close logs">
+            {/* Add / Edit Template Submodal */}
+            {templateEditModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-border pb-3">
+                            <h3 className="text-sm font-semibold text-foreground">
+                                {isCreatingTemplate ? "Add Allowed Container Template" : `Edit Template: ${templateEditModal.name}`}
+                            </h3>
+                            <button
+                                onClick={() => setTemplateEditModal(null)}
+                                className="rounded p-1 text-muted-foreground hover:text-foreground"
+                            >
                                 <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {editTplError && (
+                            <div className="rounded border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
+                                {editTplError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSaveTemplateModal} className="space-y-3.5 max-h-[70vh] overflow-y-auto pr-1">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1">
+                                        Template Name <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Grafana"
+                                        value={editTplName}
+                                        onChange={(e) => setEditTplName(e.target.value)}
+                                        className="h-8 w-full rounded border border-border bg-background px-3 text-xs outline-none focus:border-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1">
+                                        Slug ID
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. grafana"
+                                        value={editTplId}
+                                        onChange={(e) => setEditTplId(e.target.value)}
+                                        disabled={!isCreatingTemplate}
+                                        className="h-8 w-full rounded border border-border bg-background px-3 font-mono text-xs outline-none focus:border-primary disabled:opacity-60"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1">
+                                        Container Image <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. grafana/grafana:latest"
+                                        value={editTplImage}
+                                        onChange={(e) => setEditTplImage(e.target.value)}
+                                        className="h-8 w-full rounded border border-border bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1">
+                                        Category
+                                    </label>
+                                    <select
+                                        value={editTplCategory}
+                                        onChange={(e) => setEditTplCategory(e.target.value)}
+                                        className="h-8 w-full rounded border border-border bg-background px-2.5 text-xs outline-none focus:border-primary"
+                                    >
+                                        <option value="automation">Automation</option>
+                                        <option value="ai">AI & LLM</option>
+                                        <option value="runtime">Runtimes</option>
+                                        <option value="database">Databases</option>
+                                        <option value="cache">Cache & Queue</option>
+                                        <option value="tools">Dev Tools</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-foreground mb-1">
+                                    Description
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Brief summary of what this application does..."
+                                    value={editTplDescription}
+                                    onChange={(e) => setEditTplDescription(e.target.value)}
+                                    className="w-full rounded border border-border bg-background p-2.5 text-xs outline-none focus:border-primary"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-foreground mb-1">
+                                    Tags (comma-separated)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="latest, 10.4.0, alpine"
+                                    value={editTplTags}
+                                    onChange={(e) => setEditTplTags(e.target.value)}
+                                    className="h-8 w-full rounded border border-border bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                />
+                            </div>
+
+                            {/* Ports configuration */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-medium text-foreground">Default Port Mappings</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditTplPorts([...editTplPorts, { host: "", container: "" }])}
+                                        className="text-xs text-primary hover:underline"
+                                    >
+                                        + Add Port
+                                    </button>
+                                </div>
+                                {editTplPorts.map((p, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Host Port (e.g. 3000)"
+                                            value={p.host}
+                                            onChange={(e) => {
+                                                const next = [...editTplPorts];
+                                                next[idx].host = e.target.value;
+                                                setEditTplPorts(next);
+                                            }}
+                                            className="h-7 flex-1 rounded border border-border bg-background px-2 font-mono text-xs"
+                                        />
+                                        <span className="text-xs text-muted-foreground">:</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Container Port (e.g. 3000)"
+                                            value={p.container}
+                                            onChange={(e) => {
+                                                const next = [...editTplPorts];
+                                                next[idx].container = e.target.value;
+                                                setEditTplPorts(next);
+                                            }}
+                                            className="h-7 flex-1 rounded border border-border bg-background px-2 font-mono text-xs"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditTplPorts(editTplPorts.filter((_, i) => i !== idx))}
+                                            className="text-muted-foreground hover:text-destructive p-1"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Enabled switch */}
+                            <div className="flex items-center gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditTplEnabled(!editTplEnabled)}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                        editTplEnabled ? "bg-primary" : "bg-muted"
+                                    }`}
+                                >
+                                    <span
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                            editTplEnabled ? "translate-x-4" : "translate-x-0"
+                                        }`}
+                                    />
+                                </button>
+                                <span className="text-xs font-medium text-foreground">
+                                    {editTplEnabled ? "Template is enabled in catalog" : "Template is disabled"}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setTemplateEditModal(null)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" size="sm">
+                                    {isCreatingTemplate ? "Add to Catalog" : "Save Changes"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Template Delete Confirmation Modal */}
+            {templateDeleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
+                        <div className="flex items-center gap-3 text-destructive">
+                            <div className="rounded-full bg-destructive/10 p-2">
+                                <Trash2 className="h-5 w-5" />
+                            </div>
+                            <h3 className="text-sm font-semibold text-foreground">Remove Template from Catalog</h3>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Are you sure you want to remove <strong className="text-foreground">{templateDeleteTarget.name}</strong> ({templateDeleteTarget.image}) from the allowed templates library?
+                        </p>
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTemplateDeleteTarget(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleDeleteTemplateConfirmed}
+                            >
+                                Remove Template
                             </Button>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-auto bg-zinc-950 p-5">
+                    </div>
+                </div>
+            )}
+
+            {/* Reset to Defaults Confirmation Modal */}
+            {resetModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
+                        <div className="flex items-center gap-3 text-amber-600">
+                            <div className="rounded-full bg-amber-500/10 p-2">
+                                <RotateCw className="h-5 w-5" />
+                            </div>
+                            <h3 className="text-sm font-semibold text-foreground">Reset Allowed Templates to Defaults</h3>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Are you sure you want to restore the system default container templates catalog? Custom additions and custom edits will be replaced with standard defaults.
+                        </p>
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setResetModalOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleResetTemplatesConfirmed}
+                            >
+                                Reset to Defaults
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete container modal */}
+            {deleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 shadow-2xl">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">Remove Container</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Are you sure you want to remove container <span className="font-semibold text-foreground">{deleteModal.name || deleteModal.id}</span>? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setDeleteModal(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                    const c = deleteModal;
+                                    setDeleteModal(null);
+                                    runAction(c, "rm");
+                                }}
+                            >
+                                Remove
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Logs modal */}
+            {logsContainer ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="flex h-[min(640px,90vh)] w-full max-w-3xl flex-col rounded-lg border border-border bg-card shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div>
+                                <h3 className="text-sm font-semibold text-foreground">{logsContainer.name || logsContainer.id} logs</h3>
+                                <p className="text-xs text-muted-foreground">{logsContainer.owner}</p>
+                            </div>
+                            <button type="button" onClick={() => setLogsContainer(null)} aria-label="Close logs dialog">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto bg-black p-4 font-mono text-xs text-emerald-400">
                             {logsLoading ? (
-                                <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-zinc-400" /></div>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Loading logs...</span>
+                                </div>
                             ) : logsError ? (
-                                <p className="whitespace-pre-wrap text-xs text-red-400">{logsError.trim()}</p>
+                                <span className="text-destructive">{logsError}</span>
                             ) : (
-                                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-200">{logs || "No logs available."}</pre>
+                                <pre className="whitespace-pre-wrap">{logs || "No logs available."}</pre>
                             )}
                         </div>
                     </div>
                 </div>
             ) : null}
 
-            {/* Edit Containerfile Modal */}
+            {/* Dockerfile edit modal */}
             {dockerfileContainer ? (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
-                    <div className="flex h-[min(760px,90vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl">
-                        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-                            <div className="min-w-0">
-                                <h2 className="text-sm font-semibold text-foreground">Edit Containerfile · {dockerfileContainer.name || dockerfileContainer.id}</h2>
-                                <code className="mt-1 block break-all text-xs text-muted-foreground">{dockerfilePath || "Containerfile path unavailable"}</code>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+                    <div className="flex h-[min(640px,90vh)] w-full max-w-3xl flex-col rounded-lg border border-border bg-card shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                            <div>
+                                <h3 className="text-sm font-semibold text-foreground">Containerfile — {dockerfileContainer.name || dockerfileContainer.id}</h3>
+                                {dockerfilePath ? <p className="font-mono text-xs text-muted-foreground">{dockerfilePath}</p> : null}
                             </div>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDockerfileContainer(null)} disabled={dockerfileSaving} aria-label="Close Containerfile editor">
+                            <button type="button" onClick={() => setDockerfileContainer(null)} aria-label="Close Containerfile editor">
                                 <X className="h-4 w-4" />
-                            </Button>
+                            </button>
                         </div>
                         {dockerfileError ? (
-                            <div className="border-b border-destructive/20 bg-destructive/10 px-5 py-3 text-xs text-destructive">
-                                {dockerfileError.trim()}
-                                {!dockerfilePath ? <span className="mt-1 block text-muted-foreground">Add the label mthan.containerfile=/absolute/path/Containerfile (or mthan.dockerfile) when creating the container, or use Podman Compose from a directory containing Containerfile/Dockerfile.</span> : null}
+                            <div className="border-b border-destructive/30 bg-destructive/10 px-5 py-2 text-xs text-destructive">
+                                {dockerfileError}
                             </div>
                         ) : null}
-                        <div className="min-h-0 flex-1 bg-background">
+                        <div className="flex flex-1 flex-col overflow-hidden p-4">
                             {dockerfileLoading ? (
-                                <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                                <div className="flex flex-1 items-center justify-center text-muted-foreground">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <span>Loading Containerfile...</span>
+                                </div>
                             ) : (
-                                <textarea value={dockerfileContent} onChange={(event) => setDockerfileContent(event.target.value)} disabled={!dockerfilePath} spellCheck={false} className="h-full w-full resize-none bg-transparent p-5 font-mono text-xs leading-6 text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50" aria-label="Containerfile content" />
+                                <textarea
+                                    value={dockerfileContent}
+                                    onChange={(e) => setDockerfileContent(e.target.value)}
+                                    className="flex-1 resize-none rounded border border-border bg-background p-3 font-mono text-xs outline-none focus:border-primary"
+                                    placeholder="# Containerfile content..."
+                                    spellCheck={false}
+                                />
                             )}
-                        </div>
-                        <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
-                            <p className="text-xs text-muted-foreground">Saving does not rebuild the image or recreate the container.</p>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setDockerfileContainer(null)} disabled={dockerfileSaving}>Cancel</Button>
-                                <Button size="sm" className="gap-2" onClick={saveDockerfile} disabled={!dockerfilePath || dockerfileLoading || dockerfileSaving}>
+                            <div className="mt-4 flex items-center justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setDockerfileContainer(null)}>
+                                    Cancel
+                                </Button>
+                                <Button size="sm" className="gap-2" onClick={saveDockerfile} disabled={dockerfileLoading || dockerfileSaving}>
                                     {dockerfileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                     Save
                                 </Button>
@@ -1419,6 +2260,18 @@ export default function ContainersRoute({
             wide
             actions={
                 <div className="flex items-center gap-2">
+                    {runtime.isRoot && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setSettingsModalOpen(true)}
+                            title="Container Library & Policy Settings"
+                        >
+                            <Sliders className="h-4 w-4" />
+                            Settings
+                        </Button>
+                    )}
                     <Button size="sm" className="gap-2" onClick={openCreateModal}>
                         <Plus className="h-4 w-4" />
                         Create Container

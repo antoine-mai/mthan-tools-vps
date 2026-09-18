@@ -92,7 +92,7 @@ func UserLogsHandler(sessions *services.SessionService, containers *services.Con
 	})
 }
 
-func UserCreateHandler(sessions *services.SessionService, containers *services.ContainerService) http.Handler {
+func UserCreateHandler(sessions *services.SessionService, containers *services.ContainerService, settings *services.SettingsService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, ok := requestSession(r, sessions)
 		if !ok {
@@ -108,6 +108,10 @@ func UserCreateHandler(sessions *services.SessionService, containers *services.C
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
+		if !services.IsImageAllowed(settings, input.Image) {
+			http.Error(w, "custom container images are restricted by administrator. Please select from the allowed library", http.StatusForbidden)
+			return
+		}
 		input.Owner = session.Username
 		id, err := containers.CreateCurrentUser(session.Username, input)
 		if err != nil {
@@ -115,6 +119,35 @@ func UserCreateHandler(sessions *services.SessionService, containers *services.C
 			return
 		}
 		writeJSON(w, map[string]string{"status": "ok", "id": id})
+	})
+}
+
+func UserTemplatesHandler(sessions *services.SessionService, settings *services.SettingsService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, ok := requestSession(r, sessions)
+		if !ok {
+			http.Error(w, "session invalid", http.StatusUnauthorized)
+			return
+		}
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		cfg, err := services.GetContainerTemplatesSettings(settings)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var enabled []services.LibraryTemplate
+		for _, t := range cfg.Templates {
+			if t.Enabled {
+				enabled = append(enabled, t)
+			}
+		}
+		writeJSON(w, services.ContainerTemplatesSettings{
+			Templates:   enabled,
+			LibraryOnly: cfg.LibraryOnly,
+		})
 	})
 }
 
