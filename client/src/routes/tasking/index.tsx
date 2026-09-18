@@ -126,6 +126,7 @@ function TaskingUserStandalone() {
         <DashboardLayout
             title="Tasking"
             description="Manage your scheduled cron jobs, automated tasks, and execution history."
+            wide
         >
             <div className="space-y-6">
                 <TaskingContent />

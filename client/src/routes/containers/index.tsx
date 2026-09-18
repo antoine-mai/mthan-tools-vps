@@ -466,6 +466,7 @@ function ContainersUserStandalone() {
         <DashboardLayout
             title="Containers"
             description="View and manage your rootless Podman containers."
+            wide
         >
             <div className="space-y-6">
                 <ContainersContent />
