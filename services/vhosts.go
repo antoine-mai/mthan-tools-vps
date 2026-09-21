@@ -19,9 +19,9 @@ var ErrVHostNotFound = errors.New("vhost not found")
 var ErrVHostUpdateFailed = errors.New("caddy configuration update failed")
 
 const (
-	CaddyUsersDir  = "/etc/caddy/Caddyfile.d/mthan-users"
+	CaddyUsersDir  = "/etc/caddy/mthan-users"
 	CaddyfilePath  = "/etc/caddy/Caddyfile"
-	CaddyImportDir = "import /etc/caddy/Caddyfile.d/mthan-users/*"
+	CaddyImportDir = "import /etc/caddy/mthan-users/*"
 )
 
 func UserCaddyfilePath(username string) string {
@@ -68,6 +68,20 @@ func EnsureCaddyMThanUsers() error {
 		return err
 	}
 
+	// Migrate files from legacy /etc/caddy/Caddyfile.d/mthan-users if it exists
+	oldDir := "/etc/caddy/Caddyfile.d/mthan-users"
+	if fi, statErr := os.Stat(oldDir); statErr == nil && fi.IsDir() {
+		if entries, readErr := os.ReadDir(oldDir); readErr == nil {
+			for _, entry := range entries {
+				oldPath := filepath.Join(oldDir, entry.Name())
+				newPath := filepath.Join(CaddyUsersDir, entry.Name())
+				if _, err := os.Stat(newPath); os.IsNotExist(err) {
+					_ = os.Rename(oldPath, newPath)
+				}
+			}
+		}
+	}
+
 	content, err := os.ReadFile(CaddyfilePath)
 	if os.IsNotExist(err) {
 		_ = os.MkdirAll("/etc/caddy", 0755)
@@ -78,6 +92,11 @@ func EnsureCaddyMThanUsers() error {
 	}
 
 	text := string(content)
+	oldImport := "import /etc/caddy/Caddyfile.d/mthan-users/*"
+	if strings.Contains(text, oldImport) {
+		text = strings.ReplaceAll(text, oldImport, CaddyImportDir)
+		_ = os.WriteFile(CaddyfilePath, []byte(text), 0644)
+	}
 	if !strings.Contains(text, CaddyImportDir) {
 		updated := strings.TrimRight(text, "\r\n") + "\n\n" + CaddyImportDir + "\n"
 		if err := os.WriteFile(CaddyfilePath, []byte(updated), 0644); err != nil {
@@ -92,6 +111,20 @@ func EnsureCaddyMThanUsers() error {
 				userPath := UserCaddyfilePath(u.Username)
 				if _, statErr := os.Stat(userPath); os.IsNotExist(statErr) {
 					_ = os.WriteFile(userPath, []byte(fmt.Sprintf("# Virtual hosts for user: %s\n", u.Username)), 0644)
+				}
+				// Ensure user home is executable (0711) and htdocs is readable (0755) so Caddy/PHP-FPM can serve files
+				if u.Home != "" && u.Home != "/" {
+					if info, statErr := os.Stat(u.Home); statErr == nil && info.IsDir() {
+						if info.Mode().Perm()&0001 == 0 {
+							_ = os.Chmod(u.Home, 0711)
+						}
+					}
+					htdocs := filepath.Join(u.Home, "htdocs")
+					if info, statErr := os.Stat(htdocs); statErr == nil && info.IsDir() {
+						if info.Mode().Perm()&0005 != 0005 {
+							_ = os.Chmod(htdocs, 0755)
+						}
+					}
 				}
 			}
 		}

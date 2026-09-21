@@ -200,17 +200,25 @@ install_rclone() {
 }
 
 configure_caddy_users_dir() {
-  local caddy_conf_dir="/etc/caddy/Caddyfile.d/mthan-users"
+  local caddy_conf_dir="/etc/caddy/mthan-users"
   local caddyfile="/etc/caddy/Caddyfile"
-  local import_line="import /etc/caddy/Caddyfile.d/mthan-users/*"
+  local import_line="import /etc/caddy/mthan-users/*"
 
   echo "Configuring Caddy mthan-users directory: ${caddy_conf_dir}"
   mkdir -p "${caddy_conf_dir}"
+
+  # Migrate files from legacy /etc/caddy/Caddyfile.d/mthan-users if exists
+  if [[ -d "/etc/caddy/Caddyfile.d/mthan-users" ]]; then
+    cp -rn /etc/caddy/Caddyfile.d/mthan-users/* "${caddy_conf_dir}/" 2>/dev/null || true
+  fi
 
   if [[ ! -f "${caddyfile}" ]]; then
     mkdir -p "/etc/caddy"
     echo "${import_line}" > "${caddyfile}"
   else
+    if grep -qF "import /etc/caddy/Caddyfile.d/mthan-users/*" "${caddyfile}"; then
+      sed -i 's|import /etc/caddy/Caddyfile.d/mthan-users/\*|import /etc/caddy/mthan-users/\*|g' "${caddyfile}"
+    fi
     if ! grep -qF "${import_line}" "${caddyfile}"; then
       echo -e "\n${import_line}" >> "${caddyfile}"
     fi
@@ -219,6 +227,26 @@ configure_caddy_users_dir() {
   if command -v caddy >/dev/null 2>&1; then
     caddy reload --config "${caddyfile}" 2>/dev/null || systemctl reload caddy 2>/dev/null || true
   fi
+}
+
+configure_home_mode() {
+  echo "Configuring user home permissions (HOME_MODE 0711)..."
+  if [[ -f /etc/login.defs ]]; then
+    if grep -q "^HOME_MODE" /etc/login.defs; then
+      sed -i 's/^HOME_MODE.*/HOME_MODE\t0711/' /etc/login.defs
+    else
+      echo -e "\nHOME_MODE\t0711" >> /etc/login.defs
+    fi
+  fi
+
+  for home_dir in /home/*; do
+    if [[ -d "${home_dir}" ]]; then
+      chmod 711 "${home_dir}" 2>/dev/null || true
+      if [[ -d "${home_dir}/htdocs" ]]; then
+        chmod 755 "${home_dir}/htdocs" 2>/dev/null || true
+      fi
+    fi
+  done
 }
 
 download_binary() {
@@ -362,6 +390,7 @@ main() {
   install_libcrypt
   install_caddy
   install_rclone
+  configure_home_mode
 
   if [[ "${REINSTALL}" == "1" ]]; then
     cleanup_old_install

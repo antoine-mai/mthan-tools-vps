@@ -192,7 +192,7 @@ function VHostsStandalone() {
 // ─── Inline user Caddyfile editor ────────────────────────────────────────────
 
 function UserCaddyfileEditor({ username }: { username: string }) {
-    const path = `/etc/caddy/Caddyfile.d/mthan-users/${username}.caddy`;
+    const path = `/etc/caddy/mthan-users/${username}.caddy`;
     const [content, setContent] = useState("");
     const [loadingFile, setLoadingFile] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -415,7 +415,7 @@ function VHostsContent({
                             onClick={() =>
                                 setEditing({
                                     title: `${ownerFilter}.caddy`,
-                                    path: `/etc/caddy/Caddyfile.d/mthan-users/${ownerFilter}.caddy`,
+                                    path: `/etc/caddy/mthan-users/${ownerFilter}.caddy`,
                                 })
                             }
                         >

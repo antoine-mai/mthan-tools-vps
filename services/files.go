@@ -45,12 +45,17 @@ func CreateFileItem(parentPath, name, homeDir string, isRoot, directory bool) er
 		return err
 	}
 	if directory {
-		return os.Mkdir(target, 0755)
+		if err := os.Mkdir(target, 0755); err != nil {
+			return err
+		}
+		_ = os.Chmod(target, 0755)
+		return nil
 	}
 	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
+	_ = os.Chmod(target, 0644)
 	return file.Close()
 }
 

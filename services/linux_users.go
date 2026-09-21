@@ -14,6 +14,9 @@ func ProvisionUserHome(home string, uid, gid int) error {
 	if err := os.MkdirAll(home, 0755); err != nil {
 		return err
 	}
+	if err := os.Chmod(home, 0711); err != nil {
+		return err
+	}
 	if err := os.Chown(home, uid, gid); err != nil {
 		return err
 	}
@@ -21,6 +24,9 @@ func ProvisionUserHome(home string, uid, gid int) error {
 	for _, name := range DefaultUserDirectories {
 		directory := filepath.Join(home, name)
 		if err := os.MkdirAll(directory, 0755); err != nil {
+			return err
+		}
+		if err := os.Chmod(directory, 0755); err != nil {
 			return err
 		}
 		if err := os.Chown(directory, uid, gid); err != nil {

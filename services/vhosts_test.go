@@ -78,10 +78,10 @@ func TestCaddyConstants(t *testing.T) {
 	if !strings.Contains(CaddyImportDir, "mthan-users") {
 		t.Fatalf("unexpected CaddyImportDir: %s", CaddyImportDir)
 	}
-	if CaddyUsersDir != "/etc/caddy/Caddyfile.d/mthan-users" {
+	if CaddyUsersDir != "/etc/caddy/mthan-users" {
 		t.Fatalf("unexpected CaddyUsersDir: %s", CaddyUsersDir)
 	}
-	expected := "/etc/caddy/Caddyfile.d/mthan-users/testuser.caddy"
+	expected := "/etc/caddy/mthan-users/testuser.caddy"
 	if UserCaddyfilePath("testuser") != expected {
 		t.Fatalf("UserCaddyfilePath(testuser) = %q, want %q", UserCaddyfilePath("testuser"), expected)
 	}

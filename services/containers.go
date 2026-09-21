@@ -738,6 +738,15 @@ func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, 
 		}
 	}
 
+	// Ensure home is executable (0711) and htdocs is readable (0755) for web server traversal
+	if linuxUser.Home != "" && linuxUser.Home != "/" {
+		_ = os.Chmod(linuxUser.Home, 0711)
+		htdocsDir := filepath.Join(linuxUser.Home, "htdocs")
+		_ = os.MkdirAll(htdocsDir, 0755)
+		_ = os.Chmod(htdocsDir, 0755)
+		chownUser(htdocsDir, linuxUser)
+	}
+
 	appDir := filepath.Join(linuxUser.Home, "htdocs", input.Name)
 	if _, err := os.Stat(appDir); err == nil {
 		return "", fmt.Errorf("app folder htdocs/%s already exists", input.Name)
@@ -746,6 +755,7 @@ func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, 
 	if err := os.MkdirAll(appDir, 0755); err != nil {
 		return "", err
 	}
+	_ = os.Chmod(appDir, 0755)
 	chownUser(appDir, linuxUser)
 
 	if input.Type == "direct" {
