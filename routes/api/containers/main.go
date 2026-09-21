@@ -15,7 +15,8 @@ func UserHandler(sessions *services.SessionService, containers *services.Contain
 			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return
 		}
-		writeJSON(w, map[string]any{"containers": containers.ListCurrentUser(session.Username)})
+		list := containers.ListCurrentUser(session.Username)
+		writeJSON(w, map[string]any{"containers": list, "apps": list})
 	})
 }
 
@@ -108,9 +109,11 @@ func UserCreateHandler(sessions *services.SessionService, containers *services.C
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		if !services.IsImageAllowed(settings, input.Image) {
-			http.Error(w, "custom container images are restricted by administrator. Please select from supported templates", http.StatusForbidden)
-			return
+		if input.Type == "docker" || (input.Type == "" && input.Image != "") {
+			if !services.IsImageAllowed(settings, input.Image) {
+				http.Error(w, "custom container images are restricted by administrator. Please select from supported templates", http.StatusForbidden)
+				return
+			}
 		}
 		input.Owner = session.Username
 		id, err := containers.CreateCurrentUser(session.Username, input)

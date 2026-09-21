@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,16 +30,122 @@ type ContainerDockerfile struct {
 }
 
 type Container struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Image     string   `json:"image"`
-	Command   string   `json:"command,omitempty"`
-	Engine    string   `json:"engine"`
-	Owner     string   `json:"owner"`
-	State     string   `json:"state"`
-	Status    string   `json:"status"`
-	CreatedAt string   `json:"createdAt,omitempty"`
-	Ports     []string `json:"ports"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Image        string   `json:"image"`
+	Command      string   `json:"command,omitempty"`
+	Engine       string   `json:"engine"`
+	Owner        string   `json:"owner"`
+	State        string   `json:"state"`
+	Status       string   `json:"status"`
+	CreatedAt    string   `json:"createdAt,omitempty"`
+	Ports        []string `json:"ports"`
+	Type         string   `json:"type"`                   // "docker" | "direct"
+	Runtime      string   `json:"runtime,omitempty"`      // "php", "node", "python", "static", "docker"
+	Path         string   `json:"path"`                   // absolute path: /home/<user>/htdocs/<app>
+	RelativePath string   `json:"relativePath"`           // relative: htdocs/<app>
+}
+
+type AppMeta struct {
+	Name        string   `json:"name"`
+	Owner       string   `json:"owner"`
+	Type        string   `json:"type"`              // "docker" | "direct"
+	Runtime     string   `json:"runtime,omitempty"` // "php", "node", "python", "static", "docker"
+	Image       string   `json:"image,omitempty"`
+	ContainerID string   `json:"containerId,omitempty"`
+	Ports       []string `json:"ports,omitempty"`
+	CreatedAt   string   `json:"createdAt,omitempty"`
+}
+
+func readAppMeta(dir string) (AppMeta, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, ".app.json"))
+	if err != nil {
+		return AppMeta{}, false
+	}
+	var meta AppMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return AppMeta{}, false
+	}
+	return meta, true
+}
+
+func chownUser(path string, linuxUser LinuxUser) {
+	if linuxUser.UID <= 0 {
+		return
+	}
+	gid := linuxUser.UID
+	if u, err := user.Lookup(linuxUser.Username); err == nil {
+		if g, err := strconv.Atoi(u.Gid); err == nil {
+			gid = g
+		}
+	}
+	_ = os.Chown(path, linuxUser.UID, gid)
+}
+
+func writeAppMeta(dir string, meta AppMeta, linuxUser LinuxUser) error {
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, ".app.json")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return err
+	}
+	chownUser(path, linuxUser)
+	return nil
+}
+
+func detectDirectRuntime(dir string) string {
+	if _, err := os.Stat(filepath.Join(dir, "index.php")); err == nil {
+		return "php"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
+		return "php"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+		return "node"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "server.js")); err == nil {
+		return "node"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "requirements.txt")); err == nil {
+		return "python"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "app.py")); err == nil {
+		return "python"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "main.py")); err == nil {
+		return "python"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "index.html")); err == nil {
+		return "static"
+	}
+	return "custom"
+}
+
+func scaffoldDirectApp(dir, appName, runtime string, linuxUser LinuxUser) error {
+	switch runtime {
+	case "php":
+		content := fmt.Sprintf("<?php\n// Application: %s\nheader('Content-Type: text/html; charset=utf-8');\n?>\n<!DOCTYPE html>\n<html>\n<head><title>%s</title><style>body{font-family:system-ui,sans-serif;padding:2rem;line-height:1.6}</style></head>\n<body>\n  <h1>Welcome to %s</h1>\n  <p>Your PHP application is ready in <code>htdocs/%s</code>.</p>\n  <hr/>\n  <p>PHP Version: <?php echo phpversion(); ?></p>\n</body>\n</html>\n", appName, appName, appName, appName)
+		_ = os.WriteFile(filepath.Join(dir, "index.php"), []byte(content), 0644)
+		chownUser(filepath.Join(dir, "index.php"), linuxUser)
+	case "node":
+		pkg := fmt.Sprintf("{\n  \"name\": \"%s\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Node.js application\",\n  \"main\": \"server.js\",\n  \"scripts\": {\n    \"start\": \"node server.js\"\n  }\n}\n", appName)
+		srv := fmt.Sprintf("const http = require('http');\nconst port = process.env.PORT || 3000;\n\nconst server = http.createServer((req, res) => {\n  res.statusCode = 200;\n  res.setHeader('Content-Type', 'text/html; charset=utf-8');\n  res.end('<h1>Welcome to %s</h1><p>Node.js application running in <code>htdocs/%s</code></p>');\n});\n\nserver.listen(port, () => {\n  console.log('Server running on port ' + port);\n});\n", appName, appName)
+		_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkg), 0644)
+		_ = os.WriteFile(filepath.Join(dir, "server.js"), []byte(srv), 0644)
+		chownUser(filepath.Join(dir, "package.json"), linuxUser)
+		chownUser(filepath.Join(dir, "server.js"), linuxUser)
+	case "python":
+		appPy := fmt.Sprintf("import os\nfrom http.server import HTTPServer, BaseHTTPRequestHandler\n\nPORT = int(os.environ.get(\"PORT\", 8000))\n\nclass Handler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        self.send_response(200)\n        self.send_header(\"Content-type\", \"text/html; charset=utf-8\")\n        self.end_headers()\n        html = f\"<h1>Welcome to %s</h1><p>Python application running in <code>htdocs/%s</code></p>\"\n        self.wfile.write(html.encode(\"utf-8\"))\n\nif __name__ == \"__main__\":\n    server = HTTPServer((\"\", PORT), Handler)\n    print(f\"Server listening on port {PORT}\")\n    server.serve_forever()\n", appName, appName)
+		_ = os.WriteFile(filepath.Join(dir, "app.py"), []byte(appPy), 0644)
+		chownUser(filepath.Join(dir, "app.py"), linuxUser)
+	default:
+		indexHtml := fmt.Sprintf("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>%s</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin: 0; background: #f8fafc; color: #0f172a; }\n    .card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 500px; text-align: center; }\n    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1e293b; }\n    p { color: #64748b; font-size: 0.95rem; line-height: 1.5; }\n    code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; color: #3b82f6; }\n  </style>\n</head>\n<body>\n  <div class=\"card\">\n    <h1>🚀 %s</h1>\n    <p>Your application is ready in <code>htdocs/%s</code>.</p>\n    <p>Upload or edit your files in the File Manager to start building.</p>\n  </div>\n</body>\n</html>\n", appName, appName, appName)
+		_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte(indexHtml), 0644)
+		chownUser(filepath.Join(dir, "index.html"), linuxUser)
+	}
+	return nil
 }
 
 type containerCommandRunner interface {
@@ -87,17 +194,17 @@ func (s *ContainerService) ListAll() []Container {
 	var wait sync.WaitGroup
 	limit := make(chan struct{}, 4)
 	for _, linuxUser := range users {
-		if linuxUser.UID < 0 {
+		if linuxUser.UID <= 0 {
 			continue
 		}
 		wait.Add(1)
-		go func(linuxUser LinuxUser) {
+		go func(u LinuxUser) {
 			defer wait.Done()
 			limit <- struct{}{}
-			containers := s.listRootlessPodman(linuxUser)
+			apps := s.ListForOwner(u.Username)
 			<-limit
 			mu.Lock()
-			result = append(result, containers...)
+			result = append(result, apps...)
 			mu.Unlock()
 		}(linuxUser)
 	}
@@ -107,66 +214,250 @@ func (s *ContainerService) ListAll() []Container {
 }
 
 func (s *ContainerService) ListCurrentUser(username string) []Container {
-	if !isCurrentUser(username) {
-		return []Container{}
-	}
-	output, err := s.runner.Run("podman", "ps", "-a", "--format", "json")
-	if err != nil {
-		return []Container{}
-	}
-	result := parsePodmanContainers(output, username)
-	sortContainers(result)
-	return result
+	return s.ListForOwner(username)
 }
 
-func (s *ContainerService) ListForOwner(owner string) []Container {
+func (s *ContainerService) listRawContainersForOwner(owner string) []Container {
 	output, err := s.runForOwner("podman", owner, "ps", "-a", "--format", "json")
 	if err != nil {
 		return []Container{}
 	}
-	result := parsePodmanContainers(output, owner)
+	return parsePodmanContainers(output, owner)
+}
+
+func (s *ContainerService) ListForOwner(owner string) []Container {
+	if owner == "root" || owner == "system" {
+		return s.listRootPodman()
+	}
+
+	linuxUser, exists, err := HomeUser(owner)
+	if err != nil || !exists || linuxUser.UID <= 0 {
+		return []Container{}
+	}
+
+	htdocsDir := filepath.Join(linuxUser.Home, "htdocs")
+	_ = os.MkdirAll(htdocsDir, 0755)
+	chownUser(htdocsDir, linuxUser)
+
+	rawContainers := s.listRawContainersForOwner(owner)
+	containersByName := make(map[string]Container)
+	containersByID := make(map[string]Container)
+	for _, c := range rawContainers {
+		if c.Name != "" {
+			containersByName[c.Name] = c
+		}
+		if c.ID != "" {
+			containersByID[c.ID] = c
+		}
+	}
+
+	seenApps := make(map[string]bool)
+	var result []Container
+
+	entries, err := os.ReadDir(htdocsDir)
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			appName := entry.Name()
+			if strings.HasPrefix(appName, ".") {
+				continue
+			}
+			seenApps[appName] = true
+			appPath := filepath.Join(htdocsDir, appName)
+			appMeta, hasMeta := readAppMeta(appPath)
+
+			var matchedContainer *Container
+			if hasMeta && appMeta.ContainerID != "" {
+				if c, ok := containersByID[appMeta.ContainerID]; ok {
+					matchedContainer = &c
+				}
+			}
+			if matchedContainer == nil {
+				if c, ok := containersByName[appName]; ok {
+					matchedContainer = &c
+				}
+			}
+
+			if matchedContainer != nil {
+				c := *matchedContainer
+				c.Type = "docker"
+				if appMeta.Runtime != "" {
+					c.Runtime = appMeta.Runtime
+				} else {
+					c.Runtime = "docker"
+				}
+				c.Path = appPath
+				c.RelativePath = filepath.Join("htdocs", appName)
+				result = append(result, c)
+			} else if hasMeta && appMeta.Type == "docker" {
+				result = append(result, Container{
+					ID:           appMeta.ContainerID,
+					Name:         appName,
+					Image:        appMeta.Image,
+					Engine:       "podman",
+					Owner:        owner,
+					State:        "stopped",
+					Status:       "Stopped",
+					CreatedAt:    appMeta.CreatedAt,
+					Ports:        appMeta.Ports,
+					Type:         "docker",
+					Runtime:      "docker",
+					Path:         appPath,
+					RelativePath: filepath.Join("htdocs", appName),
+				})
+			} else {
+				runtime := appMeta.Runtime
+				if runtime == "" {
+					runtime = detectDirectRuntime(appPath)
+				}
+				result = append(result, Container{
+					ID:           appName,
+					Name:         appName,
+					Engine:       "direct",
+					Owner:        owner,
+					State:        "ready",
+					Status:       fmt.Sprintf("Ready (Direct %s)", strings.ToUpper(runtime)),
+					Type:         "direct",
+					Runtime:      runtime,
+					Path:         appPath,
+					RelativePath: filepath.Join("htdocs", appName),
+					CreatedAt:    appMeta.CreatedAt,
+				})
+			}
+		}
+	}
+
+	for _, c := range rawContainers {
+		if c.Name != "" && !seenApps[c.Name] {
+			appDir := filepath.Join(htdocsDir, c.Name)
+			_ = os.MkdirAll(appDir, 0755)
+			chownUser(appDir, linuxUser)
+			_ = writeAppMeta(appDir, AppMeta{
+				Name:        c.Name,
+				Owner:       owner,
+				Type:        "docker",
+				Runtime:     "docker",
+				Image:       c.Image,
+				ContainerID: c.ID,
+				Ports:       c.Ports,
+				CreatedAt:   c.CreatedAt,
+			}, linuxUser)
+
+			c.Type = "docker"
+			c.Runtime = "docker"
+			c.Path = appDir
+			c.RelativePath = filepath.Join("htdocs", c.Name)
+			result = append(result, c)
+			seenApps[c.Name] = true
+		}
+	}
+
 	sortContainers(result)
 	return result
 }
 
 func (s *ContainerService) ActionAll(engine, owner, id, action string) error {
-	args, err := containerActionArgs(id, action)
-	if err != nil {
+	if owner == "root" || owner == "system" {
+		args, err := containerActionArgs(id, action)
+		if err != nil {
+			return err
+		}
+		_, err = s.runForOwner(engine, owner, args...)
 		return err
 	}
-	_, err = s.runForOwner(engine, owner, args...)
-	return err
+
+	linuxUser, exists, err := HomeUser(owner)
+	if err != nil || !exists {
+		return errors.New("invalid app owner")
+	}
+
+	appName := id
+	containers := s.listRawContainersForOwner(owner)
+	var matchedContainer *Container
+	for _, c := range containers {
+		if c.ID == id || c.Name == id {
+			matchedContainer = &c
+			appName = c.Name
+			break
+		}
+	}
+
+	if action == "rm" {
+		if matchedContainer != nil {
+			_, _ = s.runForOwner("podman", owner, "rm", "-f", matchedContainer.ID)
+		}
+		appDir := filepath.Join(linuxUser.Home, "htdocs", appName)
+		if pathWithin(appDir, filepath.Join(linuxUser.Home, "htdocs")) {
+			_ = os.RemoveAll(appDir)
+		}
+		return nil
+	}
+
+	if matchedContainer != nil {
+		args, err := containerActionArgs(matchedContainer.ID, action)
+		if err != nil {
+			return err
+		}
+		_, err = s.runForOwner(engine, owner, args...)
+		return err
+	}
+
+	return nil
 }
 
 func (s *ContainerService) LogsAll(engine, owner, id string) (string, error) {
-	if !allowedContainerID.MatchString(id) {
-		return "", errors.New("invalid container")
+	if owner == "root" || owner == "system" {
+		if !allowedContainerID.MatchString(id) {
+			return "", errors.New("invalid container")
+		}
+		output, err := s.runForOwner(engine, owner, "logs", "--tail", "200", id)
+		return string(output), err
 	}
-	output, err := s.runForOwner(engine, owner, "logs", "--tail", "200", id)
-	return string(output), err
+
+	linuxUser, exists, err := HomeUser(owner)
+	if err != nil || !exists {
+		return "", errors.New("invalid app owner")
+	}
+
+	containers := s.listRawContainersForOwner(owner)
+	for _, c := range containers {
+		if c.ID == id || c.Name == id {
+			output, err := s.runForOwner(engine, owner, "logs", "--tail", "200", c.ID)
+			return string(output), err
+		}
+	}
+
+	appDir := filepath.Join(linuxUser.Home, "htdocs", id)
+	for _, logFile := range []string{"app.log", "logs/app.log", "output.log", "error.log"} {
+		logPath := filepath.Join(appDir, logFile)
+		if data, err := os.ReadFile(logPath); err == nil {
+			return string(data), nil
+		}
+	}
+	return fmt.Sprintf("Direct application located at htdocs/%s\nNo container logs or log file detected.", id), nil
 }
 
 func (s *ContainerService) ActionCurrentUser(username, id, action string) error {
-	if !isCurrentUser(username) {
-		return errors.New("container owner unavailable")
-	}
-	args, err := containerActionArgs(id, action)
-	if err != nil {
-		return err
-	}
-	_, err = s.runner.Run("podman", args...)
-	return err
+	return s.ActionAll("podman", username, id, action)
 }
 
 func (s *ContainerService) LogsCurrentUser(username, id string) (string, error) {
-	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
-		return "", errors.New("invalid container")
-	}
-	output, err := s.runner.Run("podman", "logs", "--tail", "200", id)
-	return string(output), err
+	return s.LogsAll("podman", username, id)
 }
 
 func (s *ContainerService) DockerfileAll(engine, owner, id string) (ContainerDockerfile, error) {
+	linuxUser, exists, err := HomeUser(owner)
+	if err == nil && exists {
+		appDir := filepath.Join(linuxUser.Home, "htdocs", id)
+		for _, name := range []string{"Dockerfile", "Containerfile"} {
+			dfPath := filepath.Join(appDir, name)
+			if _, statErr := os.Stat(dfPath); statErr == nil {
+				return readContainerDockerfile(dfPath)
+			}
+		}
+	}
 	path, err := s.containerDockerfilePath(engine, owner, id)
 	if err != nil {
 		return ContainerDockerfile{}, err
@@ -175,6 +466,14 @@ func (s *ContainerService) DockerfileAll(engine, owner, id string) (ContainerDoc
 }
 
 func (s *ContainerService) WriteDockerfileAll(engine, owner, id, content string) (ContainerDockerfile, error) {
+	linuxUser, exists, err := HomeUser(owner)
+	if err == nil && exists {
+		appDir := filepath.Join(linuxUser.Home, "htdocs", id)
+		if stat, statErr := os.Stat(appDir); statErr == nil && stat.IsDir() {
+			dfPath := filepath.Join(appDir, "Dockerfile")
+			return writeContainerDockerfile(dfPath, content)
+		}
+	}
 	path, err := s.containerDockerfilePath(engine, owner, id)
 	if err != nil {
 		return ContainerDockerfile{}, err
@@ -183,33 +482,11 @@ func (s *ContainerService) WriteDockerfileAll(engine, owner, id, content string)
 }
 
 func (s *ContainerService) DockerfileCurrentUser(username, id string) (ContainerDockerfile, error) {
-	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
-		return ContainerDockerfile{}, ErrContainerDockerfileDenied
-	}
-	output, err := s.runner.Run("podman", "inspect", id)
-	if err != nil {
-		return ContainerDockerfile{}, err
-	}
-	path, err := containerDockerfilePathFromInspect(output, "podman", username)
-	if err != nil {
-		return ContainerDockerfile{}, err
-	}
-	return readContainerDockerfile(path)
+	return s.DockerfileAll("podman", username, id)
 }
 
 func (s *ContainerService) WriteDockerfileCurrentUser(username, id, content string) (ContainerDockerfile, error) {
-	if !isCurrentUser(username) || !allowedContainerID.MatchString(id) {
-		return ContainerDockerfile{}, ErrContainerDockerfileDenied
-	}
-	output, err := s.runner.Run("podman", "inspect", id)
-	if err != nil {
-		return ContainerDockerfile{}, err
-	}
-	path, err := containerDockerfilePathFromInspect(output, "podman", username)
-	if err != nil {
-		return ContainerDockerfile{}, err
-	}
-	return writeContainerDockerfile(path, content)
+	return s.WriteDockerfileAll("podman", username, id, content)
 }
 
 func (s *ContainerService) containerDockerfilePath(engine, owner, id string) (string, error) {
@@ -363,6 +640,8 @@ type CreateContainerInput struct {
 	Ports         []string          `json:"ports,omitempty"`
 	Volumes       []string          `json:"volumes,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
+	Type          string            `json:"type,omitempty"`    // "docker" | "direct"
+	Runtime       string            `json:"runtime,omitempty"` // "php" | "node" | "python" | "static"
 }
 
 func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
@@ -436,20 +715,78 @@ func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
 }
 
 func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	if input.Name == "" || !allowedContainerID.MatchString(input.Name) {
+		return "", errors.New("invalid app name: alphanumeric, hyphen, underscore, and dot only")
+	}
+
 	input.Owner = strings.TrimSpace(input.Owner)
 	if input.Owner == "" || input.Owner == "root" || input.Owner == "system" {
-		return "", errors.New("containers must run under a non-root user")
+		return "", errors.New("apps must run under a non-root user")
 	}
+
+	linuxUser, exists, err := HomeUser(input.Owner)
+	if err != nil || !exists || linuxUser.UID <= 0 {
+		return "", errors.New("invalid app owner: user must exist and be non-root")
+	}
+
+	if input.Type == "" {
+		if input.Image != "" {
+			input.Type = "docker"
+		} else {
+			input.Type = "direct"
+		}
+	}
+
+	appDir := filepath.Join(linuxUser.Home, "htdocs", input.Name)
+	if _, err := os.Stat(appDir); err == nil {
+		return "", fmt.Errorf("app folder htdocs/%s already exists", input.Name)
+	}
+
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		return "", err
+	}
+	chownUser(appDir, linuxUser)
+
+	if input.Type == "direct" {
+		if input.Runtime == "" {
+			input.Runtime = "static"
+		}
+		if err := scaffoldDirectApp(appDir, input.Name, input.Runtime, linuxUser); err != nil {
+			_ = os.RemoveAll(appDir)
+			return "", err
+		}
+		_ = writeAppMeta(appDir, AppMeta{
+			Name:      input.Name,
+			Owner:     input.Owner,
+			Type:      "direct",
+			Runtime:   input.Runtime,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		}, linuxUser)
+		return input.Name, nil
+	}
+
+	// Docker App
 	if s.limits != nil {
-		userContainers := s.ListForOwner(input.Owner)
-		if err := s.limits.CheckContainerLimit(input.Owner, len(userContainers)); err != nil {
+		userApps := s.ListForOwner(input.Owner)
+		if err := s.limits.CheckContainerLimit(input.Owner, len(userApps)); err != nil {
+			_ = os.RemoveAll(appDir)
 			return "", err
 		}
 	}
-	linuxUser, exists, err := HomeUser(input.Owner)
-	if err != nil || !exists || linuxUser.UID <= 0 {
-		return "", errors.New("invalid container owner: user must exist and be non-root")
+
+	hasAppMount := false
+	for _, v := range input.Volumes {
+		parts := strings.Split(v, ":")
+		if len(parts) >= 2 && (parts[0] == appDir || parts[0] == "." || parts[0] == "./") {
+			hasAppMount = true
+			break
+		}
 	}
+	if !hasAppMount {
+		input.Volumes = append(input.Volumes, appDir+":/app")
+	}
+
 	for i, v := range input.Volumes {
 		v = strings.TrimSpace(v)
 		if v == "" {
@@ -459,24 +796,38 @@ func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, 
 		if len(parts) >= 2 {
 			hostPath := parts[0]
 			if !filepath.IsAbs(hostPath) {
-				hostPath = filepath.Join(linuxUser.Home, hostPath)
+				hostPath = filepath.Join(appDir, hostPath)
 				parts[0] = hostPath
 				input.Volumes[i] = strings.Join(parts, ":")
 			}
 			if !pathWithin(hostPath, linuxUser.Home) {
+				_ = os.RemoveAll(appDir)
 				return "", fmt.Errorf("volume host path must be within %s", linuxUser.Home)
 			}
 			_ = os.MkdirAll(hostPath, 0755)
+			chownUser(hostPath, linuxUser)
 		}
 	}
 
 	args, err := buildCreateContainerArgs(input)
 	if err != nil {
+		_ = os.RemoveAll(appDir)
 		return "", err
+	}
+
+	appLabels := []string{
+		"--label", "mthan.app.name=" + input.Name,
+		"--label", "mthan.app.owner=" + input.Owner,
+		"--label", "mthan.app.type=docker",
+		"--label", "mthan.app.path=" + appDir,
+	}
+	if len(args) >= 2 {
+		args = append(args[:2], append(appLabels, args[2:]...)...)
 	}
 
 	output, err := s.runForOwnerWithTimeout(3*time.Minute, "podman", input.Owner, args...)
 	if err != nil {
+		_ = os.RemoveAll(appDir)
 		outStr := strings.TrimSpace(string(output))
 		if outStr != "" {
 			return "", fmt.Errorf("%s", outStr)
@@ -487,13 +838,22 @@ func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, 
 	if len(containerID) > 12 {
 		containerID = containerID[:12]
 	}
+
+	_ = writeAppMeta(appDir, AppMeta{
+		Name:        input.Name,
+		Owner:       input.Owner,
+		Type:        "docker",
+		Runtime:     "docker",
+		Image:       input.Image,
+		ContainerID: containerID,
+		Ports:       input.Ports,
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+	}, linuxUser)
+
 	return containerID, nil
 }
 
 func (s *ContainerService) CreateCurrentUser(username string, input CreateContainerInput) (string, error) {
-	if !isCurrentUser(username) {
-		return "", errors.New("container owner unavailable")
-	}
 	input.Owner = username
 	return s.CreateContainer(input)
 }

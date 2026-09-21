@@ -7,6 +7,8 @@ import {
     ChevronRight,
     FileCode2,
     FileText,
+    Folder,
+    FolderOpen,
     Layers,
     Loader2,
     Lock,
@@ -43,6 +45,10 @@ export type ContainerRecord = {
     status: string;
     createdAt?: string;
     ports: string[];
+    type?: "docker" | "direct";
+    runtime?: string;
+    path?: string;
+    relativePath?: string;
 };
 
 export type LinuxUser = {
@@ -741,6 +747,8 @@ export function ContainersContent({
     const [createEnv, setCreateEnv] = useState<Array<{ key: string; value: string }>>([]);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState("");
+    const [customAppMode, setCustomAppMode] = useState<"docker" | "direct">("docker");
+    const [directRuntime, setDirectRuntime] = useState<"php" | "node" | "python" | "static">("php");
 
     // Delete container modal state
     const [deleteModal, setDeleteModal] = useState<ContainerRecord | null>(null);
@@ -927,6 +935,8 @@ export function ContainersContent({
 
     const openCreateModal = () => {
         setCreateTab("system");
+        setCustomAppMode("docker");
+        setDirectRuntime("php");
         const initial = allowedTemplates[0] || templates[0];
         if (initial) {
             setSelectedLibImage(initial);
@@ -956,24 +966,31 @@ export function ContainersContent({
     const handleCreateContainer = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (createTab === "system") {
-            setCreateError("System templates are coming soon. Please select a template from the Support tab.");
+            setCreateError("System applications are coming soon. Please select an app from Support or Custom tab.");
             return;
         }
 
+        const trimmedName = createName.trim();
+        if (!trimmedName) {
+            setCreateError("App name is required.");
+            return;
+        }
+
+        const isDirect = createTab === "custom" && customAppMode === "direct";
         const trimmedImage = createImage.trim();
-        if (!trimmedImage) {
+        if (!isDirect && !trimmedImage) {
             setCreateError("Container image is required.");
             return;
         }
 
         const selectedOwner = runtime.isRoot ? createOwner : (runtime.username || "");
         if (!selectedOwner || selectedOwner === "root") {
-            setCreateError("A non-root user must be selected as the container owner.");
+            setCreateError("A non-root user must be selected as the app owner.");
             return;
         }
 
         if (libraryOnly && !runtime.isRoot && createTab === "custom") {
-            setCreateError("Custom image builds are restricted. Please select a template from the Support tab.");
+            setCreateError("Custom app creation is restricted. Please select an app from the Support tab.");
             return;
         }
 
@@ -998,14 +1015,16 @@ export function ContainersContent({
             }
 
             const payload = {
-                name: createName.trim(),
-                image: trimmedImage,
+                name: trimmedName,
                 owner: selectedOwner,
-                command: createCommand.trim(),
-                restartPolicy: createRestartPolicy,
-                ports,
-                volumes,
-                env,
+                type: isDirect ? "direct" : "docker",
+                runtime: isDirect ? directRuntime : "docker",
+                image: isDirect ? "" : trimmedImage,
+                command: isDirect ? "" : createCommand.trim(),
+                restartPolicy: isDirect ? "" : createRestartPolicy,
+                ports: isDirect ? [] : ports,
+                volumes: isDirect ? [] : volumes,
+                env: isDirect ? {} : env,
             };
 
             const response = await fetch(`${Api.current.containers}/create`, {
@@ -1256,9 +1275,11 @@ export function ContainersContent({
         });
     }, [templates, settingsCategory, settingsSearch]);
 
+    const isDirectApp = createTab === "custom" && customAppMode === "direct";
+
     const renderCommonConfig = () => (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
                 <label className="text-xs font-medium text-foreground">
                     App Name <span className="text-destructive">*</span>
                 </label>
@@ -1270,11 +1291,15 @@ export function ContainersContent({
                     required
                     className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                 />
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span>App folder: <code className="font-mono font-semibold text-foreground">htdocs/{createName.trim() || "app-name"}</code></span>
+                </p>
             </div>
 
             {/* App Owner (Non-root users only) */}
             {runtime.isRoot && (
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground">
                         App Owner (Non-root User) <span className="text-destructive">*</span>
                     </label>
@@ -1297,35 +1322,39 @@ export function ContainersContent({
                         </select>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        App runs rootless under this user with isolated storage and permissions.
+                        App files and runtime are managed under this user with isolated permissions.
                     </p>
                 </div>
             )}
 
-            <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium text-foreground">Command (Optional)</label>
-                <input
-                    type="text"
-                    value={createCommand}
-                    onChange={(e) => setCreateCommand(e.target.value)}
-                    placeholder="e.g. sh -c 'sleep 3600'"
-                    className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                />
-            </div>
+            {!isDirectApp && (
+                <>
+                    <div className="space-y-1 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground">Command (Optional)</label>
+                        <input
+                            type="text"
+                            value={createCommand}
+                            onChange={(e) => setCreateCommand(e.target.value)}
+                            placeholder="e.g. sh -c 'sleep 3600'"
+                            className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                        />
+                    </div>
 
-            <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium text-foreground">Restart Policy</label>
-                <select
-                    value={createRestartPolicy}
-                    onChange={(e) => setCreateRestartPolicy(e.target.value)}
-                    className="h-8 w-full rounded border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
-                >
-                    <option value="unless-stopped">Unless Stopped (Recommended)</option>
-                    <option value="always">Always</option>
-                    <option value="on-failure">On Failure</option>
-                    <option value="no">Do not restart (No)</option>
-                </select>
-            </div>
+                    <div className="space-y-1 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground">Restart Policy</label>
+                        <select
+                            value={createRestartPolicy}
+                            onChange={(e) => setCreateRestartPolicy(e.target.value)}
+                            className="h-8 w-full rounded border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
+                        >
+                            <option value="unless-stopped">Unless Stopped (Recommended)</option>
+                            <option value="always">Always</option>
+                            <option value="on-failure">On Failure</option>
+                            <option value="no">Do not restart (No)</option>
+                        </select>
+                    </div>
+                </>
+            )}
         </div>
     );
 
@@ -1396,7 +1425,7 @@ export function ContainersContent({
                 <div>
                     <label className="text-xs font-medium text-foreground">Volume Mounts</label>
                     <p className="text-xs text-muted-foreground">
-                        Directory relative to user home : Container Mount Path
+                        Host app folder <code>htdocs/{createName.trim() || "app-name"}</code> is automatically mounted. Add extra mounts if needed.
                     </p>
                 </div>
                 <button
@@ -1644,70 +1673,131 @@ export function ContainersContent({
                         <table className="w-full text-left text-xs">
                             <thead className="border-b border-border bg-muted/50 text-muted-foreground font-medium">
                                 <tr>
-                                    <th className="px-4 py-3">App</th>
+                                    <th className="px-4 py-3">App & Folder</th>
+                                    <th className="px-4 py-3 w-36">Type</th>
                                     {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
                                         <th className="px-4 py-3 w-28">Owner</th>
                                     )}
-                                    <th className="px-4 py-3 min-w-[160px]">Image</th>
                                     <th className="px-4 py-3 w-32">State</th>
                                     <th className="px-4 py-3 min-w-[140px]">Ports</th>
-                                    <th className="px-4 py-3 text-right w-36">Actions</th>
+                                    <th className="px-4 py-3 text-right w-44">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {displayedContainers.map((container) => (
-                                    <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-4 py-3">
-                                            <p className="font-semibold text-foreground">{container.name || container.id.slice(0, 12)}</p>
-                                            <code className="mt-0.5 block text-xs text-muted-foreground font-mono">{container.id.slice(0, 12)}</code>
-                                        </td>
-                                        {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
-                                            <td className="px-4 py-3 font-medium text-foreground">
-                                                <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
-                                                    <User className="h-3 w-3 text-muted-foreground" />
-                                                    {container.owner}
-                                                </span>
+                                {displayedContainers.map((container) => {
+                                    const isDirect = container.type === "direct";
+                                    const fileHref = runtime.isRoot
+                                        ? `/users/${encodeURIComponent(container.owner)}/files?path=${encodeURIComponent(container.path || `htdocs/${container.name}`)}`
+                                        : `/files?path=${encodeURIComponent(container.path || `htdocs/${container.name}`)}`;
+
+                                    return (
+                                        <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <p className="font-semibold text-foreground">{container.name || container.id.slice(0, 12)}</p>
+                                                <Link
+                                                    to={fileHref}
+                                                    className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-muted-foreground hover:text-primary transition-colors"
+                                                    title="Open folder in File Manager"
+                                                >
+                                                    <Folder className="h-3 w-3 text-muted-foreground" />
+                                                    <span>{container.relativePath || `htdocs/${container.name}`}</span>
+                                                </Link>
                                             </td>
-                                        )}
-                                        <td className="max-w-64 truncate px-4 py-3 text-foreground font-mono" title={container.image}>
-                                            {container.image || "—"}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`h-2 w-2 rounded-full ${container.state.toLowerCase() === "running" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                                                <span className="text-foreground capitalize">{container.status || container.state || "Unknown"}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground font-mono">
-                                            {container.ports?.length ? container.ports.join(", ") : "—"}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                                {container.state.toLowerCase() === "running" ? (
-                                                    <Button size="icon" variant="outline" className="h-7 w-7" title="Stop" aria-label={`Stop ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "stop")}>
-                                                        {actionLoading.endsWith(":stop") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
+
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-col items-start gap-1">
+                                                    {isDirect ? (
+                                                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 font-medium text-xs text-emerald-600 dark:text-emerald-400">
+                                                            <FileCode2 className="h-3 w-3" />
+                                                            Direct
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 font-medium text-xs text-blue-600 dark:text-blue-400">
+                                                            <Box className="h-3 w-3" />
+                                                            Docker
+                                                        </span>
+                                                    )}
+                                                    <span className="max-w-44 truncate font-mono text-xs text-muted-foreground" title={container.image || container.runtime}>
+                                                        {isDirect
+                                                            ? (container.runtime ? container.runtime.toUpperCase() : "STATIC")
+                                                            : (container.image || "podman")}
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
+                                                <td className="px-4 py-3 font-medium text-foreground">
+                                                    <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+                                                        <User className="h-3 w-3 text-muted-foreground" />
+                                                        {container.owner}
+                                                    </span>
+                                                </td>
+                                            )}
+
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={`h-2 w-2 rounded-full ${
+                                                            container.state?.toLowerCase() === "running"
+                                                                ? "bg-emerald-500"
+                                                                : container.state?.toLowerCase() === "ready"
+                                                                ? "bg-blue-500"
+                                                                : "bg-muted-foreground/40"
+                                                        }`}
+                                                    />
+                                                    <span className="text-foreground capitalize">{container.status || container.state || "Unknown"}</span>
+                                                </div>
+                                            </td>
+
+                                            <td className="px-4 py-3 text-muted-foreground font-mono">
+                                                {container.ports?.length ? container.ports.join(", ") : "—"}
+                                            </td>
+
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <Link to={fileHref} title={`Open files in ${container.relativePath || `htdocs/${container.name}`}`}>
+                                                        <Button size="icon" variant="outline" className="h-7 w-7" aria-label={`Open files for ${container.name}`}>
+                                                            <FolderOpen className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </Link>
+
+                                                    {!isDirect && (
+                                                        <>
+                                                            {container.state?.toLowerCase() === "running" ? (
+                                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Stop" aria-label={`Stop ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "stop")}>
+                                                                    {actionLoading.endsWith(":stop") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
+                                                                </Button>
+                                                            ) : (
+                                                                <Button size="icon" variant="outline" className="h-7 w-7 text-emerald-600" title="Start" aria-label={`Start ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "start")}>
+                                                                    {actionLoading.endsWith(":start") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+                                                                </Button>
+                                                            )}
+                                                            <Button size="icon" variant="outline" className="h-7 w-7" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state?.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
+                                                                {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                                                            </Button>
+                                                            <Button size="icon" variant="outline" className="h-7 w-7" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
+                                                                <FileText className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button size="icon" variant="outline" className="h-7 w-7" title="Edit Containerfile" aria-label={`Edit Containerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
+                                                                <FileCode2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </>
+                                                    )}
+
+                                                    {isDirect && (
+                                                        <Button size="icon" variant="outline" className="h-7 w-7" title="App Info" aria-label={`View details for ${container.name}`} onClick={() => openLogs(container)}>
+                                                            <FileText className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
+
+                                                    <Button size="icon" variant="outline" className="h-7 w-7 text-destructive hover:bg-destructive/10" title="Delete App" aria-label={`Delete ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => setDeleteModal(container)}>
+                                                        {actionLoading.endsWith(":rm") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                                                     </Button>
-                                                ) : (
-                                                    <Button size="icon" variant="outline" className="h-7 w-7 text-emerald-600" title="Start" aria-label={`Start ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => runAction(container, "start")}>
-                                                        {actionLoading.endsWith(":start") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                                                    </Button>
-                                                )}
-                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
-                                                    {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
-                                                    <FileText className="h-3 w-3" />
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-7 w-7" title="Edit Containerfile" aria-label={`Edit Containerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
-                                                    <FileCode2 className="h-3 w-3" />
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-7 w-7 text-destructive hover:bg-destructive/10" title="Remove" aria-label={`Remove ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => setDeleteModal(container)}>
-                                                    {actionLoading.endsWith(":rm") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -1954,7 +2044,7 @@ export function ContainersContent({
                             {/* Tab 3: Custom */}
                             {createTab === "custom" && (
                                 <div className="flex-1 overflow-y-auto p-6">
-                                    <div className="mx-auto max-w-2xl space-y-4">
+                                    <div className="mx-auto max-w-2xl space-y-5">
                                         {libraryOnly && !runtime.isRoot ? (
                                             <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-3">
                                                 <Lock className="h-5 w-5 shrink-0 mt-0.5" />
@@ -1977,27 +2067,115 @@ export function ContainersContent({
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-foreground">
-                                                        App Image / Registry URI <span className="text-destructive">*</span>
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={createImage}
-                                                        onChange={(e) => setCreateImage(e.target.value)}
-                                                        placeholder="e.g. docker.io/library/nginx:alpine or ghcr.io/owner/repo:latest"
-                                                        required
-                                                        className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Supports standard image references from any reachable container registry.
-                                                    </p>
+                                                {/* Mode Selector */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-medium text-foreground">App Execution Mode</label>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCustomAppMode("docker")}
+                                                            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+                                                                customAppMode === "docker"
+                                                                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                                                    : "border-border hover:bg-muted/50"
+                                                            }`}
+                                                        >
+                                                            <Box className={`h-5 w-5 mt-0.5 shrink-0 ${customAppMode === "docker" ? "text-primary" : "text-muted-foreground"}`} />
+                                                            <div>
+                                                                <p className={`text-xs font-semibold ${customAppMode === "docker" ? "text-primary" : "text-foreground"}`}>
+                                                                    Docker Container
+                                                                </p>
+                                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                    Run containerized applications from Docker Hub or any image registry.
+                                                                </p>
+                                                            </div>
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCustomAppMode("direct")}
+                                                            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+                                                                customAppMode === "direct"
+                                                                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                                                    : "border-border hover:bg-muted/50"
+                                                            }`}
+                                                        >
+                                                            <FileCode2 className={`h-5 w-5 mt-0.5 shrink-0 ${customAppMode === "direct" ? "text-primary" : "text-muted-foreground"}`} />
+                                                            <div>
+                                                                <p className={`text-xs font-semibold ${customAppMode === "direct" ? "text-primary" : "text-foreground"}`}>
+                                                                    Direct Code Run
+                                                                </p>
+                                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                    Run PHP, Node.js, Python, or Static HTML directly on the host VPS.
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    </div>
                                                 </div>
 
-                                                {renderCommonConfig()}
-                                                {renderPortsSection()}
-                                                {renderVolumesSection()}
-                                                {renderEnvSection()}
+                                                {customAppMode === "direct" ? (
+                                                    <div className="space-y-4">
+                                                        <div className="space-y-2">
+                                                            <label className="text-xs font-medium text-foreground">Runtime Template</label>
+                                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                                {[
+                                                                    { id: "php", label: "PHP", desc: "index.php" },
+                                                                    { id: "node", label: "Node.js", desc: "server.js" },
+                                                                    { id: "python", label: "Python", desc: "app.py" },
+                                                                    { id: "static", label: "Static HTML", desc: "index.html" },
+                                                                ].map((rt) => (
+                                                                    <button
+                                                                        key={rt.id}
+                                                                        type="button"
+                                                                        onClick={() => setDirectRuntime(rt.id as any)}
+                                                                        className={`flex flex-col items-center justify-center rounded-md border p-3 text-center transition-all ${
+                                                                            directRuntime === rt.id
+                                                                                ? "border-primary bg-primary/10 font-semibold text-primary"
+                                                                                : "border-border hover:bg-muted text-muted-foreground"
+                                                                        }`}
+                                                                    >
+                                                                        <span className="text-xs">{rt.label}</span>
+                                                                        <span className="mt-1 font-mono text-xs text-muted-foreground">{rt.desc}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        {renderCommonConfig()}
+
+                                                        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                                                            <p className="font-medium text-foreground">Direct Mode</p>
+                                                            <p className="mt-1">
+                                                                Starter code will be generated inside <code>htdocs/{createName.trim() || "app-name"}</code>.
+                                                                You can browse, upload, and edit application files anytime in the File Manager.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="space-y-1">
+                                                            <label className="text-xs font-medium text-foreground">
+                                                                App Image / Registry URI <span className="text-destructive">*</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={createImage}
+                                                                onChange={(e) => setCreateImage(e.target.value)}
+                                                                placeholder="e.g. docker.io/library/nginx:alpine or ghcr.io/owner/repo:latest"
+                                                                required
+                                                                className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                                            />
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Supports standard image references from Docker Hub or any accessible container registry.
+                                                            </p>
+                                                        </div>
+
+                                                        {renderCommonConfig()}
+                                                        {renderPortsSection()}
+                                                        {renderVolumesSection()}
+                                                        {renderEnvSection()}
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -2571,11 +2749,14 @@ export function ContainersContent({
             {deleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
                     <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 shadow-2xl">
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <h3 className="text-sm font-semibold text-foreground">Remove App</h3>
                             <p className="text-xs text-muted-foreground">
-                                Are you sure you want to remove app <span className="font-semibold text-foreground">{deleteModal.name || deleteModal.id}</span>? This action cannot be undone.
+                                Are you sure you want to remove app <span className="font-semibold text-foreground">{deleteModal.name || deleteModal.id}</span>?
                             </p>
+                            <div className="rounded border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive">
+                                Warning: This will delete the app folder <code className="font-mono font-semibold">{deleteModal.relativePath || `htdocs/${deleteModal.name}`}</code> and remove any associated container. This action cannot be undone.
+                            </div>
                         </div>
                         <div className="flex items-center justify-end gap-2">
                             <Button variant="outline" size="sm" onClick={() => setDeleteModal(null)}>

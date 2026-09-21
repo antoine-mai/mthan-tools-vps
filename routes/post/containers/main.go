@@ -24,7 +24,7 @@ func Handler(sessions *services.SessionService, containers *services.ContainerSe
 		} else {
 			list = containers.ListAll()
 		}
-		if err := json.NewEncoder(w).Encode(map[string]any{"containers": list}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"containers": list, "apps": list}); err != nil {
 			http.Error(w, "could not read containers", http.StatusInternalServerError)
 		}
 	})
