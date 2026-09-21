@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+    AppWindow,
     Box,
     ChevronDown,
     ChevronRight,
-    Container as ContainerIcon,
     FileCode2,
     FileText,
     Layers,
@@ -464,8 +464,8 @@ export default function ContainersRoute({
 function ContainersUserStandalone() {
     return (
         <DashboardLayout
-            title="Containers"
-            description="View and manage your rootless Podman containers."
+            title="Apps"
+            description="View and manage your rootless applications."
             wide
         >
             <div className="space-y-6">
@@ -496,12 +496,12 @@ function ContainersStandalone() {
             const res = await fetch("/post/containers", { cache: "no-store" });
             if (!res.ok) {
                 const text = await res.text();
-                throw new Error(text || "Failed to load containers");
+                throw new Error(text || "Failed to load apps");
             }
             const data = await res.json();
             setAllContainers(data.containers || []);
         } catch (err) {
-            setContainerError(err instanceof Error ? err.message : "Failed to load containers");
+            setContainerError(err instanceof Error ? err.message : "Failed to load apps");
         } finally {
             setLoadingContainers(false);
         }
@@ -516,7 +516,7 @@ function ContainersStandalone() {
         fetch("/post/user/list", { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
-                // Filter out root (uid 0) - containers always run under non-root users!
+                // Filter out root (uid 0) - apps always run under non-root users!
                 const list: LinuxUser[] = (data?.users ?? []).filter(
                     (u: LinuxUser) => u.uid !== 0
                 );
@@ -535,13 +535,13 @@ function ContainersStandalone() {
     }, [allContainers]);
 
     return (
-        <DashboardLayout title="Containers" fullWidth>
+        <DashboardLayout title="Apps" fullWidth>
             <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[220px_1fr]">
                 {/* Subsidebar */}
                 <aside className="flex h-full flex-col overflow-y-auto border-r border-border bg-card/60">
-                    {/* All Containers Link */}
+                    {/* All Apps Link */}
                     <Link
-                        to="/containers"
+                        to="/apps"
                         className={`flex items-center justify-between border-b border-border px-3 py-3 text-xs font-semibold transition-colors ${
                             activeOwner === "all"
                                 ? "bg-primary/10 text-primary"
@@ -549,8 +549,8 @@ function ContainersStandalone() {
                         }`}
                     >
                         <span className="flex items-center gap-2">
-                            <ContainerIcon className="h-4 w-4 shrink-0" />
-                            All Containers
+                            <AppWindow className="h-4 w-4 shrink-0" />
+                            All Apps
                         </span>
                         <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -597,7 +597,7 @@ function ContainersStandalone() {
                                         return (
                                             <Link
                                                 key={u.username}
-                                                to={`/containers/${encodeURIComponent(u.username)}`}
+                                                to={`/apps/${encodeURIComponent(u.username)}`}
                                                 className={`flex items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
                                                     isSelected
                                                         ? "font-semibold text-primary bg-primary/10"
@@ -1260,27 +1260,27 @@ export function ContainersContent({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
                 <label className="text-xs font-medium text-foreground">
-                    Container Name <span className="text-destructive">*</span>
+                    App Name <span className="text-destructive">*</span>
                 </label>
                 <input
                     type="text"
                     value={createName}
                     onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="my-container"
+                    placeholder="my-app"
                     required
                     className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                 />
             </div>
 
-            {/* Container Owner (Non-root users only) */}
+            {/* App Owner (Non-root users only) */}
             {runtime.isRoot && (
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-foreground">
-                        Container Owner (Non-root User) <span className="text-destructive">*</span>
+                        App Owner (Non-root User) <span className="text-destructive">*</span>
                     </label>
                     {users.length === 0 ? (
                         <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-                            No non-root users found. Containers must run under a user account. Please create a user first.
+                            No non-root users found. Apps must run under a user account. Please create a user first.
                         </div>
                     ) : (
                         <select
@@ -1297,7 +1297,7 @@ export function ContainersContent({
                         </select>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        Container runs rootless under this user with isolated storage and permissions.
+                        App runs rootless under this user with isolated storage and permissions.
                     </p>
                 </div>
             )}
@@ -1520,8 +1520,8 @@ export function ContainersContent({
                         <div className="flex items-center gap-2">
                             <h2 className="text-base font-semibold text-foreground">
                                 {activeOwner === "all"
-                                    ? "All Containers"
-                                    : `Containers: ${activeOwner}`}
+                                    ? "All Apps"
+                                    : `Apps: ${activeOwner}`}
                             </h2>
                             {userLimits && userLimits.maxContainers > 0 && activeOwner && activeOwner !== "all" ? (
                                 <span
@@ -1531,12 +1531,12 @@ export function ContainersContent({
                                             : "bg-muted text-muted-foreground"
                                     }`}
                                 >
-                                    Quota: {scopedContainers.length} / {userLimits.maxContainers} containers
+                                    Quota: {scopedContainers.length} / {userLimits.maxContainers} apps
                                 </span>
                             ) : null}
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            {displayedContainers.length} of {scopedContainers.length} container{scopedContainers.length !== 1 ? "s" : ""}
+                            {displayedContainers.length} of {scopedContainers.length} app{scopedContainers.length !== 1 ? "s" : ""}
                             {activeOwner === "all" ? " across all users" : ` owned by ${activeOwner}`}
                         </p>
                     </div>
@@ -1547,14 +1547,14 @@ export function ContainersContent({
                             size="sm"
                             className="gap-2 h-8 text-xs"
                             onClick={() => setSettingsModalOpen(true)}
-                            title="Container Library & Policy Settings"
+                            title="App Settings & Supported Templates"
                         >
                             <Sliders className="h-3.5 w-3.5" />
                             Settings
                         </Button>
                         <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
                             <Plus className="h-3.5 w-3.5" />
-                            Create Container
+                            Create App
                         </Button>
                         <Button variant="outline" size="sm" className="gap-2 h-8 text-xs" onClick={handleRefresh} disabled={isLoading}>
                             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -1574,7 +1574,7 @@ export function ContainersContent({
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search containers..."
+                                placeholder="Search apps..."
                                 className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                             />
                         </div>
@@ -1603,7 +1603,7 @@ export function ContainersContent({
 
                         <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
                             <Plus className="h-3.5 w-3.5" />
-                            Create Container
+                            Create App
                         </Button>
                     </div>
                 </div>
@@ -1620,22 +1620,22 @@ export function ContainersContent({
             {isLoading && scopedContainers.length === 0 ? (
                 <div className="flex items-center justify-center py-16 text-muted-foreground">
                     <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
-                    <span className="text-xs">Loading containers...</span>
+                    <span className="text-xs">Loading apps...</span>
                 </div>
             ) : displayedContainers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 text-center">
-                    <ContainerIcon className="h-10 w-10 text-muted-foreground/60" />
-                    <p className="mt-3 text-sm font-medium text-foreground">No containers found</p>
+                    <AppWindow className="h-10 w-10 text-muted-foreground/60" />
+                    <p className="mt-3 text-sm font-medium text-foreground">No apps found</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {searchTerm
-                            ? "No containers match your search filter."
+                            ? "No apps match your search filter."
                             : activeOwner && activeOwner !== "all"
-                                ? `No Podman containers found for user "${activeOwner}".`
-                                : "Rootless Podman containers created under user accounts will appear here."}
+                                ? `No applications found for user "${activeOwner}".`
+                                : "Rootless applications created under user accounts will appear here."}
                     </p>
                     <Button size="sm" className="mt-4 gap-2 text-xs" onClick={openCreateModal}>
                         <Plus className="h-3.5 w-3.5" />
-                        Create Container
+                        Create App
                     </Button>
                 </div>
             ) : (
@@ -1644,7 +1644,7 @@ export function ContainersContent({
                         <table className="w-full text-left text-xs">
                             <thead className="border-b border-border bg-muted/50 text-muted-foreground font-medium">
                                 <tr>
-                                    <th className="px-4 py-3">Container</th>
+                                    <th className="px-4 py-3">App</th>
                                     {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
                                         <th className="px-4 py-3 w-28">Owner</th>
                                     )}
@@ -1714,17 +1714,17 @@ export function ContainersContent({
                 </div>
             )}
 
-            {/* Create Container Modal */}
+            {/* Create App Modal */}
             {createModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
                     <div className="flex h-[min(840px,92vh)] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card shadow-2xl">
                         {/* Header */}
                         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
                             <div className="flex items-center gap-2">
-                                <ContainerIcon className="h-4 w-4 text-primary" />
-                                <h3 className="text-sm font-semibold text-foreground">Create Container</h3>
+                                <AppWindow className="h-4 w-4 text-primary" />
+                                <h3 className="text-sm font-semibold text-foreground">Create App</h3>
                             </div>
-                            <button type="button" onClick={() => setCreateModalOpen(false)} aria-label="Close create container modal">
+                            <button type="button" onClick={() => setCreateModalOpen(false)} aria-label="Close create app modal">
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
@@ -1790,7 +1790,7 @@ export function ContainersContent({
                                     </div>
                                     <h3 className="mt-4 text-sm font-semibold text-foreground">Coming Soon</h3>
                                     <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                                        System container templates will be available here soon.
+                                        System app templates will be available here soon.
                                     </p>
                                     <div className="mt-5 flex items-center gap-2">
                                         <Button
@@ -1800,7 +1800,7 @@ export function ContainersContent({
                                             className="text-xs"
                                         >
                                             <Layers className="mr-1.5 h-3.5 w-3.5" />
-                                            Go to Support Templates
+                                            Go to Support Apps
                                         </Button>
                                         {(!libraryOnly || runtime.isRoot) && (
                                             <Button
@@ -1831,7 +1831,7 @@ export function ContainersContent({
                                                     type="text"
                                                     value={libSearch}
                                                     onChange={(e) => setLibSearch(e.target.value)}
-                                                    placeholder="Search support templates..."
+                                                    placeholder="Search support apps..."
                                                     className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
                                                 />
                                             </div>
@@ -1884,7 +1884,7 @@ export function ContainersContent({
                                             })}
                                             {filteredLibImages.length === 0 && (
                                                 <div className="p-6 text-center text-xs text-muted-foreground">
-                                                    No support templates match your filter.
+                                                    No support apps match your filter.
                                                 </div>
                                             )}
                                         </div>
@@ -1896,7 +1896,7 @@ export function ContainersContent({
                                         <div className="space-y-2 rounded border border-border bg-muted/20 p-3.5">
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <span className="text-xs font-semibold text-foreground">{selectedLibImage?.name || "Select a Template"}</span>
+                                                    <span className="text-xs font-semibold text-foreground">{selectedLibImage?.name || "Select an App"}</span>
                                                     <span className="ml-2 font-mono text-xs text-muted-foreground">{createImage}</span>
                                                 </div>
                                                 <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
@@ -1959,10 +1959,10 @@ export function ContainersContent({
                                             <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-3">
                                                 <Lock className="h-5 w-5 shrink-0 mt-0.5" />
                                                 <div className="space-y-1">
-                                                    <p className="font-semibold">Custom container creation is restricted</p>
+                                                    <p className="font-semibold">Custom app creation is restricted</p>
                                                     <p className="text-muted-foreground">
-                                                        The administrator has restricted container deployments to supported templates only.
-                                                        Please switch to the <strong>Support</strong> tab to select an approved container.
+                                                        The administrator has restricted app deployments to supported templates only.
+                                                        Please switch to the <strong>Support</strong> tab to select an approved app.
                                                     </p>
                                                     <Button
                                                         type="button"
@@ -1979,7 +1979,7 @@ export function ContainersContent({
                                             <>
                                                 <div className="space-y-1">
                                                     <label className="text-xs font-medium text-foreground">
-                                                        Container Image / Registry URI <span className="text-destructive">*</span>
+                                                        App Image / Registry URI <span className="text-destructive">*</span>
                                                     </label>
                                                     <input
                                                         type="text"
@@ -2030,7 +2030,7 @@ export function ContainersContent({
                                         ) : (
                                             <Plus className="mr-2 h-4 w-4" />
                                         )}
-                                        {createTab === "system" ? "Coming Soon" : "Deploy Container"}
+                                        {createTab === "system" ? "Coming Soon" : "Deploy App"}
                                     </Button>
                                 </div>
                             </div>
@@ -2039,7 +2039,7 @@ export function ContainersContent({
                 </div>
             )}
 
-            {/* Container Settings Modal (Root Only) */}
+            {/* App Settings Modal (Root Only) */}
             {settingsModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
                     <div className="flex h-[min(840px,92vh)] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card shadow-2xl">
@@ -2048,9 +2048,9 @@ export function ContainersContent({
                             <div className="flex items-center gap-2">
                                 <Sliders className="h-5 w-5 text-primary" />
                                 <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Container Settings & Supported Templates</h3>
+                                    <h3 className="text-sm font-semibold text-foreground">App Settings & Supported Templates</h3>
                                     <p className="text-xs text-muted-foreground">
-                                        Configure approved container templates and user deployment policies.
+                                        Configure approved app templates and user deployment policies.
                                     </p>
                                 </div>
                             </div>
@@ -2090,7 +2090,7 @@ export function ContainersContent({
                                             Restrict non-root users to supported templates only
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-0.5">
-                                            When enabled, non-root users can only deploy containers from the Support catalog and cannot enter arbitrary custom images.
+                                            When enabled, non-root users can only deploy apps from the Support catalog and cannot enter arbitrary custom images.
                                         </p>
                                     </div>
                                     <button
@@ -2116,12 +2116,12 @@ export function ContainersContent({
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                                                Supported Container Templates ({templates.length} total, {allowedTemplates.length} enabled)
+                                                Supported App Templates ({templates.length} total, {allowedTemplates.length} enabled)
                                             </h4>
                                             {settingsSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-0.5">
-                                            Templates enabled here will appear in the Support tab for users when creating containers.
+                                            Templates enabled here will appear in the Support tab for users when creating apps.
                                         </p>
                                     </div>
 
@@ -2307,7 +2307,7 @@ export function ContainersContent({
                     <div className="relative w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl space-y-4">
                         <div className="flex items-center justify-between border-b border-border pb-3">
                             <h3 className="text-sm font-semibold text-foreground">
-                                {isCreatingTemplate ? "Add Container Template" : `Edit Template: ${templateEditModal.name}`}
+                                {isCreatingTemplate ? "Add App Template" : `Edit Template: ${templateEditModal.name}`}
                             </h3>
                             <button
                                 onClick={() => setTemplateEditModal(null)}
@@ -2356,7 +2356,7 @@ export function ContainersContent({
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-foreground mb-1">
-                                        Container Image <span className="text-destructive">*</span>
+                                        App Image <span className="text-destructive">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -2541,11 +2541,11 @@ export function ContainersContent({
                             <div className="rounded-full bg-amber-500/10 p-2">
                                 <RotateCw className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-semibold text-foreground">Reset Supported Templates to Defaults</h3>
+                            <h3 className="text-sm font-semibold text-foreground">Reset Supported App Templates to Defaults</h3>
                         </div>
 
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Are you sure you want to restore the system default container templates catalog? Custom additions and custom edits will be replaced with standard defaults.
+                            Are you sure you want to restore the system default app templates catalog? Custom additions and custom edits will be replaced with standard defaults.
                         </p>
 
                         <div className="flex items-center justify-end gap-2 pt-2">
@@ -2567,14 +2567,14 @@ export function ContainersContent({
                 </div>
             )}
 
-            {/* Delete container modal */}
+            {/* Delete app modal */}
             {deleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
                     <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 shadow-2xl">
                         <div className="space-y-1">
-                            <h3 className="text-sm font-semibold text-foreground">Remove Container</h3>
+                            <h3 className="text-sm font-semibold text-foreground">Remove App</h3>
                             <p className="text-xs text-muted-foreground">
-                                Are you sure you want to remove container <span className="font-semibold text-foreground">{deleteModal.name || deleteModal.id}</span>? This action cannot be undone.
+                                Are you sure you want to remove app <span className="font-semibold text-foreground">{deleteModal.name || deleteModal.id}</span>? This action cannot be undone.
                             </p>
                         </div>
                         <div className="flex items-center justify-end gap-2">

@@ -104,9 +104,9 @@ export default function AgentRoute() {
             } else if (promptText.includes("user") || promptText.includes("password")) {
                 replyText = "You can manage standard Linux system users (adding accounts, configuring environments) inside the Users section. Superusers can also manage passwords via terminal.";
             } else if (promptText.includes("app") || promptText.includes("podman") || promptText.includes("container")) {
-                replyText = "Active system services like Caddy and Podman can be checked, stopped, or restarted inside the Apps tab, and containers in the Containers tab.";
+                replyText = "Active system services like Caddy and Podman can be checked, stopped, or restarted inside Settings > Apps, and container applications in the Apps tab.";
             } else if (promptText.includes("help") || promptText.includes("what can you do")) {
-                replyText = "I can guide you on how to manage Virtual Hosts, monitor system Apps (Caddy, Podman), manage Containers, and add or manage Linux users.";
+                replyText = "I can guide you on how to manage Virtual Hosts, monitor system services, manage Apps, and add or manage Linux users.";
             }
 
             const agentMsg: ChatMessage = {

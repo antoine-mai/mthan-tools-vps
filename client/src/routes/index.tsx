@@ -37,6 +37,7 @@ export default function AppRoutes() {
             <Route path="/login" element={<LoginRoute />} />
             <Route path="/files" element={<ProtectedRoute><FilesRoute /></ProtectedRoute>} />
             <Route path="/vhosts" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
+            <Route path="/apps" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
             <Route path="/containers" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
             <Route path="/tasking" element={<ProtectedRoute><TaskingRoute /></ProtectedRoute>} />
             <Route path="/backup" element={<ProtectedRoute><BackupRoute /></ProtectedRoute>} />
@@ -44,6 +45,7 @@ export default function AppRoutes() {
             {runtime.isRoot ? (
                 <>
                     <Route path="/vhosts/:owner" element={<ProtectedRoute><VHostsRoute /></ProtectedRoute>} />
+                    <Route path="/apps/:owner" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
                     <Route path="/containers/:owner" element={<ProtectedRoute><ContainersRoute /></ProtectedRoute>} />
                     <Route path="/tasking/:owner" element={<ProtectedRoute><TaskingRoute /></ProtectedRoute>} />
                     <Route path="/apis" element={<ProtectedRoute><APIsRoute /></ProtectedRoute>} />

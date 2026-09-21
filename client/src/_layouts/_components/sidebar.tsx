@@ -10,7 +10,7 @@ import {
     Globe,
     Settings,
     Braces,
-    Container,
+    AppWindow,
     Archive,
     CalendarClock,
 } from "lucide-react";
@@ -32,7 +32,7 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         ...(runtime.isRoot ? [{ icon: Users, label: "Users", href: "/users" }] : []),
         { icon: Globe, label: "VHosts", href: "/vhosts" },
-        { icon: Container, label: "Containers", href: "/containers" },
+        { icon: AppWindow, label: "Apps", href: "/apps" },
         { icon: CalendarClock, label: "Tasking", href: "/tasking" },
         { icon: Folder, label: "Files", href: "/files" },
         { icon: Archive, label: "Backup", href: "/backup" },
@@ -66,7 +66,8 @@ export default function Sidebar({ className = "", isTerminalOpen, onTerminalTogg
                     const Icon = item.icon;
                     const isActive =
                         location.pathname === item.href ||
-                        (item.href !== "/" && location.pathname.startsWith(`${item.href}/`));
+                        (item.href !== "/" && location.pathname.startsWith(`${item.href}/`)) ||
+                        (item.href === "/apps" && (location.pathname === "/containers" || location.pathname.startsWith("/containers/")));
                     return (
                         <Link
                             key={item.label}

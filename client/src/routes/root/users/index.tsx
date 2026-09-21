@@ -20,7 +20,7 @@ import {
     CheckCircle2,
     XCircle,
     Globe,
-    Container as ContainerIcon,
+    AppWindow,
     Archive,
     CalendarClock,
     Sliders,
@@ -534,7 +534,7 @@ export default function UsersRoute() {
                                         <nav className="ml-5 border-l border-border py-1 pl-2">
                                             <UserSubItem username={u.username} section="overview" active={activeSection === "overview"} icon={LayoutDashboard} label="Overview" />
                                             <UserSubItem username={u.username} section="files" active={activeSection === "files"} icon={Folder} label="Files" />
-                                            <UserSubItem username={u.username} section="containers" active={activeSection === "containers"} icon={ContainerIcon} label="Containers" />
+                                            <UserSubItem username={u.username} section="containers" active={activeSection === "containers"} icon={AppWindow} label="Apps" />
                                             <UserSubItem username={u.username} section="vhosts" active={activeSection === "vhosts"} icon={Globe} label="VHosts" />
                                             <UserSubItem username={u.username} section="tasking" active={activeSection === "tasking"} icon={CalendarClock} label="Tasking" />
                                             <UserSubItem username={u.username} section="terminal" active={activeSection === "terminal"} icon={Terminal} label="Terminal" />
@@ -580,15 +580,15 @@ export default function UsersRoute() {
                                         variant="outline"
                                         className="h-7 gap-1.5 px-2 text-xs"
                                         onClick={() => {
-                                            setLimitsError("");
-                                            setEditMaxTasks(userLimits?.maxTasks ?? 10);
-                                            setEditMaxContainers(userLimits?.maxContainers ?? 5);
-                                            setLimitsModalOpen(true);
+                                             setLimitsError("");
+                                             setEditMaxTasks(userLimits?.maxTasks ?? 10);
+                                             setEditMaxContainers(userLimits?.maxContainers ?? 5);
+                                             setLimitsModalOpen(true);
                                         }}
-                                        title="Configure task and container limits for this user"
+                                        title="Configure task and app limits for this user"
                                     >
                                         <Sliders className="h-3.5 w-3.5 text-primary" />
-                                        <span>Limits: {userLimits?.maxTasks ?? 10} Tasks / {userLimits?.maxContainers ?? 5} Containers</span>
+                                        <span>Limits: {userLimits?.maxTasks ?? 10} Tasks / {userLimits?.maxContainers ?? 5} Apps</span>
                                     </Button>
                                     {!selectedUser.cpanelEnabled ? (
                                         <Button size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => { setActivationError(""); setActivationOpen(true); }}>
@@ -649,15 +649,15 @@ export default function UsersRoute() {
                                                 <div className="space-y-6">
                                                     {/* 4 Metric Summary Cards */}
                                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                                        {/* Card 1: Containers */}
+                                                        {/* Card 1: Apps */}
                                                         <div className="border border-border bg-card p-5 relative overflow-hidden flex flex-col justify-between">
                                                             <div>
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                                                        Containers
+                                                                        Apps
                                                                     </span>
                                                                     <div className="p-2 rounded-md bg-primary/10 text-primary">
-                                                                        <ContainerIcon className="h-4 w-4" />
+                                                                        <AppWindow className="h-4 w-4" />
                                                                     </div>
                                                                 </div>
                                                                 <div className="mt-3 flex items-baseline gap-2">
@@ -760,7 +760,7 @@ export default function UsersRoute() {
                                                                     <span className="text-xs text-muted-foreground">max tasks</span>
                                                                 </div>
                                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                                    Max containers: {userLimits?.maxContainers ?? 5}
+                                                                    Max apps: {userLimits?.maxContainers ?? 5}
                                                                 </p>
                                                             </div>
                                                             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
@@ -842,12 +842,12 @@ export default function UsersRoute() {
 
                                                     {/* Containers & VHosts Preview Rows */}
                                                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                                                        {/* Containers List */}
+                                                        {/* Apps List */}
                                                         <div className="border border-border bg-card flex flex-col">
                                                             <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
-                                                                    <ContainerIcon className="h-4 w-4 text-primary" />
-                                                                    <h3 className="text-sm font-semibold text-foreground">Containers</h3>
+                                                                    <AppWindow className="h-4 w-4 text-primary" />
+                                                                    <h3 className="text-sm font-semibold text-foreground">Apps</h3>
                                                                 </div>
                                                                 <Link
                                                                     to={`/users/${encodeURIComponent(selectedUser.username)}/containers`}
@@ -859,7 +859,7 @@ export default function UsersRoute() {
                                                             <div className="p-4 flex-1">
                                                                 {overviewData.containers.items.length === 0 ? (
                                                                     <div className="text-center py-6 text-xs text-muted-foreground">
-                                                                        No containers found for this user.
+                                                                        No apps found for this user.
                                                                     </div>
                                                                 ) : (
                                                                     <div className="divide-y divide-border">
@@ -986,7 +986,7 @@ export default function UsersRoute() {
                         <Folder className="h-3.5 w-3.5 text-muted-foreground" />Files
                     </button>
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("containers")} role="menuitem">
-                        <ContainerIcon className="h-3.5 w-3.5 text-muted-foreground" />Containers
+                        <AppWindow className="h-3.5 w-3.5 text-muted-foreground" />Apps
                     </button>
                     <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted" onClick={() => navigateFromContextMenu("vhosts")} role="menuitem">
                         <Globe className="h-3.5 w-3.5 text-muted-foreground" />VHosts
@@ -1266,7 +1266,7 @@ export default function UsersRoute() {
                         </div>
 
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Configure resource quotas for this user. These limits restrict how many scheduled tasks and containers the user can create.
+                            Configure resource quotas for this user. These limits restrict how many scheduled tasks and apps the user can create.
                         </p>
 
                         {limitsError && (
@@ -1296,7 +1296,7 @@ export default function UsersRoute() {
 
                             <div>
                                 <label className="block text-xs font-medium text-foreground mb-1">
-                                    Max Containers
+                                    Max Apps
                                 </label>
                                 <input
                                     type="number"
@@ -1308,7 +1308,7 @@ export default function UsersRoute() {
                                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                 />
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Maximum number of Podman containers allowed (default: 5).
+                                    Maximum number of applications allowed (default: 5).
                                 </p>
                             </div>
 
