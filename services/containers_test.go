@@ -93,9 +93,15 @@ func TestBuildCreateContainerArgs(t *testing.T) {
 		t.Fatal("expected error for empty image")
 	}
 
-	// Test invalid container name
+	// Test invalid container name (spaces, uppercase, special chars)
 	if _, err := buildCreateContainerArgs(CreateContainerInput{Image: "alpine", Name: "invalid name with space"}); err == nil {
-		t.Fatal("expected error for invalid container name")
+		t.Fatal("expected error for invalid container name with spaces")
+	}
+	if _, err := buildCreateContainerArgs(CreateContainerInput{Image: "alpine", Name: "My-App"}); err == nil {
+		t.Fatal("expected error for uppercase container name")
+	}
+	if _, err := buildCreateContainerArgs(CreateContainerInput{Image: "alpine", Name: "app.name"}); err == nil {
+		t.Fatal("expected error for dot in container name")
 	}
 }
 

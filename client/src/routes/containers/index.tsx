@@ -7,7 +7,6 @@ import {
     ChevronRight,
     FileCode2,
     FileText,
-    Folder,
     FolderOpen,
     Layers,
     Loader2,
@@ -77,6 +76,21 @@ export type UserLimits = {
     currentTasks?: number;
     currentContainers?: number;
 };
+
+function formatRuntimeLanguage(runtime?: string): string {
+    switch (runtime?.toLowerCase()) {
+        case "php":
+            return "PHP";
+        case "node":
+            return "Node.js";
+        case "python":
+            return "Python";
+        case "static":
+            return "Static HTML";
+        default:
+            return runtime ? runtime.toUpperCase() : "Static HTML";
+    }
+}
 
 const LIB_CATEGORIES = [
     { id: "all", label: "All" },
@@ -924,7 +938,10 @@ export function ContainersContent({
         setCreatePorts(item.defaultPorts ? item.defaultPorts.map((p) => ({ ...p })) : []);
         setCreateVolumes(item.defaultVolumes ? item.defaultVolumes.map((v) => ({ ...v })) : []);
         setCreateEnv(item.defaultEnv ? item.defaultEnv.map((e) => ({ ...e })) : []);
-        setCreateName(`${item.id}-1`);
+        if (!createName.trim()) {
+            const cleanId = item.id.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+            setCreateName(`${cleanId}-1`);
+        }
     };
 
     const selectTag = (tag: string) => {
@@ -937,17 +954,16 @@ export function ContainersContent({
         setCreateTab("system");
         setCustomAppMode("docker");
         setDirectRuntime("php");
+        setCreateName("");
         const initial = allowedTemplates[0] || templates[0];
         if (initial) {
             setSelectedLibImage(initial);
-            setCreateName(`${initial.id}-1`);
             setCreateImage(initial.image);
             setCreatePorts(initial.defaultPorts ? initial.defaultPorts.map((p) => ({ ...p })) : []);
             setCreateVolumes(initial.defaultVolumes ? initial.defaultVolumes.map((v) => ({ ...v })) : []);
             setCreateEnv(initial.defaultEnv ? initial.defaultEnv.map((e) => ({ ...e })) : []);
         } else {
             setSelectedLibImage(null);
-            setCreateName("");
             setCreateImage("");
             setCreatePorts([]);
             setCreateVolumes([]);
@@ -955,7 +971,6 @@ export function ContainersContent({
         }
         setLibSearch("");
         setLibCategory("all");
-        // Always set owner to a valid non-root user!
         setCreateOwner(effectiveDefaultOwner);
         setCreateCommand("");
         setCreateRestartPolicy("unless-stopped");
@@ -970,9 +985,13 @@ export function ContainersContent({
             return;
         }
 
-        const trimmedName = createName.trim();
+        const trimmedName = createName.trim().toLowerCase();
         if (!trimmedName) {
             setCreateError("App name is required.");
+            return;
+        }
+        if (!/^[a-z0-9_-]+$/.test(trimmedName)) {
+            setCreateError("App name can only contain lowercase letters, numbers, hyphens (-), and underscores (_). No spaces.");
             return;
         }
 
@@ -1275,86 +1294,32 @@ export function ContainersContent({
         });
     }, [templates, settingsCategory, settingsSearch]);
 
-    const isDirectApp = createTab === "custom" && customAppMode === "direct";
-
-    const renderCommonConfig = () => (
+    const renderDockerRuntimeConfig = () => (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium text-foreground">
-                    App Name <span className="text-destructive">*</span>
-                </label>
+                <label className="text-xs font-medium text-foreground">Command (Optional)</label>
                 <input
                     type="text"
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="my-app"
-                    required
+                    value={createCommand}
+                    onChange={(e) => setCreateCommand(e.target.value)}
+                    placeholder="e.g. sh -c 'sleep 3600'"
                     className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
                 />
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span>App folder: <code className="font-mono font-semibold text-foreground">htdocs/{createName.trim() || "app-name"}</code></span>
-                </p>
             </div>
 
-            {/* App Owner (Non-root users only) */}
-            {runtime.isRoot && (
-                <div className="space-y-1 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground">
-                        App Owner (Non-root User) <span className="text-destructive">*</span>
-                    </label>
-                    {users.length === 0 ? (
-                        <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-                            No non-root users found. Apps must run under a user account. Please create a user first.
-                        </div>
-                    ) : (
-                        <select
-                            value={createOwner}
-                            onChange={(e) => setCreateOwner(e.target.value)}
-                            required
-                            className="h-8 w-full rounded border border-input bg-background px-2.5 font-mono text-xs outline-none focus:border-primary"
-                        >
-                            {users.map((u) => (
-                                <option key={u.username} value={u.username}>
-                                    {u.username}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                        App files and runtime are managed under this user with isolated permissions.
-                    </p>
-                </div>
-            )}
-
-            {!isDirectApp && (
-                <>
-                    <div className="space-y-1 sm:col-span-2">
-                        <label className="text-xs font-medium text-foreground">Command (Optional)</label>
-                        <input
-                            type="text"
-                            value={createCommand}
-                            onChange={(e) => setCreateCommand(e.target.value)}
-                            placeholder="e.g. sh -c 'sleep 3600'"
-                            className="h-8 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
-                        />
-                    </div>
-
-                    <div className="space-y-1 sm:col-span-2">
-                        <label className="text-xs font-medium text-foreground">Restart Policy</label>
-                        <select
-                            value={createRestartPolicy}
-                            onChange={(e) => setCreateRestartPolicy(e.target.value)}
-                            className="h-8 w-full rounded border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
-                        >
-                            <option value="unless-stopped">Unless Stopped (Recommended)</option>
-                            <option value="always">Always</option>
-                            <option value="on-failure">On Failure</option>
-                            <option value="no">Do not restart (No)</option>
-                        </select>
-                    </div>
-                </>
-            )}
+            <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-medium text-foreground">Restart Policy</label>
+                <select
+                    value={createRestartPolicy}
+                    onChange={(e) => setCreateRestartPolicy(e.target.value)}
+                    className="h-8 w-full rounded border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
+                >
+                    <option value="unless-stopped">Unless Stopped (Recommended)</option>
+                    <option value="always">Always</option>
+                    <option value="on-failure">On Failure</option>
+                    <option value="no">Do not restart (No)</option>
+                </select>
+            </div>
         </div>
     );
 
@@ -1673,8 +1638,9 @@ export function ContainersContent({
                         <table className="w-full text-left text-xs">
                             <thead className="border-b border-border bg-muted/50 text-muted-foreground font-medium">
                                 <tr>
-                                    <th className="px-4 py-3">App & Folder</th>
-                                    <th className="px-4 py-3 w-36">Type</th>
+                                    <th className="px-4 py-3">App</th>
+                                    <th className="px-4 py-3 w-28">Type</th>
+                                    <th className="px-4 py-3 min-w-[120px]">Language</th>
                                     {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
                                         <th className="px-4 py-3 w-28">Owner</th>
                                     )}
@@ -1694,35 +1660,32 @@ export function ContainersContent({
                                         <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30 transition-colors">
                                             <td className="px-4 py-3">
                                                 <p className="font-semibold text-foreground">{container.name || container.id.slice(0, 12)}</p>
-                                                <Link
-                                                    to={fileHref}
-                                                    className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-muted-foreground hover:text-primary transition-colors"
-                                                    title="Open folder in File Manager"
-                                                >
-                                                    <Folder className="h-3 w-3 text-muted-foreground" />
-                                                    <span>{container.relativePath || `htdocs/${container.name}`}</span>
-                                                </Link>
                                             </td>
 
                                             <td className="px-4 py-3">
-                                                <div className="flex flex-col items-start gap-1">
-                                                    {isDirect ? (
-                                                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 font-medium text-xs text-emerald-600 dark:text-emerald-400">
-                                                            <FileCode2 className="h-3 w-3" />
-                                                            Direct
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 font-medium text-xs text-blue-600 dark:text-blue-400">
-                                                            <Box className="h-3 w-3" />
-                                                            Docker
-                                                        </span>
-                                                    )}
-                                                    <span className="max-w-44 truncate font-mono text-xs text-muted-foreground" title={container.image || container.runtime}>
-                                                        {isDirect
-                                                            ? (container.runtime ? container.runtime.toUpperCase() : "STATIC")
-                                                            : (container.image || "podman")}
+                                                {isDirect ? (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 font-medium text-xs text-emerald-600 dark:text-emerald-400">
+                                                        <FileCode2 className="h-3 w-3" />
+                                                        Direct
                                                     </span>
-                                                </div>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 font-medium text-xs text-blue-600 dark:text-blue-400">
+                                                        <Box className="h-3 w-3" />
+                                                        Docker
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            <td className="px-4 py-3">
+                                                {isDirect ? (
+                                                    <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 font-mono text-xs font-medium text-foreground">
+                                                        {formatRuntimeLanguage(container.runtime)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="max-w-44 truncate font-mono text-xs text-muted-foreground block" title={container.image || "podman"}>
+                                                        {container.image || "podman"}
+                                                    </span>
+                                                )}
                                             </td>
 
                                             {runtime.isRoot && (!activeOwner || activeOwner === "all") && (
@@ -1819,59 +1782,109 @@ export function ContainersContent({
                             </button>
                         </div>
 
-                        {/* Tabs */}
-                        <div className="flex shrink-0 border-b border-border bg-muted/20 px-5">
-                            <button
-                                type="button"
-                                onClick={() => setCreateTab("system")}
-                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
-                                    createTab === "system"
-                                        ? "border-primary text-primary"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                <Server className="h-4 w-4" />
-                                System
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setCreateTab("support")}
-                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
-                                    createTab === "support"
-                                        ? "border-primary text-primary"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                <Layers className="h-4 w-4" />
-                                Support
-                                <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-xs font-normal text-primary">
-                                    {allowedTemplates.length}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setCreateTab("custom")}
-                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
-                                    createTab === "custom"
-                                        ? "border-primary text-primary"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                {libraryOnly && !runtime.isRoot ? (
-                                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                                ) : (
-                                    <Wrench className="h-4 w-4" />
-                                )}
-                                Custom
-                                {libraryOnly && !runtime.isRoot && (
-                                    <span className="rounded bg-muted px-1.5 py-0.2 text-xs text-muted-foreground">
-                                        Restricted
-                                    </span>
-                                )}
-                            </button>
-                        </div>
-
                         <form onSubmit={handleCreateContainer} className="flex min-h-0 flex-1 flex-col">
+                            {/* Common App Name & Owner Configuration (Shared across System, Support, Custom) */}
+                            <div className="shrink-0 border-b border-border bg-card px-6 py-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className={`space-y-1.5 ${runtime.isRoot ? "" : "sm:col-span-2"}`}>
+                                        <label className="text-xs font-semibold text-foreground">
+                                            App Name <span className="text-destructive">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={createName}
+                                            onChange={(e) => {
+                                                const clean = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+                                                setCreateName(clean);
+                                            }}
+                                            placeholder="my-app"
+                                            pattern="^[a-z0-9_-]+$"
+                                            title="Lowercase letters, numbers, hyphens (-), and underscores (_) only."
+                                            required
+                                            className="h-9 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                                        />
+                                    </div>
+
+                                    {/* App Owner (Non-root users only) */}
+                                    {runtime.isRoot && (
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold text-foreground">
+                                                App Owner <span className="text-destructive">*</span>
+                                            </label>
+                                            {users.length === 0 ? (
+                                                <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                                                    No non-root users found. Apps must run under a user account.
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    value={createOwner}
+                                                    onChange={(e) => setCreateOwner(e.target.value)}
+                                                    required
+                                                    className="h-9 w-full rounded border border-input bg-background px-2.5 font-mono text-xs outline-none focus:border-primary"
+                                                >
+                                                    {users.map((u) => (
+                                                        <option key={u.username} value={u.username}>
+                                                            {u.username}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="flex shrink-0 border-b border-border bg-muted/20 px-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateTab("system")}
+                                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                        createTab === "system"
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <Server className="h-4 w-4" />
+                                    System
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateTab("support")}
+                                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                        createTab === "support"
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <Layers className="h-4 w-4" />
+                                    Support
+                                    <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-xs font-normal text-primary">
+                                        {allowedTemplates.length}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateTab("custom")}
+                                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold transition-colors ${
+                                        createTab === "custom"
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    {libraryOnly && !runtime.isRoot ? (
+                                        <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                                    ) : (
+                                        <Wrench className="h-4 w-4" />
+                                    )}
+                                    Custom
+                                    {libraryOnly && !runtime.isRoot && (
+                                        <span className="rounded bg-muted px-1.5 py-0.2 text-xs text-muted-foreground">
+                                            Restricted
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
                             {/* Tab 1: System */}
                             {createTab === "system" && (
                                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8 text-center">
@@ -2033,7 +2046,7 @@ export function ContainersContent({
                                             />
                                         </div>
 
-                                        {renderCommonConfig()}
+                                        {renderDockerRuntimeConfig()}
                                         {renderPortsSection()}
                                         {renderVolumesSection()}
                                         {renderEnvSection()}
@@ -2141,8 +2154,6 @@ export function ContainersContent({
                                                             </div>
                                                         </div>
 
-                                                        {renderCommonConfig()}
-
                                                         <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
                                                             <p className="font-medium text-foreground">Direct Mode</p>
                                                             <p className="mt-1">
@@ -2170,7 +2181,7 @@ export function ContainersContent({
                                                             </p>
                                                         </div>
 
-                                                        {renderCommonConfig()}
+                                                        {renderDockerRuntimeConfig()}
                                                         {renderPortsSection()}
                                                         {renderVolumesSection()}
                                                         {renderEnvSection()}

@@ -18,6 +18,7 @@ import (
 )
 
 var allowedContainerID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+var allowedAppName = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 var (
 	ErrContainerDockerfileDenied  = errors.New("Dockerfile access denied")
@@ -657,8 +658,8 @@ func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
 
 	input.Name = strings.TrimSpace(input.Name)
 	if input.Name != "" {
-		if !allowedContainerID.MatchString(input.Name) {
-			return nil, errors.New("invalid container name: alphanumeric, hyphen, underscore, and dot only")
+		if !allowedAppName.MatchString(input.Name) {
+			return nil, errors.New("invalid container name: lowercase letters, numbers, hyphens (-), and underscores (_) only")
 		}
 		args = append(args, "--name", input.Name)
 	}
@@ -716,8 +717,8 @@ func buildCreateContainerArgs(input CreateContainerInput) ([]string, error) {
 
 func (s *ContainerService) CreateContainer(input CreateContainerInput) (string, error) {
 	input.Name = strings.TrimSpace(input.Name)
-	if input.Name == "" || !allowedContainerID.MatchString(input.Name) {
-		return "", errors.New("invalid app name: alphanumeric, hyphen, underscore, and dot only")
+	if input.Name == "" || !allowedAppName.MatchString(input.Name) {
+		return "", errors.New("invalid app name: lowercase letters, numbers, hyphens (-), and underscores (_) only")
 	}
 
 	input.Owner = strings.TrimSpace(input.Owner)
