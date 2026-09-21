@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     Folder,
     ChevronRight,
@@ -10,6 +11,8 @@ import {
     Clipboard,
     FilePlus2,
     FolderPlus,
+    FolderUp,
+    Home,
     Pencil,
     Trash2,
     Download,
@@ -53,7 +56,12 @@ export default function FilesRoute({
     rootLabel,
     embedded = false,
 }: FilesRouteProps = {}) {
+    const [searchParams] = useSearchParams();
+    const queryPath = searchParams.get("path") || "";
+    const targetInitialPath = initialPath || queryPath;
+
     const [homePath, setHomePath] = useState<string>("");
+    const [currentParentPath, setCurrentParentPath] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -73,32 +81,6 @@ export default function FilesRoute({
 
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Initialize root / home directory
-    const initExplorer = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const startPath = initialPath || new URLSearchParams(window.location.search).get("path") || "";
-            const response = await fetch(`${apiEndpoint}?path=${encodeURIComponent(startPath)}`);
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(text || "Failed to initialize root path");
-            }
-            const data: DirectoryList = await response.json();
-            setHomePath(data.currentPath);
-
-            // Fetch and set items for the root folder
-            const items = await fetchFolderContents(data.currentPath);
-            setExpanded({ [data.currentPath]: items });
-            setOpenPaths({ [data.currentPath]: true });
-            setSelectedFile(null);
-        } catch (err: any) {
-            setError(err.message || "Could not load file system.");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [initialPath]);
-
     // Load folder contents (directories & files)
     const fetchFolderContents = async (path: string): Promise<FileItem[]> => {
         try {
@@ -106,7 +88,6 @@ export default function FilesRoute({
             if (!response.ok) return [];
             const data: DirectoryList = await response.json();
 
-            // Sort: directories first, then files
             return (data.items || []).sort((a, b) => {
                 if (a.isDir && !b.isDir) return -1;
                 if (!a.isDir && b.isDir) return 1;
@@ -116,6 +97,44 @@ export default function FilesRoute({
             return [];
         }
     };
+
+    // Load a directory as root view
+    const loadDirectory = useCallback(async (dirPath: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`${apiEndpoint}?path=${encodeURIComponent(dirPath)}`);
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Failed to initialize root path");
+            }
+            const data: DirectoryList = await response.json();
+            setHomePath(data.currentPath);
+            setCurrentParentPath(data.parentPath || "");
+
+            const items = (data.items || []).sort((a, b) => {
+                if (a.isDir && !b.isDir) return -1;
+                if (!a.isDir && b.isDir) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            setExpanded({ [data.currentPath]: items });
+            setOpenPaths({ [data.currentPath]: true });
+            setSelectedFile(null);
+        } catch (err: any) {
+            setError(err.message || "Could not load file system.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Initialize root / home directory
+    const initExplorer = useCallback(() => {
+        return loadDirectory(targetInitialPath);
+    }, [loadDirectory, targetInitialPath]);
+
+    useEffect(() => {
+        initExplorer();
+    }, [initExplorer]);
 
     const handleToggleExpand = async (path: string) => {
         const isOpen = openPaths[path] || false;
@@ -339,33 +358,50 @@ export default function FilesRoute({
     };
 
     const displayRootName =
-        rootLabel ||
-        (homePath
-            ? runtime.isRoot && !initialPath
+        homePath
+            ? homePath === "/"
                 ? "/"
-                : initialPath
-                ? rootLabel || initialPath.split("/").filter(Boolean).pop() || initialPath
-                : runtime.username
-            : runtime.isRoot
-            ? "/"
-            : runtime.username);
+                : homePath.split("/").filter(Boolean).pop() || homePath
+            : rootLabel || (runtime.isRoot ? "/" : runtime.username);
 
     const content = (
         <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] overflow-hidden h-full w-full bg-background relative">
             {/* 1. Left Explorer Sidebar */}
             <aside className="border-r border-border bg-card/60 flex flex-col h-full overflow-hidden select-none">
                 <div className="flex h-10 items-center justify-between px-3 border-b border-border bg-muted/20">
-                    <span className="text-xs font-semibold text-muted-foreground truncate" title={rootLabel || "Explorer"}>
-                        {rootLabel ? `${rootLabel} / Files` : "Explorer"}
-                    </span>
-                    <button
-                        onClick={initExplorer}
-                        className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                        title="Refresh Explorer"
-                        disabled={isLoading}
-                    >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                    </button>
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {currentParentPath && (
+                            <button
+                                onClick={() => void loadDirectory(currentParentPath)}
+                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                                title={`Up to ${currentParentPath}`}
+                            >
+                                <FolderUp className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                        <span className="text-xs font-semibold text-muted-foreground truncate" title={homePath || rootLabel || "Explorer"}>
+                            {displayRootName}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {currentParentPath && (
+                            <button
+                                onClick={() => void loadDirectory("")}
+                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                title="Root / Home"
+                            >
+                                <Home className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                        <button
+                            onClick={initExplorer}
+                            className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                            title="Refresh Explorer"
+                            disabled={isLoading}
+                        >
+                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                        </button>
+                    </div>
                 </div>
 
                 <div

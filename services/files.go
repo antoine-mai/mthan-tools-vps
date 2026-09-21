@@ -102,7 +102,11 @@ func AllowedFilePath(path, homeDir string, isRoot bool) (string, error) {
 func allowedFilePath(path, homeDir string, isRoot bool) (string, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {
-		return "", ErrAccessDenied
+		if !isRoot && homeDir != "" {
+			path = filepath.Clean(filepath.Join(homeDir, path))
+		} else {
+			return "", ErrAccessDenied
+		}
 	}
 	if !isRoot {
 		home := filepath.Clean(homeDir)
@@ -235,6 +239,9 @@ func ListDirectory(requestedPath string, homeDir string, isRoot bool) (Directory
 		targetPath = homeDir
 	} else {
 		targetPath = filepath.Clean(requestedPath)
+		if !filepath.IsAbs(targetPath) && !isRoot && homeDir != "" {
+			targetPath = filepath.Clean(filepath.Join(homeDir, targetPath))
+		}
 	}
 
 	// Enforce home directory jail for standard users
@@ -295,6 +302,9 @@ type FileContent struct {
 
 func GetFileContent(filePath string, homeDir string, isRoot bool) (FileContent, error) {
 	filePath = filepath.Clean(filePath)
+	if !filepath.IsAbs(filePath) && !isRoot && homeDir != "" {
+		filePath = filepath.Clean(filepath.Join(homeDir, filePath))
+	}
 
 	// Enforce home jail for standard users
 	if !isRoot {

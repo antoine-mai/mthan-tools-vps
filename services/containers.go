@@ -319,7 +319,7 @@ func (s *ContainerService) ListForOwner(owner string) []Container {
 					Engine:       "direct",
 					Owner:        owner,
 					State:        "ready",
-					Status:       fmt.Sprintf("Ready (Direct %s)", strings.ToUpper(runtime)),
+					Status:       "Ready",
 					Type:         "direct",
 					Runtime:      runtime,
 					Path:         appPath,

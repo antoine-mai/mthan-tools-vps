@@ -483,12 +483,8 @@ export default function ContainersRoute({
 
 function ContainersUserStandalone() {
     return (
-        <DashboardLayout
-            title="Apps"
-            description="View and manage your rootless applications."
-            wide
-        >
-            <div className="space-y-6">
+        <DashboardLayout title="Apps" fullWidth>
+            <div className="h-full overflow-y-auto p-6">
                 <ContainersContent />
             </div>
         </DashboardLayout>
@@ -1507,17 +1503,19 @@ export function ContainersContent({
 
     return (
         <div className="space-y-5">
-            {/* Header info for root in subsidebar view */}
-            {runtime.isRoot && !embedded && (
-                <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Standalone Page Header & Toolbar */}
+            {!embedded && (
+                <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
                             <h2 className="text-base font-semibold text-foreground">
-                                {activeOwner === "all"
-                                    ? "All Apps"
-                                    : `Apps: ${activeOwner}`}
+                                {runtime.isRoot
+                                    ? activeOwner === "all"
+                                        ? "All Apps"
+                                        : `Apps: ${activeOwner}`
+                                    : "Apps"}
                             </h2>
-                            {userLimits && userLimits.maxContainers > 0 && activeOwner && activeOwner !== "all" ? (
+                            {userLimits && userLimits.maxContainers > 0 && (
                                 <span
                                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                         scopedContainers.length >= userLimits.maxContainers
@@ -1525,44 +1523,22 @@ export function ContainersContent({
                                             : "bg-muted text-muted-foreground"
                                     }`}
                                 >
-                                    Quota: {scopedContainers.length} / {userLimits.maxContainers} apps
+                                    Quota: {scopedContainers.length} / {userLimits.maxContainers}
                                 </span>
-                            ) : null}
+                            )}
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {displayedContainers.length} of {scopedContainers.length} app{scopedContainers.length !== 1 ? "s" : ""}
-                            {activeOwner === "all" ? " across all users" : ` owned by ${activeOwner}`}
+                            {runtime.isRoot
+                                ? activeOwner === "all"
+                                    ? " across all users"
+                                    : ` owned by ${activeOwner}`
+                                : ""}
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2 sm:pt-0">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 h-8 text-xs"
-                            onClick={() => setSettingsModalOpen(true)}
-                            title="App Settings & Supported Templates"
-                        >
-                            <Sliders className="h-3.5 w-3.5" />
-                            Settings
-                        </Button>
-                        <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
-                            <Plus className="h-3.5 w-3.5" />
-                            Create App
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2 h-8 text-xs" onClick={handleRefresh} disabled={isLoading}>
-                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                            Refresh
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Toolbar for non-root / embedded */}
-            {(!runtime.isRoot || embedded) && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-1 flex-wrap items-center gap-3">
-                        <div className="relative min-w-[240px] max-w-sm flex-1">
+                    <div className="flex flex-1 items-center justify-end gap-2 flex-wrap sm:flex-nowrap">
+                        <div className="relative min-w-[180px] max-w-xs flex-1 sm:flex-initial">
                             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 type="text"
@@ -1573,27 +1549,57 @@ export function ContainersContent({
                             />
                         </div>
 
+                        {runtime.isRoot && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 h-8 text-xs"
+                                onClick={() => setSettingsModalOpen(true)}
+                                title="App Settings & Supported Templates"
+                            >
+                                <Sliders className="h-3.5 w-3.5" />
+                                Settings
+                            </Button>
+                        )}
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 h-8 text-xs"
+                            onClick={handleRefresh}
+                            disabled={isLoading}
+                        >
+                            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </Button>
+
+                        <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Create App
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Compact Toolbar for embedded view */}
+            {embedded && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative min-w-[200px] max-w-sm flex-1">
+                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search apps..."
+                            className="h-8 w-full rounded border border-border bg-background pl-8 pr-3 text-xs outline-none focus:border-primary"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" className="gap-2 h-8 text-xs" onClick={handleRefresh} disabled={isLoading}>
                             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
                             Refresh
                         </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {userLimits && userLimits.maxContainers > 0 && (
-                            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs">
-                                <span className="text-muted-foreground">Quota:</span>
-                                <span
-                                    className={`font-semibold ${
-                                        scopedContainers.length >= userLimits.maxContainers
-                                            ? "text-destructive"
-                                            : "text-foreground"
-                                    }`}
-                                >
-                                    {scopedContainers.length} / {userLimits.maxContainers}
-                                </span>
-                            </div>
-                        )}
 
                         <Button size="sm" className="gap-2 h-8 text-xs font-medium" onClick={openCreateModal}>
                             <Plus className="h-3.5 w-3.5" />
@@ -1653,8 +1659,8 @@ export function ContainersContent({
                                 {displayedContainers.map((container) => {
                                     const isDirect = container.type === "direct";
                                     const fileHref = runtime.isRoot
-                                        ? `/users/${encodeURIComponent(container.owner)}/files?path=${encodeURIComponent(container.path || `htdocs/${container.name}`)}`
-                                        : `/files?path=${encodeURIComponent(container.path || `htdocs/${container.name}`)}`;
+                                        ? `/users/${encodeURIComponent(container.owner)}/files?path=${encodeURIComponent(container.path || `/home/${container.owner}/htdocs/${container.name}`)}`
+                                        : `/files?path=${encodeURIComponent(container.relativePath || container.path || `htdocs/${container.name}`)}`;
 
                                     return (
                                         <tr key={`${container.engine}:${container.owner}:${container.id}`} className="hover:bg-muted/30 transition-colors">
@@ -1708,7 +1714,7 @@ export function ContainersContent({
                                                                 : "bg-muted-foreground/40"
                                                         }`}
                                                     />
-                                                    <span className="text-foreground capitalize">{container.status || container.state || "Unknown"}</span>
+                                                    <span className="text-foreground capitalize">{isDirect ? "Ready" : (container.status || container.state || "Unknown")}</span>
                                                 </div>
                                             </td>
 
@@ -1724,6 +1730,10 @@ export function ContainersContent({
                                                         </Button>
                                                     </Link>
 
+                                                    <Button size="icon" variant="outline" className="h-7 w-7" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
+                                                        <FileText className="h-3 w-3" />
+                                                    </Button>
+
                                                     {!isDirect && (
                                                         <>
                                                             {container.state?.toLowerCase() === "running" ? (
@@ -1738,19 +1748,10 @@ export function ContainersContent({
                                                             <Button size="icon" variant="outline" className="h-7 w-7" title="Restart" aria-label={`Restart ${container.name}`} disabled={Boolean(actionLoading) || container.state?.toLowerCase() !== "running"} onClick={() => runAction(container, "restart")}>
                                                                 {actionLoading.endsWith(":restart") && actionLoading.includes(container.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
                                                             </Button>
-                                                            <Button size="icon" variant="outline" className="h-7 w-7" title="Logs" aria-label={`View logs for ${container.name}`} onClick={() => openLogs(container)}>
-                                                                <FileText className="h-3 w-3" />
-                                                            </Button>
                                                             <Button size="icon" variant="outline" className="h-7 w-7" title="Edit Containerfile" aria-label={`Edit Containerfile for ${container.name}`} onClick={() => openDockerfile(container)}>
                                                                 <FileCode2 className="h-3 w-3" />
                                                             </Button>
                                                         </>
-                                                    )}
-
-                                                    {isDirect && (
-                                                        <Button size="icon" variant="outline" className="h-7 w-7" title="App Info" aria-label={`View details for ${container.name}`} onClick={() => openLogs(container)}>
-                                                            <FileText className="h-3 w-3" />
-                                                        </Button>
                                                     )}
 
                                                     <Button size="icon" variant="outline" className="h-7 w-7 text-destructive hover:bg-destructive/10" title="Delete App" aria-label={`Delete ${container.name}`} disabled={Boolean(actionLoading)} onClick={() => setDeleteModal(container)}>

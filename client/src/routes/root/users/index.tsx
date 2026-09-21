@@ -618,12 +618,18 @@ export default function UsersRoute() {
                             {activeSection === "files" ? (
                                 /* File Explorer filling 100% remaining space without page scrollbar */
                                 <div className="flex-1 min-h-0 w-full overflow-hidden">
-                                    <FilesRoute
-                                        key={selectedUser.username}
-                                        initialPath={selectedUser.home}
-                                        rootLabel={selectedUser.username}
-                                        embedded={true}
-                                    />
+                                    {(() => {
+                                        const queryPath = new URLSearchParams(window.location.search).get("path");
+                                        const targetPath = queryPath || selectedUser.home;
+                                        return (
+                                            <FilesRoute
+                                                key={`${selectedUser.username}:${targetPath}`}
+                                                initialPath={targetPath}
+                                                rootLabel={selectedUser.username}
+                                                embedded={true}
+                                            />
+                                        );
+                                    })()}
                                 </div>
                             ) : activeSection === "terminal" ? (
                                 /* Embedded User Terminal filling 100% remaining space */
