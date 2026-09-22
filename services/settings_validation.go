@@ -8,7 +8,7 @@ import (
 var allowedSettingKeys = map[string]bool{
 	"general_app_name": true, "general_color_mode": true, "apps_header": true,
 	"users_default_shell": true, "users_home_base": true, "users_create_home": true,
-	"users_auto_username": true,
+	"users_auto_username": true, "general_root_route": true,
 }
 
 func ValidSetting(key, value string) bool {
@@ -20,6 +20,21 @@ func ValidSetting(key, value string) bool {
 		return strings.TrimSpace(value) != "" && len(value) <= 80
 	case "general_color_mode":
 		return value == "system" || value == "light" || value == "dark"
+	case "general_root_route":
+		val := CleanRoutePrefix(value)
+		if len(val) < 2 || len(val) > 60 {
+			return false
+		}
+		part := strings.TrimPrefix(val, "/")
+		if strings.Contains(part, "/") {
+			return false
+		}
+		for _, ch := range part {
+			if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+				return false
+			}
+		}
+		return !IsReservedRoutePrefix(part)
 	case "users_default_shell", "users_home_base":
 		return strings.HasPrefix(value, "/") && !strings.Contains(value, "..") && len(value) <= 255
 	case "users_create_home", "users_auto_username":

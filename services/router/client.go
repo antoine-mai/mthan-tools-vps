@@ -26,7 +26,7 @@ type ClientRuntime struct {
 	Username string `json:"username"`
 }
 
-func Register(mux *http.ServeMux, startup services.StartupConfig, sessions *services.SessionService, clientFS embed.FS) {
+func Register(mux *http.ServeMux, startup services.StartupConfig, sessions *services.SessionService, settings *services.SettingsService, clientFS embed.FS) {
 	runtime := newClientRuntime(startup)
 	subFS, err := fs.Sub(clientFS, "client/build")
 	if err != nil {
@@ -46,7 +46,7 @@ func Register(mux *http.ServeMux, startup services.StartupConfig, sessions *serv
 	}
 
 	if startup.IsRoot {
-		registerRootRoutes(mux, runtime, sessions, subFS)
+		registerRootRoutes(mux, runtime, sessions, settings, subFS)
 		return
 	}
 
@@ -73,10 +73,12 @@ func newClientRuntime(startup services.StartupConfig) ClientRuntime {
 	}
 }
 
-func clientHandler(runtime ClientRuntime, sessions *services.SessionService, embeddedFS fs.FS, clientDirs ...string) http.Handler {
+func clientHandler(runtime ClientRuntime, sessions *services.SessionService, settings *services.SettingsService, embeddedFS fs.FS, clientDirs ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestRuntime := runtime
-		if !runtime.IsRoot {
+		if runtime.IsRoot && settings != nil {
+			requestRuntime.BasePath = settings.RootRoute()
+		} else if !runtime.IsRoot {
 			requestRuntime.UID = -1
 			requestRuntime.Username = ""
 			if session, ok := sessions.GetUserSession(r); ok {

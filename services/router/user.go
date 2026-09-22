@@ -11,6 +11,7 @@ func registerUserRoutes(mux *http.ServeMux, runtime ClientRuntime, sessions *ser
 	mux.Handle("GET /", clientHandler(
 		runtime,
 		sessions,
+		nil,
 		embeddedFS,
 		"client/build/user",
 		"public/dist/client/user",

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -12,7 +13,9 @@ import (
 const settingsDBEnv = "SETTINGS_DB_PATH"
 
 type SettingsService struct {
-	db *sql.DB
+	db        *sql.DB
+	mu        sync.RWMutex
+	rootRoute string
 }
 
 func NewSettingsService() (*SettingsService, error) {
@@ -62,6 +65,7 @@ func NewSettingsService() (*SettingsService, error) {
 	for key, value := range map[string]string{
 		"general_app_name":    "MTHAN VPS",
 		"general_color_mode":  "system",
+		"general_root_route":  "/root",
 		"apps_header":         "[]",
 		"users_default_shell": "/bin/bash",
 		"users_home_base":     "/home",
@@ -74,7 +78,18 @@ func NewSettingsService() (*SettingsService, error) {
 		}
 	}
 	_, _ = db.Exec("UPDATE settings SET value = 'MTHAN VPS' WHERE key = 'general_app_name' AND value IN ('MThan VPS Panel', 'MThan VPS')")
-	return &SettingsService{db: db}, nil
+
+	var initialRootRoute string
+	_ = db.QueryRow("SELECT value FROM settings WHERE key = 'general_root_route'").Scan(&initialRootRoute)
+	if initialRootRoute == "" {
+		initialRootRoute = "/root"
+	}
+	initialRootRoute = CleanRoutePrefix(initialRootRoute)
+
+	return &SettingsService{
+		db:        db,
+		rootRoute: initialRootRoute,
+	}, nil
 }
 
 func (s *SettingsService) All() (map[string]string, error) {
@@ -97,7 +112,60 @@ func (s *SettingsService) All() (map[string]string, error) {
 func (s *SettingsService) Set(key, value string) error {
 	_, err := s.db.Exec(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`, key, value)
+	if err == nil && key == "general_root_route" {
+		s.mu.Lock()
+		s.rootRoute = CleanRoutePrefix(value)
+		s.mu.Unlock()
+	}
 	return err
+}
+
+func (s *SettingsService) RootRoute() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.rootRoute == "" {
+		return "/root"
+	}
+	return s.rootRoute
+}
+
+func CleanRoutePrefix(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "/root"
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	p = strings.TrimRight(p, "/")
+	if p == "" || p == "/" {
+		return "/root"
+	}
+	return p
+}
+
+func IsReservedRoutePrefix(name string) bool {
+	lower := strings.ToLower(strings.Trim(name, "/"))
+	if lower == "root" {
+		return false
+	}
+	reserved := map[string]bool{
+		"api":        true,
+		"post":       true,
+		"login":      true,
+		"apps":       true,
+		"containers": true,
+		"files":      true,
+		"vhosts":     true,
+		"tasking":    true,
+		"backup":     true,
+		"agent":      true,
+		"settings":   true,
+		"apis":       true,
+		"terminal":   true,
+		"users":      true,
+	}
+	return reserved[lower]
 }
 
 func (s *SettingsService) Get(key, fallback string) string {

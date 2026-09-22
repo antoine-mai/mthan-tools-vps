@@ -37,11 +37,15 @@ func handle(w http.ResponseWriter, r *http.Request, settings *services.SettingsS
 		http.Error(w, "invalid setting", http.StatusBadRequest)
 		return
 	}
-	if err := settings.Set(input.Key, input.Value); err != nil {
+	val := input.Value
+	if input.Key == "general_root_route" {
+		val = services.CleanRoutePrefix(val)
+	}
+	if err := settings.Set(input.Key, val); err != nil {
 		http.Error(w, "could not save setting", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, map[string]string{"status": "ok", "value": val})
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

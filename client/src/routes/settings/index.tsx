@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Loader2, Plus, X } from "lucide-react";
 
 import { useApp } from "_contexts/app";
 import DashboardLayout from "_layouts/dashboard";
+import { Button } from "_layouts/_components/ui/button";
 import { defaultAppName } from "_utils/app-settings";
 import Api from "_utils/api";
+import { runtime } from "../../runtime";
 import SettingsSidebar, { availableApps } from "./sidebar";
 import {
     getColorModePreference,
@@ -25,6 +27,62 @@ export default function SettingsRoute() {
     const [draggedApp, setDraggedApp] = useState<string | null>(null);
     const [defaultShell, setDefaultShell] = useState("/bin/bash");
     const [homeBase, setHomeBase] = useState("/home");
+
+    const currentRootRoute = settings.general_root_route || runtime.basePath || "/root";
+    const [rootRouteDraft, setRootRouteDraft] = useState(currentRootRoute);
+    const [rootRouteError, setRootRouteError] = useState("");
+    const [savingRootRoute, setSavingRootRoute] = useState(false);
+
+    useEffect(() => {
+        setRootRouteDraft(settings.general_root_route || runtime.basePath || "/root");
+    }, [settings.general_root_route]);
+
+    const reservedRoutePrefixes = new Set([
+        "api", "post", "login", "apps", "containers", "files", "vhosts",
+        "tasking", "backup", "agent", "settings", "apis", "terminal", "users"
+    ]);
+
+    const saveRootRoute = async () => {
+        setRootRouteError("");
+        const cleaned = ("/" + rootRouteDraft.trim().replace(/^\/+/, "").replace(/\/+$/, "")).toLowerCase();
+        if (!cleaned || cleaned === "/") {
+            setRootRouteError("Root route cannot be empty or '/'. Default is '/root'.");
+            return;
+        }
+        const slug = cleaned.replace(/^\//, "");
+        if (slug.includes("/")) {
+            setRootRouteError("Nested paths are not supported. Use a single path segment like '/admin'.");
+            return;
+        }
+        if (!/^[a-z0-9_-]+$/.test(slug)) {
+            setRootRouteError("Only lowercase letters, numbers, hyphens, and underscores are allowed.");
+            return;
+        }
+        if (reservedRoutePrefixes.has(slug)) {
+            setRootRouteError(`'/${slug}' is a reserved route path. Please choose another name.`);
+            return;
+        }
+        if (cleaned === currentRootRoute) {
+            return;
+        }
+
+        setSavingRootRoute(true);
+        try {
+            const res = await fetch(Api.root.settings, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key: "general_root_route", value: cleaned }),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to update root route path.");
+            }
+            window.location.href = `${cleaned}/settings`;
+        } catch (err: any) {
+            setRootRouteError(err.message || "Could not save root route path.");
+            setSavingRootRoute(false);
+        }
+    };
 
     useEffect(() => {
         const syncColorMode = () => setCurrentColorMode(getColorModePreference());
@@ -120,6 +178,52 @@ export default function SettingsRoute() {
                                     <option value="light">Light</option>
                                     <option value="dark">Dark</option>
                                 </select>
+                            </div>
+
+                            <div className="grid gap-3 p-4 sm:grid-cols-[180px_1fr] sm:items-center">
+                                <div>
+                                    <label htmlFor="root-route" className="text-sm font-medium">Root Route Path</label>
+                                    <p className="text-xs text-muted-foreground">URL prefix for admin panel</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            id="root-route"
+                                            value={rootRouteDraft}
+                                            onChange={(event) => {
+                                                setRootRouteError("");
+                                                setRootRouteDraft(event.target.value.toLowerCase().replace(/[^a-z0-9_/-]/g, ""));
+                                            }}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    void saveRootRoute();
+                                                }
+                                            }}
+                                            disabled={savingRootRoute}
+                                            placeholder="/root"
+                                            className="h-9 max-w-xs flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus:ring-1 focus:ring-ring"
+                                        />
+                                        {rootRouteDraft !== currentRootRoute && (
+                                            <Button
+                                                size="sm"
+                                                className="h-9 gap-1.5 text-xs font-medium"
+                                                onClick={() => void saveRootRoute()}
+                                                disabled={savingRootRoute}
+                                            >
+                                                {savingRootRoute ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                                Save & Relocate
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {rootRouteError ? (
+                                        <p className="text-xs text-destructive">{rootRouteError}</p>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            Current: <span className="font-mono font-semibold text-foreground">{currentRootRoute}</span>. Changing this relocates the root panel URL.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
