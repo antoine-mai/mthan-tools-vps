@@ -40,6 +40,7 @@ func NewSettingsService() (*SettingsService, error) {
 		name TEXT NOT NULL,
 		key_hash TEXT NOT NULL UNIQUE,
 		key_prefix TEXT NOT NULL,
+		owner TEXT NOT NULL DEFAULT 'root',
 		accepted_ips TEXT NOT NULL DEFAULT '[]',
 		enabled INTEGER NOT NULL DEFAULT 1,
 		last_used_at DATETIME,
@@ -53,6 +54,11 @@ func NewSettingsService() (*SettingsService, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if _, err := db.Exec(`ALTER TABLE apis ADD COLUMN owner TEXT NOT NULL DEFAULT 'root'`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		_ = db.Close()
+		return nil, err
+	}
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_apis_owner ON apis(owner)`)
 	for oldKey, newKey := range map[string]string{
 		"app_name": "general_app_name", "color_mode": "general_color_mode", "header_apps": "apps_header",
 	} {

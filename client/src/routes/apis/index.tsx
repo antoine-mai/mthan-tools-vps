@@ -1,8 +1,10 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Braces, Check, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
+import Api from "_utils/api";
 import DashboardLayout from "_layouts/dashboard";
 import { Button } from "_layouts/_components/ui/button";
+import { runtime } from "runtime";
 
 interface APIKey {
     acceptedIps: string[];
@@ -12,6 +14,7 @@ interface APIKey {
     keyPrefix: string;
     lastUsedAt: string | null;
     name: string;
+    owner?: string;
 }
 
 export default function APIsRoute() {
@@ -26,7 +29,7 @@ export default function APIsRoute() {
 
     const loadAPIs = async () => {
         try {
-            const response = await fetch("/post/apis", { cache: "no-store" });
+            const response = await fetch(Api.current.apis, { cache: "no-store" });
             if (!response.ok) throw new Error((await response.text()) || "Failed to load API keys");
             const data = await response.json();
             setAPIs(data.apis || []);
@@ -48,7 +51,7 @@ export default function APIsRoute() {
         setSaving(true);
         setError("");
         try {
-            const response = await fetch("/post/apis", {
+            const response = await fetch(Api.current.apis, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: name.trim(), acceptedIps: parseAcceptedIPs(acceptedIPs) }),
@@ -67,7 +70,7 @@ export default function APIsRoute() {
     };
 
     const updateAPI = async (id: string, changes: { enabled?: boolean; acceptedIps?: string[] }) => {
-        const response = await fetch("/post/apis", {
+        const response = await fetch(Api.current.apis, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id, ...changes }),
@@ -89,7 +92,7 @@ export default function APIsRoute() {
 
     const deleteAPI = async (api: APIKey) => {
         if (!window.confirm(`Delete API key "${api.name}"? This action cannot be undone.`)) return;
-        const response = await fetch(`/post/apis?id=${encodeURIComponent(api.id)}`, { method: "DELETE" });
+        const response = await fetch(`${Api.current.apis}?id=${encodeURIComponent(api.id)}`, { method: "DELETE" });
         if (!response.ok) {
             setError((await response.text()) || "Failed to delete API key");
             return;
@@ -140,6 +143,7 @@ export default function APIsRoute() {
                         <thead className="border-b border-border bg-muted/40 text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-3 font-semibold">Name</th>
+                                {runtime.isRoot && <th className="px-4 py-3 font-semibold">Owner</th>}
                                 <th className="px-4 py-3 font-semibold">Key</th>
                                 <th className="px-4 py-3 font-semibold">Accepted IPs</th>
                                 <th className="px-4 py-3 font-semibold">Status</th>
@@ -149,12 +153,17 @@ export default function APIsRoute() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {loading ? (
-                                <tr><td colSpan={6} className="p-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></td></tr>
+                                <tr><td colSpan={runtime.isRoot ? 7 : 6} className="p-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></td></tr>
                             ) : apis.length === 0 ? (
-                                <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">No API keys created.</td></tr>
+                                <tr><td colSpan={runtime.isRoot ? 7 : 6} className="p-10 text-center text-muted-foreground">No API keys created.</td></tr>
                             ) : apis.map((api) => (
                                 <tr key={api.id} className="hover:bg-muted/20">
                                     <td className="px-4 py-3 font-medium text-foreground">{api.name}</td>
+                                    {runtime.isRoot && (
+                                        <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+                                            <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-medium">{api.owner || "root"}</span>
+                                        </td>
+                                    )}
                                     <td className="px-4 py-3 font-mono text-muted-foreground">{api.keyPrefix}••••••••</td>
                                     <td className="max-w-xs px-4 py-3 font-mono text-[11px] text-muted-foreground">{api.acceptedIps.length ? api.acceptedIps.join(", ") : "All IPs"}</td>
                                     <td className="px-4 py-3">

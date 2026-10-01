@@ -20,9 +20,19 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 		path := strings.TrimPrefix(r.URL.Path, "/api/vhost")
 		switch path {
 		case "", "/":
+			if r.Method == http.MethodPost {
+				handleCreateVHost(w, r, session.Username, vhosts)
+				return
+			}
 			writeJSON(w, http.StatusOK, vhosts.Status())
 		case "/list":
 			writeJSON(w, http.StatusOK, map[string]any{"vhosts": vhosts.SummariesForOwner(session.Username)})
+		case "/create":
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			handleCreateVHost(w, r, session.Username, vhosts)
 		case "/config":
 			_ = services.CreateUserCaddyfile(session.Username)
 			configPath := services.UserCaddyfilePath(session.Username)
@@ -57,6 +67,19 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 				http.Error(w, "vhost not found", http.StatusNotFound)
 				return
 			}
+			if r.Method == http.MethodDelete {
+				err := vhosts.Delete(hostname, session.Username)
+				if errors.Is(err, services.ErrVHostNotFound) {
+					http.Error(w, "vhost not found", http.StatusNotFound)
+					return
+				}
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			host, err := vhosts.Get(hostname)
 			if errors.Is(err, services.ErrVHostNotFound) {
 				http.Error(w, "vhost not found", http.StatusNotFound)
@@ -66,8 +89,29 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 				http.Error(w, "vhost information unavailable", http.StatusInternalServerError)
 				return
 			}
+			if !strings.EqualFold(host.Owner, session.Username) {
+				http.Error(w, "vhost not found", http.StatusNotFound)
+				return
+			}
 			writeJSON(w, http.StatusOK, host)
 		}
+	})
+}
+
+func handleCreateVHost(w http.ResponseWriter, r *http.Request, username string, vhosts *services.VHostService) {
+	var input services.CreateVHostInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	input.Owner = username
+	if err := vhosts.CreateVHost(input); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"hostname": services.CleanHostname(input.Hostname),
 	})
 }
 

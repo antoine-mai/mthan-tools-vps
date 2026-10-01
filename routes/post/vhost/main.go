@@ -27,6 +27,28 @@ func Handler(sessions *services.SessionService, vhosts *services.VHostService) h
 			} else {
 				writeJSON(w, map[string]any{"vhosts": vhosts.Summaries()})
 			}
+		case "/create":
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var input services.CreateVHostInput
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			if strings.TrimSpace(input.Owner) == "" {
+				input.Owner = "root"
+			}
+			if err := vhosts.CreateVHost(input); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeJSON(w, map[string]any{
+				"status":   "ok",
+				"hostname": services.CleanHostname(input.Hostname),
+			})
+			return
 		case "/config":
 			owner := r.URL.Query().Get("owner")
 			configPath := "/etc/caddy/Caddyfile"

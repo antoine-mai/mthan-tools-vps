@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	apiapis "mthan/vps/routes/api/apis"
 	apibackup "mthan/vps/routes/api/backup"
 	containersroute "mthan/vps/routes/api/containers"
 	apifiles "mthan/vps/routes/api/files"
@@ -140,14 +141,24 @@ func Register(mux *http.ServeMux, deps Dependencies) {
 	if userLimitsSvc != nil && cronTaskSvc != nil {
 		mux.Handle("GET /api/user/limits", public(apilimits.Handler(deps.Sessions, userLimitsSvc, cronTaskSvc, containerSvc)))
 	}
-	mux.Handle("GET /api/vhost", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
-	mux.Handle("GET /api/vhost/", public(vhostroute.Handler(deps.Sessions, services.NewVHostService())))
+	vhostHandler := public(vhostroute.Handler(deps.Sessions, services.NewVHostService()))
+	mux.Handle("GET /api/vhost", vhostHandler)
+	mux.Handle("GET /api/vhost/", vhostHandler)
+	mux.Handle("POST /api/vhost", vhostHandler)
+	mux.Handle("POST /api/vhost/", vhostHandler)
+	mux.Handle("PUT /api/vhost/", vhostHandler)
+	mux.Handle("DELETE /api/vhost/", vhostHandler)
 	mux.Handle("GET /api/terminal", public(terminal.Handler(deps.Sessions, deps.Startup, false)))
 	mux.Handle("GET /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("POST /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("DELETE /api/backup", public(apibackup.Handler(deps.Sessions, services.NewBackupService())))
 	mux.Handle("POST /api/backup/restore", public(apibackup.RestoreHandler(deps.Sessions, services.NewBackupService())))
 	if deps.Settings != nil {
+		mux.Handle("GET /api/apis", public(apiapis.Handler(deps.Sessions, deps.Settings)))
+		mux.Handle("POST /api/apis", public(apiapis.Handler(deps.Sessions, deps.Settings)))
+		mux.Handle("PATCH /api/apis", public(apiapis.Handler(deps.Sessions, deps.Settings)))
+		mux.Handle("DELETE /api/apis", public(apiapis.Handler(deps.Sessions, deps.Settings)))
+
 		if backupStorageSvc, err := services.NewBackupStorageService(deps.Settings.DB()); err == nil {
 			mux.Handle("GET /api/backup/storage", public(apibackup.StorageHandler(deps.Sessions, backupStorageSvc)))
 			mux.Handle("POST /api/backup/storage", public(apibackup.StorageHandler(deps.Sessions, backupStorageSvc)))

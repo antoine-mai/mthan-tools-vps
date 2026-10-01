@@ -8,6 +8,7 @@ import {
     Globe,
     Loader2,
     Pencil,
+    Plus,
     RefreshCw,
     Save,
     Search,
@@ -299,6 +300,7 @@ function VHostsContent({
     const [editing, setEditing] = useState<EditTarget | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
 
     const endpoint = runtime.isRoot
         ? ownerFilter
@@ -405,6 +407,11 @@ function VHostsContent({
                     <Button variant="outline" size="sm" className="gap-2" onClick={loadVHosts} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                         Refresh
+                    </Button>
+
+                    <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
+                        <Plus className="h-4 w-4" />
+                        Create VHost
                     </Button>
 
                     {ownerFilter && runtime.isRoot ? (
@@ -517,37 +524,35 @@ function VHostsContent({
                                         <td className="px-4 py-3 text-right">
                                             <span className="inline-flex items-center gap-1.5">
                                                 {runtime.isRoot ? (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-8 gap-1.5 px-2 text-xs"
-                                                            onClick={() =>
-                                                                setEditing({
-                                                                    title: vhost.hostname,
-                                                                    path: vhost.configFiles?.[0] || "/etc/caddy/Caddyfile",
-                                                                })
-                                                            }
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                            Edit
-                                                        </Button>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="outline"
-                                                            className="h-8 w-8 text-destructive hover:text-destructive"
-                                                            onClick={() => setDeleteTarget(vhost.hostname)}
-                                                            disabled={deleting === vhost.hostname}
-                                                            aria-label={`Delete ${vhost.hostname}`}
-                                                        >
-                                                            {deleting === vhost.hostname ? (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            ) : (
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            )}
-                                                        </Button>
-                                                    </>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 gap-1.5 px-2 text-xs"
+                                                        onClick={() =>
+                                                            setEditing({
+                                                                title: vhost.hostname,
+                                                                path: vhost.configFiles?.[0] || "/etc/caddy/Caddyfile",
+                                                            })
+                                                        }
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                        Edit
+                                                    </Button>
                                                 ) : null}
+                                                <Button
+                                                    size="icon"
+                                                    variant="outline"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={() => setDeleteTarget(vhost.hostname)}
+                                                    disabled={deleting === vhost.hostname}
+                                                    aria-label={`Delete ${vhost.hostname}`}
+                                                >
+                                                    {deleting === vhost.hostname ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    )}
+                                                </Button>
                                                 <a
                                                     href={`${vhost.tls ? "https" : "http"}://${vhost.hostname}`}
                                                     target="_blank"
@@ -608,6 +613,14 @@ function VHostsContent({
 
             {editing ? (
                 <CaddyEditor title={editing.title} path={editing.path} onClose={() => setEditing(null)} onSaved={loadVHosts} />
+            ) : null}
+
+            {createOpen ? (
+                <CreateVHostModal
+                    onClose={() => setCreateOpen(false)}
+                    onCreated={loadVHosts}
+                    defaultOwner={ownerFilter}
+                />
             ) : null}
         </div>
     );
@@ -701,6 +714,205 @@ function CaddyEditor({
                         Save & reload
                     </Button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Create Virtual Host Modal ───────────────────────────────────────────────
+
+function CreateVHostModal({
+    onClose,
+    onCreated,
+    defaultOwner,
+}: {
+    onClose: () => void;
+    onCreated: () => void;
+    defaultOwner?: string;
+}) {
+    const [hostname, setHostname] = useState("");
+    const [aliases, setAliases] = useState("");
+    const [port, setPort] = useState("");
+    const [tls, setTls] = useState(true);
+    const [owner, setOwner] = useState(defaultOwner || runtime.username || "root");
+    const [users, setUsers] = useState<LinuxUser[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (runtime.isRoot) {
+            fetch("/post/user/list", { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((data) => {
+                    const list: LinuxUser[] = (data?.users ?? []).filter((u: LinuxUser) => u.uid !== 0);
+                    setUsers(list);
+                    if (!defaultOwner && list.length > 0) {
+                        setOwner(list[0].username);
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [defaultOwner]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const cleanHost = hostname.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+        if (!cleanHost) {
+            setError("Hostname is required.");
+            return;
+        }
+
+        const cleanPort = port.trim();
+        if (!cleanPort) {
+            setError("Target port is required.");
+            return;
+        }
+
+        setLoading(true);
+        setError("");
+        try {
+            const aliasList = aliases
+                .split(/[\s,]+/)
+                .map((a) => a.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, ""))
+                .filter(Boolean);
+
+            const payload = {
+                hostname: cleanHost,
+                aliases: aliasList,
+                target: cleanPort,
+                tls,
+                owner: runtime.isRoot ? owner : (runtime.username || owner),
+            };
+
+            const ep = runtime.isRoot ? "/post/vhost/create" : "/api/vhost/create";
+            const response = await fetch(ep, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Failed to create virtual host.");
+            }
+            onCreated();
+            onClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to create virtual host.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg border border-border bg-card shadow-xl">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                    <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">Create Virtual Host</h3>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4 p-5">
+                    {error ? (
+                        <div className="rounded border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                            {error}
+                        </div>
+                    ) : null}
+
+                    {/* Owner (if Root) */}
+                    {runtime.isRoot && users.length > 0 && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-foreground">Owner</label>
+                            <select
+                                value={owner}
+                                onChange={(e) => setOwner(e.target.value)}
+                                className="h-9 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                            >
+                                <option value="root">root (system)</option>
+                                {users.map((u) => (
+                                    <option key={u.username} value={u.username}>
+                                        {u.username}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Hostname */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">
+                            Domain / Hostname <span className="text-destructive">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={hostname}
+                            onChange={(e) => setHostname(e.target.value)}
+                            placeholder="example.com"
+                            required
+                            className="h-9 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                        />
+                    </div>
+
+                    {/* Target Port */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">
+                            Target Port <span className="text-destructive">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={port}
+                            onChange={(e) => setPort(e.target.value)}
+                            placeholder="3000 or localhost:3000"
+                            required
+                            className="h-9 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                            Local port or address to reverse proxy (e.g. 3000, 8080, localhost:3000)
+                        </p>
+                    </div>
+
+                    {/* Aliases */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">Aliases (optional)</label>
+                        <input
+                            type="text"
+                            value={aliases}
+                            onChange={(e) => setAliases(e.target.value)}
+                            placeholder="www.example.com, api.example.com"
+                            className="h-9 w-full rounded border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary"
+                        />
+                        <p className="text-[11px] text-muted-foreground">Comma-separated domain aliases</p>
+                    </div>
+
+                    {/* TLS Checkbox */}
+                    <div className="flex items-center gap-2 pt-1">
+                        <input
+                            type="checkbox"
+                            id="vhost-tls"
+                            checked={tls}
+                            onChange={(e) => setTls(e.target.checked)}
+                            className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                        />
+                        <label htmlFor="vhost-tls" className="text-xs font-medium text-foreground cursor-pointer select-none">
+                            Automatic HTTPS / SSL with Caddy (Recommended)
+                        </label>
+                    </div>
+
+                    <div className="flex justify-end gap-2 border-t border-border pt-4">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={loading} className="gap-2">
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                            Create Virtual Host
+                        </Button>
+                    </div>
+                </form>
             </div>
         </div>
     );

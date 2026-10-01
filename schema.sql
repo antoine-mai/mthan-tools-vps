@@ -33,12 +33,15 @@ CREATE TABLE IF NOT EXISTS apis (
     name          TEXT NOT NULL,                        -- Friendly label / description
     key_hash      TEXT NOT NULL UNIQUE,                 -- SHA-256 hash of the generated API token
     key_prefix    TEXT NOT NULL,                        -- Visible prefix for identification (e.g. mvp_...)
+    owner         TEXT NOT NULL DEFAULT 'root',         -- Linux username of owner (e.g. 'root', 'alice')
     accepted_ips  TEXT NOT NULL DEFAULT '[]',           -- JSON array of allowed IP addresses / CIDRs
     enabled       INTEGER NOT NULL DEFAULT 1,           -- 1 = active, 0 = disabled
     last_used_at  DATETIME,                             -- Timestamp of most recent API request
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_apis_owner ON apis(owner);
 
 -- ---------------------------------------------------------------------
 -- Table: backup_storages

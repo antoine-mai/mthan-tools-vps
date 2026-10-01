@@ -29,12 +29,14 @@ export default function SettingsRoute() {
     const [homeBase, setHomeBase] = useState("/home");
 
     const currentRootRoute = settings.general_root_route || runtime.basePath || "/root";
-    const [rootRouteDraft, setRootRouteDraft] = useState(currentRootRoute);
+    const currentRootRouteSlug = currentRootRoute.replace(/^\/+/, "") || "root";
+    const [rootRouteDraft, setRootRouteDraft] = useState(currentRootRouteSlug);
     const [rootRouteError, setRootRouteError] = useState("");
     const [savingRootRoute, setSavingRootRoute] = useState(false);
 
     useEffect(() => {
-        setRootRouteDraft(settings.general_root_route || runtime.basePath || "/root");
+        const route = settings.general_root_route || runtime.basePath || "/root";
+        setRootRouteDraft(route.replace(/^\/+/, "") || "root");
     }, [settings.general_root_route]);
 
     const reservedRoutePrefixes = new Set([
@@ -44,24 +46,20 @@ export default function SettingsRoute() {
 
     const saveRootRoute = async () => {
         setRootRouteError("");
-        const cleaned = ("/" + rootRouteDraft.trim().replace(/^\/+/, "").replace(/\/+$/, "")).toLowerCase();
-        if (!cleaned || cleaned === "/") {
-            setRootRouteError("Root route cannot be empty or '/'. Default is '/root'.");
+        const slug = rootRouteDraft.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+        if (!slug) {
+            setRootRouteError("Root route cannot be empty. Default is 'root'.");
             return;
         }
-        const slug = cleaned.replace(/^\//, "");
-        if (slug.includes("/")) {
-            setRootRouteError("Nested paths are not supported. Use a single path segment like '/admin'.");
-            return;
-        }
-        if (!/^[a-z0-9_-]+$/.test(slug)) {
-            setRootRouteError("Only lowercase letters, numbers, hyphens, and underscores are allowed.");
+        if (slug.length < 2 || slug.length > 60) {
+            setRootRouteError("Route name must be between 2 and 60 characters.");
             return;
         }
         if (reservedRoutePrefixes.has(slug)) {
             setRootRouteError(`'/${slug}' is a reserved route path. Please choose another name.`);
             return;
         }
+        const cleaned = `/${slug}`;
         if (cleaned === currentRootRoute) {
             return;
         }
@@ -187,24 +185,27 @@ export default function SettingsRoute() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <div className="flex items-center gap-2">
-                                        <input
-                                            id="root-route"
-                                            value={rootRouteDraft}
-                                            onChange={(event) => {
-                                                setRootRouteError("");
-                                                setRootRouteDraft(event.target.value.toLowerCase().replace(/[^a-z0-9_/-]/g, ""));
-                                            }}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Enter") {
-                                                    event.preventDefault();
-                                                    void saveRootRoute();
-                                                }
-                                            }}
-                                            disabled={savingRootRoute}
-                                            placeholder="/root"
-                                            className="h-9 max-w-xs flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus:ring-1 focus:ring-ring"
-                                        />
-                                        {rootRouteDraft !== currentRootRoute && (
+                                        <div className="relative flex max-w-xs flex-1 items-center">
+                                            <span className="pointer-events-none absolute left-3 select-none font-mono text-sm text-muted-foreground">/</span>
+                                            <input
+                                                id="root-route"
+                                                value={rootRouteDraft}
+                                                onChange={(event) => {
+                                                    setRootRouteError("");
+                                                    setRootRouteDraft(event.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""));
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Enter") {
+                                                        event.preventDefault();
+                                                        void saveRootRoute();
+                                                    }
+                                                }}
+                                                disabled={savingRootRoute}
+                                                placeholder="root"
+                                                className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 font-mono text-sm outline-none focus:ring-1 focus:ring-ring"
+                                            />
+                                        </div>
+                                        {rootRouteDraft !== currentRootRouteSlug && (
                                             <Button
                                                 size="sm"
                                                 className="h-9 gap-1.5 text-xs font-medium"
@@ -220,7 +221,7 @@ export default function SettingsRoute() {
                                         <p className="text-xs text-destructive">{rootRouteError}</p>
                                     ) : (
                                         <p className="text-xs text-muted-foreground">
-                                            Current: <span className="font-mono font-semibold text-foreground">{currentRootRoute}</span>. Changing this relocates the root panel URL.
+                                            Current: <span className="font-mono font-semibold text-foreground">/{currentRootRouteSlug}</span>. Changing this relocates the root panel URL.
                                         </p>
                                     )}
                                 </div>

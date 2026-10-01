@@ -103,3 +103,47 @@ http://sub.domain.com:8443 {
 		t.Fatalf("extractCaddyHostnames() = %v, want %v", hosts, expected)
 	}
 }
+
+func TestGenerateCaddySiteBlock(t *testing.T) {
+	// 1. Port integer with TLS enabled
+	proxyBlock, err := GenerateCaddySiteBlock(CreateVHostInput{
+		Hostname: "my-app.com",
+		Aliases:  []string{"www.my-app.com"},
+		Port:     3000,
+		Owner:    "alice",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(proxyBlock, "my-app.com, www.my-app.com {") || !strings.Contains(proxyBlock, "reverse_proxy localhost:3000") {
+		t.Fatalf("unexpected proxy block: %s", proxyBlock)
+	}
+
+	// 2. Target string with HTTP only (TLS disabled)
+	tlsFalse := false
+	httpBlock, err := GenerateCaddySiteBlock(CreateVHostInput{
+		Hostname: "api.test",
+		Target:   "8080",
+		TLS:      &tlsFalse,
+		Owner:    "bob",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(httpBlock, "http://api.test {") || !strings.Contains(httpBlock, "reverse_proxy localhost:8080") {
+		t.Fatalf("unexpected http block: %s", httpBlock)
+	}
+
+	// 3. Target host:port
+	customTargetBlock, err := GenerateCaddySiteBlock(CreateVHostInput{
+		Hostname: "custom.test",
+		Target:   "127.0.0.1:9000",
+		Owner:    "charlie",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(customTargetBlock, "custom.test {") || !strings.Contains(customTargetBlock, "reverse_proxy 127.0.0.1:9000") {
+		t.Fatalf("unexpected custom target block: %s", customTargetBlock)
+	}
+}

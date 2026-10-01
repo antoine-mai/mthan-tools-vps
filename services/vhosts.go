@@ -112,20 +112,6 @@ func EnsureCaddyMThanUsers() error {
 				if _, statErr := os.Stat(userPath); os.IsNotExist(statErr) {
 					_ = os.WriteFile(userPath, []byte(fmt.Sprintf("# Virtual hosts for user: %s\n", u.Username)), 0644)
 				}
-				// Ensure user home is executable (0711) and htdocs is readable (0755) so Caddy/PHP-FPM can serve files
-				if u.Home != "" && u.Home != "/" {
-					if info, statErr := os.Stat(u.Home); statErr == nil && info.IsDir() {
-						if info.Mode().Perm()&0001 == 0 {
-							_ = os.Chmod(u.Home, 0711)
-						}
-					}
-					htdocs := filepath.Join(u.Home, "htdocs")
-					if info, statErr := os.Stat(htdocs); statErr == nil && info.IsDir() {
-						if info.Mode().Perm()&0005 != 0005 {
-							_ = os.Chmod(htdocs, 0755)
-						}
-					}
-				}
 			}
 		}
 	}
@@ -283,10 +269,195 @@ func (s *VHostService) Get(hostname string) (VHost, error) {
 	return VHost{}, ErrVHostNotFound
 }
 
-func (s *VHostService) Delete(hostname string) error {
+type CreateVHostInput struct {
+	Hostname string   `json:"hostname"`
+	Aliases  []string `json:"aliases"`
+	Port     int      `json:"port"`
+	Target   string   `json:"target"`
+	TLS      *bool    `json:"tls"`
+	Owner    string   `json:"owner"`
+}
+
+var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:[0-9]+)?$`)
+
+func CleanHostname(h string) string {
+	h = strings.TrimSpace(h)
+	h = strings.TrimPrefix(h, "http://")
+	h = strings.TrimPrefix(h, "https://")
+	h = strings.TrimSuffix(h, "/")
+	h = strings.TrimSuffix(h, ".")
+	return strings.ToLower(h)
+}
+
+func parseTargetPort(input CreateVHostInput) (string, error) {
+	if input.Port > 0 {
+		if input.Port > 65535 {
+			return "", errors.New("port must be between 1 and 65535")
+		}
+		return fmt.Sprintf("localhost:%d", input.Port), nil
+	}
+	target := strings.TrimSpace(input.Target)
+	if target == "" {
+		return "", errors.New("target port is required")
+	}
+	if p, err := strconv.Atoi(target); err == nil {
+		if p < 1 || p > 65535 {
+			return "", errors.New("port must be between 1 and 65535")
+		}
+		return fmt.Sprintf("localhost:%d", p), nil
+	}
+	if strings.HasPrefix(target, ":") {
+		return "localhost" + target, nil
+	}
+	if !strings.Contains(target, ":") {
+		return "localhost:" + target, nil
+	}
+	return target, nil
+}
+
+func GenerateCaddySiteBlock(input CreateVHostInput) (string, error) {
+	hostname := CleanHostname(input.Hostname)
+	if hostname == "" || !domainRegex.MatchString(hostname) {
+		return "", errors.New("invalid hostname format")
+	}
+
+	target, err := parseTargetPort(input)
+	if err != nil {
+		return "", err
+	}
+
+	var addresses []string
+	useHTTP := input.TLS != nil && !*input.TLS
+
+	if useHTTP {
+		addresses = append(addresses, "http://"+hostname)
+	} else {
+		addresses = append(addresses, hostname)
+	}
+
+	for _, alias := range input.Aliases {
+		clean := CleanHostname(alias)
+		if clean != "" && domainRegex.MatchString(clean) && clean != hostname {
+			if useHTTP {
+				addresses = append(addresses, "http://"+clean)
+			} else {
+				addresses = append(addresses, clean)
+			}
+		}
+	}
+
+	header := strings.Join(addresses, ", ")
+
+	var sb strings.Builder
+	sb.WriteString(header)
+	sb.WriteString(" {\n\treverse_proxy ")
+	sb.WriteString(target)
+	sb.WriteString("\n}\n")
+
+	return sb.String(), nil
+}
+
+func (s *VHostService) CreateVHost(input CreateVHostInput) error {
 	_ = EnsureCaddyMThanUsers()
-	hostname = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(hostname), "."))
-	path := "/etc/caddy/Caddyfile"
+	hostname := CleanHostname(input.Hostname)
+	if hostname == "" || !domainRegex.MatchString(hostname) {
+		return errors.New("invalid hostname format")
+	}
+
+	owner := strings.TrimSpace(input.Owner)
+	if owner == "" {
+		owner = "root"
+	}
+	input.Owner = owner
+
+	// Check if hostname or aliases conflict with existing vhosts
+	existingHosts := s.List()
+	for _, h := range existingHosts {
+		if strings.EqualFold(h.Hostname, hostname) || containsFold(h.Aliases, hostname) {
+			return fmt.Errorf("hostname %q is already configured (owner: %s)", hostname, h.Owner)
+		}
+		for _, alias := range input.Aliases {
+			cleanAlias := CleanHostname(alias)
+			if cleanAlias != "" && (strings.EqualFold(h.Hostname, cleanAlias) || containsFold(h.Aliases, cleanAlias)) {
+				return fmt.Errorf("alias %q is already configured (owner: %s)", cleanAlias, h.Owner)
+			}
+		}
+	}
+
+	block, err := GenerateCaddySiteBlock(input)
+	if err != nil {
+		return err
+	}
+
+	var targetPath string
+	if owner == "root" || owner == "system" {
+		targetPath = UserCaddyfilePath("root")
+		_ = CreateUserCaddyfile("root")
+	} else {
+		targetPath = UserCaddyfilePath(owner)
+		if err := CreateUserCaddyfile(owner); err != nil {
+			return fmt.Errorf("could not create user caddyfile: %w", err)
+		}
+	}
+
+	origContent, _ := os.ReadFile(targetPath)
+	newContent := strings.TrimRight(string(origContent), "\r\n") + "\n\n" + block
+
+	if err := os.WriteFile(targetPath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("could not write caddyfile: %w", err)
+	}
+
+	// Validate configuration if caddy binary is available
+	if _, err := exec.LookPath("caddy"); err == nil {
+		if output, vErr := s.runner.Run("caddy", "validate", "--config", CaddyfilePath); vErr != nil {
+			_ = os.WriteFile(targetPath, origContent, 0644)
+			errMsg := strings.TrimSpace(string(output))
+			if errMsg == "" {
+				errMsg = vErr.Error()
+			}
+			return fmt.Errorf("caddy validate failed: %s", errMsg)
+		}
+	}
+
+	if err := s.Reload(); err != nil {
+		_ = os.WriteFile(targetPath, origContent, 0644)
+		_ = s.Reload()
+		return fmt.Errorf("caddy reload failed: %w", err)
+	}
+
+	return nil
+}
+
+func (s *VHostService) Delete(hostname string, owner ...string) error {
+	_ = EnsureCaddyMThanUsers()
+	hostname = CleanHostname(hostname)
+	if hostname == "" {
+		return ErrVHostNotFound
+	}
+
+	if len(owner) > 0 && strings.TrimSpace(owner[0]) != "" && owner[0] != "root" && owner[0] != "system" {
+		username := strings.TrimSpace(owner[0])
+		userConfPath := UserCaddyfilePath(username)
+		fileContent, err := os.ReadFile(userConfPath)
+		if err != nil {
+			return ErrVHostNotFound
+		}
+		updated, found := removeCaddySiteBlock(string(fileContent), hostname)
+		if !found {
+			return ErrVHostNotFound
+		}
+		if err := os.WriteFile(userConfPath, []byte(updated), 0644); err != nil {
+			return err
+		}
+		if err := s.Reload(); err != nil {
+			_ = os.WriteFile(userConfPath, fileContent, 0644)
+			_ = s.Reload()
+			return ErrVHostUpdateFailed
+		}
+		return nil
+	}
+
+	path := CaddyfilePath
 	content, err := os.ReadFile(path)
 	if err == nil {
 		if updated, found := removeCaddySiteBlock(string(content), hostname); found {
@@ -294,9 +465,9 @@ func (s *VHostService) Delete(hostname string) error {
 			if _, writeErr := configs.Write("caddy", path, updated); writeErr != nil {
 				return writeErr
 			}
-			if _, reloadErr := s.runner.Run("caddy", "reload", "--config", path); reloadErr != nil {
+			if err := s.Reload(); err != nil {
 				_, _ = configs.Write("caddy", path, string(content))
-				_, _ = s.runner.Run("caddy", "reload", "--config", path)
+				_ = s.Reload()
 				return ErrVHostUpdateFailed
 			}
 			return nil
@@ -306,7 +477,7 @@ func (s *VHostService) Delete(hostname string) error {
 	entries, readErr := os.ReadDir(CaddyUsersDir)
 	if readErr == nil {
 		for _, entry := range entries {
-			if entry.IsDir() {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".caddy") {
 				continue
 			}
 			userConfPath := filepath.Join(CaddyUsersDir, entry.Name())
@@ -315,13 +486,10 @@ func (s *VHostService) Delete(hostname string) error {
 				continue
 			}
 			if updated, found := removeCaddySiteBlock(string(fileContent), hostname); found {
-				if strings.TrimSpace(updated) == "" {
-					_ = os.Remove(userConfPath)
-				} else {
-					_ = os.WriteFile(userConfPath, []byte(updated), 0644)
-				}
-				if _, reloadErr := s.runner.Run("caddy", "reload", "--config", path); reloadErr != nil {
+				_ = os.WriteFile(userConfPath, []byte(updated), 0644)
+				if err := s.Reload(); err != nil {
 					_ = os.WriteFile(userConfPath, fileContent, 0644)
+					_ = s.Reload()
 					return ErrVHostUpdateFailed
 				}
 				return nil

@@ -10,14 +10,15 @@ import (
 
 func Handler(sessions *services.SessionService, settings *services.SettingsService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := sessions.GetRootSession(r); !ok {
+		session, ok := sessions.GetUserSession(r)
+		if !ok {
 			http.Error(w, "session invalid", http.StatusUnauthorized)
 			return
 		}
 
 		switch r.Method {
 		case http.MethodGet:
-			keys, err := settings.APIKeys()
+			keys, err := settings.APIKeys(session.Username)
 			if err != nil {
 				http.Error(w, "API keys could not be loaded", http.StatusInternalServerError)
 				return
@@ -32,7 +33,7 @@ func Handler(sessions *services.SessionService, settings *services.SettingsServi
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
-			key, secret, err := settings.CreateAPIKey(input.Name, input.AcceptedIPs)
+			key, secret, err := settings.CreateAPIKey(input.Name, input.AcceptedIPs, session.Username)
 			if err != nil {
 				http.Error(w, "API key could not be created", http.StatusBadRequest)
 				return
@@ -52,11 +53,11 @@ func Handler(sessions *services.SessionService, settings *services.SettingsServi
 				http.Error(w, "no API key changes provided", http.StatusBadRequest)
 				return
 			}
-			if input.Enabled != nil && settings.SetAPIKeyEnabled(input.ID, *input.Enabled) != nil {
+			if input.Enabled != nil && settings.SetAPIKeyEnabled(input.ID, *input.Enabled, session.Username) != nil {
 				http.Error(w, "API key could not be updated", http.StatusNotFound)
 				return
 			}
-			if input.AcceptedIPs != nil && settings.SetAPIKeyAcceptedIPs(input.ID, *input.AcceptedIPs) != nil {
+			if input.AcceptedIPs != nil && settings.SetAPIKeyAcceptedIPs(input.ID, *input.AcceptedIPs, session.Username) != nil {
 				http.Error(w, "accepted IPs are invalid", http.StatusBadRequest)
 				return
 			}
@@ -67,7 +68,7 @@ func Handler(sessions *services.SessionService, settings *services.SettingsServi
 				http.Error(w, "API key ID is required", http.StatusBadRequest)
 				return
 			}
-			if err := settings.DeleteAPIKey(id); err != nil {
+			if err := settings.DeleteAPIKey(id, session.Username); err != nil {
 				http.Error(w, "API key could not be deleted", http.StatusNotFound)
 				return
 			}

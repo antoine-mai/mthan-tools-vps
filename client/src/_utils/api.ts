@@ -1,10 +1,11 @@
 import { runtime } from "../runtime";
 
-export type ApiRoute = "apps" | "containers" | "login" | "session" | "system" | "tasking" | "userLimits";
+export type ApiRoute = "apis" | "apps" | "containers" | "login" | "session" | "system" | "tasking" | "userLimits";
 
 export type ApiRouteMap = Record<ApiRoute, string>;
 
 const rootApi: ApiRouteMap & { settings: string } = {
+  apis: "/post/apis",
   apps: "/post/apps",
   containers: "/post/containers",
   login: "/post/login",
@@ -16,6 +17,7 @@ const rootApi: ApiRouteMap & { settings: string } = {
 };
 
 const userApi: ApiRouteMap = {
+  apis: "/api/apis",
   apps: "/api/apps",
   containers: "/api/containers",
   login: "/api/login",
